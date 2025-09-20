@@ -1135,7 +1135,7 @@ export const convertTeamToClub = (team: DatabaseTeam): Club => {
   return {
     id: team.id.toString(), // Convert integer to string for frontend
     name: team.name,
-    externalId: team.external_id,
+    externalId: team.external_id?.toString(),
     launchValue: launchPrice, // Hardcoded launch price from database
     currentValue: currentNAV, // Current price calculated from market_cap
     profitLoss: profitLoss,

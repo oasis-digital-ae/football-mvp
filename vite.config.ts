@@ -22,8 +22,7 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    rollupOptions: {
-      input: path.resolve(__dirname, "src/app/main.tsx"),
-    },
+    outDir: "dist",
+    assetsDir: "assets",
   },
 }));
