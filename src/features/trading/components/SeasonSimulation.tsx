@@ -196,6 +196,98 @@ const SeasonSimulation: React.FC = () => {
 
 
 
+    const resetAllProfilesAndInvestments = async () => {
+        if (!user) return;
+
+        // Show confirmation dialog
+        const confirmed = window.confirm(
+            '⚠️ WARNING: This will permanently delete ALL user profiles!\n\n' +
+            'This action will:\n' +
+            '• Delete all user profiles from the database\n' +
+            '• Delete all user positions and investments (cascaded)\n' +
+            '• Delete all user orders (cascaded)\n\n' +
+            'This action CANNOT be undone!\n\n' +
+            'Are you sure you want to continue?'
+        );
+
+        if (!confirmed) return;
+
+        setIsLoading(true);
+        setSimulationResults(''); // Clear previous results
+        
+        try {
+            console.log('Starting profile deletion with TRUNCATE...');
+            
+            // First, let's check what exists before deletion
+            const { data: profilesBefore, error: profilesBeforeError } = await supabase
+                .from('profiles')
+                .select('id, username')
+                .limit(100);
+            
+            const { data: positionsBefore, error: positionsBeforeError } = await supabase
+                .from('positions')
+                .select('id, user_id')
+                .limit(100);
+            
+            const { data: ordersBefore, error: ordersBeforeError } = await supabase
+                .from('orders')
+                .select('id, user_id')
+                .limit(100);
+
+            console.log('Before deletion:', {
+                profiles: profilesBefore?.length || 0,
+                positions: positionsBefore?.length || 0,
+                orders: ordersBefore?.length || 0
+            });
+
+            // Use TRUNCATE to delete all profiles (cascades to positions and orders)
+            const { error: truncateError } = await supabase
+                .rpc('truncate_profiles_table');
+
+            console.log('TRUNCATE result:', { truncateError });
+
+            // Verify deletion by checking what's left
+            const { data: profilesAfter, error: profilesAfterError } = await supabase
+                .from('profiles')
+                .select('id')
+                .limit(10);
+            
+            const { data: positionsAfter, error: positionsAfterError } = await supabase
+                .from('positions')
+                .select('id')
+                .limit(10);
+            
+            const { data: ordersAfter, error: ordersAfterError } = await supabase
+                .from('orders')
+                .select('id')
+                .limit(10);
+
+            console.log('After deletion:', {
+                profiles: profilesAfter?.length || 0,
+                positions: positionsAfter?.length || 0,
+                orders: ordersAfter?.length || 0
+            });
+
+            // Check for errors and provide feedback
+            if (truncateError) {
+                console.error('Error truncating profiles table:', truncateError);
+                setSimulationResults(`❌ Error deleting profiles: ${truncateError.message}`);
+            } else {
+                const profilesDeleted = (profilesBefore?.length || 0) - (profilesAfter?.length || 0);
+                const positionsDeleted = (positionsBefore?.length || 0) - (positionsAfter?.length || 0);
+                const ordersDeleted = (ordersBefore?.length || 0) - (ordersAfter?.length || 0);
+                
+                setSimulationResults(`✅ Successfully deleted all profiles and investments!\n🗑️ Profiles deleted: ${profilesDeleted}\n📊 Positions deleted: ${positionsDeleted}\n📋 Orders deleted: ${ordersDeleted}\n\nBefore: P:${profilesBefore?.length || 0}, Pos:${positionsBefore?.length || 0}, O:${ordersBefore?.length || 0}\nAfter: P:${profilesAfter?.length || 0}, Pos:${positionsAfter?.length || 0}, O:${ordersAfter?.length || 0}`);
+            }
+            
+        } catch (error) {
+            console.error('Unexpected error during reset:', error);
+            setSimulationResults(`❌ Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
     const resetMarketCapsOnly = async () => {
         if (!user) return;
 
@@ -379,10 +471,18 @@ const SeasonSimulation: React.FC = () => {
                         >
                             {isLoading ? 'Resetting...' : 'Reset Market Caps Only'}
                         </Button>
+                        <Button
+                            onClick={resetAllProfilesAndInvestments}
+                            disabled={isLoading}
+                            variant="destructive"
+                            className="bg-red-600 hover:bg-red-700"
+                        >
+                            {isLoading ? 'Resetting...' : 'Reset All Profiles & Investments'}
+                        </Button>
                     </div>
 
                     <div className="text-sm text-gray-400">
-                        <p>This will reset:</p>
+                        <p><strong>Reset Market Caps Only:</strong></p>
                         <ul className="list-disc list-inside ml-4 space-y-1">
                             <li>All team market caps to $100</li>
                             <li>All shares outstanding to 5</li>
@@ -390,7 +490,15 @@ const SeasonSimulation: React.FC = () => {
                             <li>Clear all match scores and snapshots</li>
                         </ul>
                         <p className="mt-2 text-yellow-400">⚠️ User investments will be preserved</p>
-                        </div>
+                        
+                        <p className="mt-4"><strong>Reset All Profiles & Investments:</strong></p>
+                        <ul className="list-disc list-inside ml-4 space-y-1">
+                            <li>Delete ALL user profiles from database</li>
+                            <li>Delete ALL user positions</li>
+                            <li>Delete ALL user orders</li>
+                        </ul>
+                        <p className="mt-2 text-red-400">⚠️ This action CANNOT be undone!</p>
+                    </div>
                 </CardContent>
             </Card>
 

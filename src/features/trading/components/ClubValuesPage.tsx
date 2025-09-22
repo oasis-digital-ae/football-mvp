@@ -4,10 +4,10 @@ import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
 import { formatCurrency, formatPercent } from '@/shared/lib/formatters';
-import { MatchHistoryModal } from './MatchHistoryModal';
 import { PurchaseConfirmationModal } from './PurchaseConfirmationModal';
 import ClickableTeamName from '@/shared/components/ClickableTeamName';
 import TeamLogo from '@/shared/components/TeamLogo';
+import TeamDetailsModal from './TeamDetailsModal';
 import { fixturesService } from '@/shared/lib/database';
 import type { DatabaseFixture } from '@/shared/lib/database';
 import { FixtureSync } from './FixtureSync';
@@ -222,11 +222,12 @@ export const ClubValuesPage: React.FC = () => {
         <FixtureSync />
       </div>
       
-      <MatchHistoryModal
+      <TeamDetailsModal
         isOpen={selectedClub !== null}
         onClose={() => setSelectedClub(null)}
-        clubId={selectedClub || ''}
-        clubName={clubs.find(c => c.id === selectedClub)?.name || ''}
+        teamId={parseInt(selectedClub || '0')}
+        teamName={clubs.find(c => c.id === selectedClub)?.name || ''}
+        userId={user?.id}
       />
       
       <PurchaseConfirmationModal
