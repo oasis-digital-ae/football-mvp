@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { teamsService, fixturesService, positionsService } from '@/shared/lib/database';
 import { matchProcessingService } from '@/shared/lib/match-processing';
+import { teamStateSnapshotService } from '@/shared/lib/team-state-snapshots';
 import { useAuth } from '@/features/auth/contexts/AuthContext';
 import { supabase } from '@/shared/lib/supabase';
 
@@ -246,6 +247,14 @@ const SeasonSimulation: React.FC = () => {
 
             console.log('TRUNCATE result:', { truncateError });
 
+            // Clear all team state snapshots (except initial ones)
+            const { error: snapshotsError } = await supabase
+                .from('team_state_snapshots')
+                .delete()
+                .neq('snapshot_type', 'initial');
+
+            console.log('Snapshots deletion result:', { snapshotsError });
+
             // Verify deletion by checking what's left
             const { data: profilesAfter, error: profilesAfterError } = await supabase
                 .from('profiles')
@@ -277,12 +286,39 @@ const SeasonSimulation: React.FC = () => {
                 const positionsDeleted = (positionsBefore?.length || 0) - (positionsAfter?.length || 0);
                 const ordersDeleted = (ordersBefore?.length || 0) - (ordersAfter?.length || 0);
                 
-                setSimulationResults(`✅ Successfully deleted all profiles and investments!\n🗑️ Profiles deleted: ${profilesDeleted}\n📊 Positions deleted: ${positionsDeleted}\n📋 Orders deleted: ${ordersDeleted}\n\nBefore: P:${profilesBefore?.length || 0}, Pos:${positionsBefore?.length || 0}, O:${ordersBefore?.length || 0}\nAfter: P:${profilesAfter?.length || 0}, Pos:${positionsAfter?.length || 0}, O:${ordersAfter?.length || 0}`);
+                const snapshotStatus = snapshotsError ? `⚠️ Snapshot cleanup failed: ${snapshotsError.message}` : '📈 All snapshots cleared!';
+                
+                setSimulationResults(`✅ Successfully deleted all profiles and investments!\n🗑️ Profiles deleted: ${profilesDeleted}\n📊 Positions deleted: ${positionsDeleted}\n📋 Orders deleted: ${ordersDeleted}\n${snapshotStatus}\n\nBefore: P:${profilesBefore?.length || 0}, Pos:${positionsBefore?.length || 0}, O:${ordersBefore?.length || 0}\nAfter: P:${profilesAfter?.length || 0}, Pos:${positionsAfter?.length || 0}, O:${ordersAfter?.length || 0}`);
             }
             
         } catch (error) {
             console.error('Unexpected error during reset:', error);
             setSimulationResults(`❌ Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    const resetMarketplaceComplete = async () => {
+        if (!user) return;
+
+        setIsLoading(true);
+        try {
+            // Call the complete reset function
+            const { data, error } = await supabase.rpc('reset_marketplace_complete');
+            
+            if (error) {
+                throw error;
+            }
+            
+            setSimulationResults(`✅ ${data}`);
+            
+            // Refresh available games to show updated data
+            await loadAvailableGames();
+            
+        } catch (error) {
+            console.error('Error resetting marketplace:', error);
+            setSimulationResults(`❌ Marketplace reset failed: ${error instanceof Error ? error.message : String(error)}`);
         } finally {
             setIsLoading(false);
         }
@@ -332,17 +368,53 @@ const SeasonSimulation: React.FC = () => {
                 })
                 .neq('id', 0); // Update all fixtures
             
+            // TRUNCATE the entire team_state_snapshots table for a fresh start
+            const { error: snapshotsError } = await supabase
+                .from('team_state_snapshots')
+                .delete()
+                .neq('id', 0); // Delete all snapshots (truncate equivalent)
             
-            if (fixturesError || sharesUpdateErrors > 0) {
-                setSimulationResults(`💰 Market caps reset to $100! 📊 Shares reset: ${sharesUpdateSuccess}/${teams.length} successful! ⚠️ ${sharesUpdateErrors} teams failed to update shares.\n`);
+            // Create fresh initial snapshots for all teams using direct SQL
+            // This bypasses the function and creates snapshots directly
+            let initialSnapshotsCreated = 0;
+            for (const team of teams) {
+                try {
+                    const { error } = await supabase
+                        .from('team_state_snapshots')
+                        .insert({
+                            team_id: team.id,
+                            snapshot_type: 'initial',
+                            trigger_event_type: 'manual',
+                            market_cap: team.market_cap,
+                            shares_outstanding: team.shares_outstanding,
+                            current_share_price: team.shares_outstanding > 0 ? team.market_cap / team.shares_outstanding : 20.00,
+                            price_impact: 0,
+                            shares_traded: 0,
+                            trade_amount: 0,
+                            effective_at: new Date().toISOString()
+                        });
+                    
+                    if (!error) {
+                        initialSnapshotsCreated++;
+                    } else {
+                        console.error(`Failed to create initial snapshot for team ${team.id}:`, error);
+                    }
+                } catch (error) {
+                    console.error(`Failed to create initial snapshot for team ${team.id}:`, error);
+                }
+            }
+            
+            if (fixturesError || sharesUpdateErrors > 0 || snapshotsError) {
+                setSimulationResults(`💰 Market caps reset to $100! 📊 Shares reset: ${sharesUpdateSuccess}/${teams.length} successful! ⚠️ ${sharesUpdateErrors} teams failed to update shares. 📈 Snapshots: ${initialSnapshotsCreated}/${teams.length} created.\n`);
             } else {
-                setSimulationResults('💰 Market caps reset to $100! 📊 Shares outstanding reset to 5! ⚽ All games reset to scheduled status.\n');
+                setSimulationResults('💰 Market caps reset to $100! 📊 Shares outstanding reset to 5! ⚽ All games reset to scheduled status. 📈 All snapshots TRUNCATED and fresh initial snapshots created!\n');
             }
             
             // Refresh available games to show updated data
             await loadAvailableGames();
         } catch (error) {
-            setSimulationResults(`❌ Market cap reset failed: ${error}`);
+            console.error('Market cap reset error:', error);
+            setSimulationResults(`❌ Market cap reset failed: ${error instanceof Error ? error.message : String(error)}`);
         } finally {
             setIsLoading(false);
         }
@@ -464,6 +536,14 @@ const SeasonSimulation: React.FC = () => {
                 <CardContent className="space-y-4">
                     <div className="flex gap-4 flex-wrap">
                         <Button
+                            onClick={resetMarketplaceComplete}
+                            disabled={isLoading}
+                            variant="default"
+                            className="bg-green-600 hover:bg-green-700"
+                        >
+                            {isLoading ? 'Resetting...' : '🔄 Complete Marketplace Reset'}
+                        </Button>
+                        <Button
                             onClick={resetMarketCapsOnly}
                             disabled={isLoading}
                             variant="secondary"
@@ -482,12 +562,26 @@ const SeasonSimulation: React.FC = () => {
                     </div>
 
                     <div className="text-sm text-gray-400">
-                        <p><strong>Reset Market Caps Only:</strong></p>
+                        <p><strong>🔄 Complete Marketplace Reset:</strong></p>
+                        <ul className="list-disc list-inside ml-4 space-y-1">
+                            <li>All team market caps to $100</li>
+                            <li>All shares outstanding to 5</li>
+                            <li>All fixtures reset to pending</li>
+                            <li>Clear ALL ledger data (total_ledger)</li>
+                            <li>Clear ALL transfer data (transfers_ledger)</li>
+                            <li>Clear ALL orders and positions</li>
+                            <li>Create fresh initial ledger entries</li>
+                        </ul>
+                        <p className="mt-2 text-red-400">⚠️ This will delete ALL user data and investments</p>
+                        
+                        <p className="mt-4"><strong>Reset Market Caps Only:</strong></p>
                         <ul className="list-disc list-inside ml-4 space-y-1">
                             <li>All team market caps to $100</li>
                             <li>All shares outstanding to 5</li>
                             <li>All games to scheduled status</li>
                             <li>Clear all match scores and snapshots</li>
+                            <li>Clear all team state snapshots (except initial)</li>
+                            <li>Recreate fresh initial snapshots</li>
                         </ul>
                         <p className="mt-2 text-yellow-400">⚠️ User investments will be preserved</p>
                         
@@ -496,6 +590,7 @@ const SeasonSimulation: React.FC = () => {
                             <li>Delete ALL user profiles from database</li>
                             <li>Delete ALL user positions</li>
                             <li>Delete ALL user orders</li>
+                            <li>Clear all team state snapshots (except initial)</li>
                         </ul>
                         <p className="mt-2 text-red-400">⚠️ This action CANNOT be undone!</p>
                     </div>

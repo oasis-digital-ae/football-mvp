@@ -1,5 +1,6 @@
 import { fixturesService, teamsService } from './database';
 import { footballApiService } from './football-api';
+import { supabase } from './supabase';
 
 // Match processing service for handling real fixture data
 export const matchProcessingService = {
@@ -50,10 +51,11 @@ export const matchProcessingService = {
       
       for (const fixture of fixturesNeedingProcessing) {
         try {
-          // Process the match result and transfer market cap
-          await teamsService.processMatchResult(fixture.id);
+          // Market cap updates are now handled by the fixture trigger
+          // Just ensure the fixture is marked as applied
+          await fixturesService.markFixtureAsApplied(fixture.id);
           
-          console.log(`✅ Processed match result for ${fixture.home_team?.name} vs ${fixture.away_team?.name}`);
+          console.log(`✅ Processed match result for ${fixture.home_team?.name} vs ${fixture.away_team?.name} (trigger will handle market cap updates)`);
         } catch (error) {
           console.error(`❌ Error processing match result for fixture ${fixture.id}:`, error);
         }
@@ -147,16 +149,13 @@ export const matchProcessingService = {
     try {
       console.log(`Simulating match result for fixture ${fixtureId}: ${result}`);
       
-      // Update fixture result
+      // Update fixture result - the trigger will handle market cap updates
       await fixturesService.updateResult(fixtureId, result);
       
       // Mark as applied
       await fixturesService.markFixtureAsApplied(fixtureId);
       
-      // Process the result
-      await teamsService.processMatchResult(fixtureId);
-      
-      console.log(`✅ Simulated match result completed for fixture ${fixtureId}`);
+      console.log(`✅ Simulated match result completed for fixture ${fixtureId} (trigger will handle market cap updates)`);
     } catch (error) {
       console.error(`❌ Error simulating match result for fixture ${fixtureId}:`, error);
       throw error;
@@ -176,50 +175,11 @@ export const matchProcessingService = {
         throw new Error(`Fixture not found: ${fixtureId}`);
       }
 
-      // Get current team market caps
-      const homeTeam = await teamsService.getById(fixture.home_team_id);
-      const awayTeam = await teamsService.getById(fixture.away_team_id);
-      
-      if (!homeTeam || !awayTeam) {
-        throw new Error('Could not find teams for fixture');
-      }
+      // Update fixture result and status - the trigger will handle market cap updates
+      await fixturesService.updateResult(fixtureId, result);
+      await fixturesService.markFixtureAsApplied(fixtureId);
 
-      // Calculate transfer amount (5% of losing team's market cap)
-      const transferPercentage = 0.05;
-      let transferAmount = 0;
-      let winnerTeamId = '';
-      let loserTeamId = '';
-
-      if (result === 'home_win') {
-        winnerTeamId = fixture.home_team_id;
-        loserTeamId = fixture.away_team_id;
-        transferAmount = awayTeam.market_cap * transferPercentage;
-      } else if (result === 'away_win') {
-        winnerTeamId = fixture.away_team_id;
-        loserTeamId = fixture.home_team_id;
-        transferAmount = homeTeam.market_cap * transferPercentage;
-      } else if (result === 'draw') {
-        // For draws, no transfer occurs
-        console.log(`Draw result for fixture ${fixtureId} - no market cap transfer`);
-        await fixturesService.updateResult(fixtureId, result);
-        await fixturesService.markFixtureAsApplied(fixtureId);
-        return;
-      }
-
-      if (transferAmount > 0) {
-        // Update team market caps directly
-        const newWinnerCap = result === 'home_win' ? homeTeam.market_cap + transferAmount : awayTeam.market_cap + transferAmount;
-        const newLoserCap = result === 'home_win' ? awayTeam.market_cap - transferAmount : homeTeam.market_cap - transferAmount;
-
-        await teamsService.updateMarketCap(winnerTeamId, newWinnerCap);
-        await teamsService.updateMarketCap(loserTeamId, newLoserCap);
-
-        // Update fixture result and status
-        await fixturesService.updateResult(fixtureId, result);
-        await fixturesService.markFixtureAsApplied(fixtureId);
-
-        console.log(`✅ Direct simulation completed for fixture ${fixtureId}: ${transferAmount} transferred`);
-      }
+      console.log(`✅ Direct simulation completed for fixture ${fixtureId} (trigger will handle market cap updates)`);
     } catch (error) {
       console.error(`❌ Error in direct match simulation for fixture ${fixtureId}:`, error);
       throw error;

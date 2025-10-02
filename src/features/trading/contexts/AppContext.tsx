@@ -9,7 +9,8 @@ import { useAuth } from '@/features/auth/contexts/AuthContext';
 import { logger } from '@/shared/lib/logger';
 import type { DatabasePositionWithTeam, DatabaseOrderWithTeam } from '@/shared/types/database.types';
 import { withErrorHandling, DatabaseError, ValidationError, BusinessLogicError, ExternalApiError, AuthenticationError } from '@/shared/lib/error-handling';
-import { ErrorBoundary } from '@/shared/lib/error-boundary';
+import ErrorBoundary from '@/shared/components/ErrorBoundary';
+import { teamStateSnapshotService } from '@/shared/lib/team-state-snapshots';
 
 interface AppContextType {
   sidebarOpen: boolean;
@@ -111,11 +112,12 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
       const dbPositions = await positionsService.getUserPositions(user.id);
       logger.db('Loaded user positions', { count: dbPositions.length });
 
-      // Convert positions to portfolio items
+      // Convert positions to portfolio items - OPTIMIZED with Map lookup
+      const clubMap = new Map(convertedClubs.map(club => [club.id, club]));
       const portfolio = dbPositions.map((position: DatabasePositionWithTeam) => {
         const teamId = position.team_id.toString();
         const teamName = position.team?.name || 'Unknown';
-        const team = convertedClubs.find(t => t.id === teamId);
+        const team = clubMap.get(teamId); // O(1) lookup instead of O(n) find
         
         // Calculate average cost from total_invested and quantity
         const avgCost = position.quantity > 0 ? position.total_invested / position.quantity : 0;
@@ -317,8 +319,33 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
         throw new DatabaseError('Failed to update team market cap');
       }
 
+      // Create snapshot for share purchase
+      try {
+        const snapshotId = await teamStateSnapshotService.createSharePurchaseSnapshot({
+          teamId: teamIdInt,
+          orderId: order.id,
+          sharesTraded: units,
+          tradeAmount: totalCost
+        });
+        logger.debug(`Created snapshot for share purchase: ${units} shares, $${totalCost}, snapshot ID: ${snapshotId}`);
+        console.log('✅ Share purchase snapshot created:', {
+          teamId: teamIdInt,
+          orderId: order.id,
+          sharesTraded: units,
+          tradeAmount: totalCost,
+          snapshotId
+        });
+      } catch (snapshotError) {
+        logger.warn('Failed to create share purchase snapshot:', snapshotError);
+        console.error('❌ Failed to create share purchase snapshot:', snapshotError);
+        // Don't fail the entire operation if snapshot creation fails
+      }
+
       // Add position using transaction history approach
       await positionsService.addPosition(profileId, teamIdInt, units, nav);
+
+      // Cash injection is automatically tracked via the orders table
+      logger.debug(`Purchase completed: ${units} shares of ${team.name} for ${totalCost}, market cap: ${team.market_cap} -> ${newMarketCap}`);
 
       // Wait a moment for database to sync, then refresh data
       await new Promise(resolve => setTimeout(resolve, 100));

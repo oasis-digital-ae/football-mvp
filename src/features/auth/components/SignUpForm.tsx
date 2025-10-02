@@ -6,8 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/sha
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { useAuth } from '@/features/auth/contexts/AuthContext';
 import { toast } from '@/shared/components/ui/use-toast';
-import { AppValidators, validateForm } from '@/shared/lib/validation';
+import { AppValidators, validateForm, validateAndSanitize } from '@/shared/lib/validation';
 import { ValidationError } from '@/shared/lib/error-handling';
+import { sanitizeInput } from '@/shared/lib/sanitization';
 
 interface SignUpFormProps {
   onSwitchToLogin: () => void;
@@ -37,8 +38,16 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSwitchToLogin }) => {
     e.preventDefault();
     
     try {
-      // Validate form data
-      const validation = validateForm(AppValidators.userRegistration, formData);
+      // Validate and sanitize form data
+      const validation = validateAndSanitize(AppValidators.userRegistration, formData, {
+        email: 'email',
+        password: 'text',
+        confirmPassword: 'text',
+        fullName: 'text',
+        birthday: 'text',
+        country: 'text',
+        phone: 'text'
+      });
       
       if (!validation.isValid) {
         setValidationErrors(validation.errors);
@@ -54,11 +63,11 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSwitchToLogin }) => {
       setLoading(true);
       setValidationErrors({});
       
-      await signUp(formData.email, formData.password, {
-        full_name: formData.fullName,
-        birthday: formData.birthday,
-        country: formData.country,
-        phone: formData.phone
+      await signUp(validation.data.email, validation.data.password, {
+        full_name: validation.data.fullName,
+        birthday: validation.data.birthday,
+        country: validation.data.country,
+        phone: validation.data.phone
       });
       
       toast({
@@ -94,7 +103,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSwitchToLogin }) => {
               id="fullName"
               type="text"
               value={formData.fullName}
-              onChange={(e) => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
+              onChange={(e) => setFormData(prev => ({ ...prev, fullName: sanitizeInput(e.target.value, 'text') }))}
               required
             />
           </div>
@@ -105,7 +114,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSwitchToLogin }) => {
               id="email"
               type="email"
               value={formData.email}
-              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+              onChange={(e) => setFormData(prev => ({ ...prev, email: sanitizeInput(e.target.value, 'email') }))}
               required
             />
           </div>
@@ -141,7 +150,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSwitchToLogin }) => {
               id="phone"
               type="tel"
               value={formData.phone}
-              onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+              onChange={(e) => setFormData(prev => ({ ...prev, phone: sanitizeInput(e.target.value, 'text') }))}
               required
             />
           </div>
@@ -152,7 +161,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSwitchToLogin }) => {
               id="password"
               type="password"
               value={formData.password}
-              onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+              onChange={(e) => setFormData(prev => ({ ...prev, password: sanitizeInput(e.target.value, 'text') }))}
               required
             />
           </div>
@@ -163,7 +172,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSwitchToLogin }) => {
               id="confirmPassword"
               type="password"
               value={formData.confirmPassword}
-              onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+              onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: sanitizeInput(e.target.value, 'text') }))}
               required
             />
           </div>

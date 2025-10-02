@@ -165,5 +165,4 @@ export interface ErrorBoundaryProps {
   fallback?: React.ComponentType<{ error: AppError }>;
 }
 
-// Placeholder for ErrorBoundary - will be implemented separately
-export const ErrorBoundary = null as any;
+// ErrorBoundary is implemented in src/shared/components/ErrorBoundary.tsx

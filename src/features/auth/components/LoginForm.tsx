@@ -5,6 +5,8 @@ import { Label } from '@/shared/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { useAuth } from '@/features/auth/contexts/AuthContext';
 import { toast } from '@/shared/components/ui/use-toast';
+import { AppValidators, validateAndSanitize } from '@/shared/lib/validation';
+import { sanitizeInput } from '@/shared/lib/sanitization';
 
 interface LoginFormProps {
   onSwitchToSignUp: () => void;
@@ -23,7 +25,22 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignUp }) => {
     setLoading(true);
     
     try {
-      await signIn(formData.email, formData.password);
+      // Validate and sanitize form data
+      const validation = validateAndSanitize(AppValidators.login, formData, {
+        email: 'email',
+        password: 'text'
+      });
+      
+      if (!validation.isValid) {
+        toast({
+          title: "Validation Error",
+          description: Object.values(validation.errors).join(', '),
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      await signIn(validation.data.email, validation.data.password);
       toast({
         title: "Success",
         description: "Signed in successfully!",
@@ -53,7 +70,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignUp }) => {
               id="email"
               type="email"
               value={formData.email}
-              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+              onChange={(e) => setFormData(prev => ({ ...prev, email: sanitizeInput(e.target.value, 'email') }))}
               required
             />
           </div>
@@ -64,7 +81,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignUp }) => {
               id="password"
               type="password"
               value={formData.password}
-              onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+              onChange={(e) => setFormData(prev => ({ ...prev, password: sanitizeInput(e.target.value, 'text') }))}
               required
             />
           </div>

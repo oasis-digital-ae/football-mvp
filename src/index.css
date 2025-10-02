@@ -17,6 +17,38 @@
     -webkit-backdrop-filter: blur(12px);
   }
 
+  /* Slide-down panel animations */
+  .slide-down-panel {
+    display: grid;
+    grid-template-rows: 0fr;
+    overflow: clip;
+    transition: grid-template-rows 280ms cubic-bezier(0.25, 0.8, 0.25, 1);
+  }
+  
+  .slide-down-panel[data-open="true"] {
+    grid-template-rows: 1fr;
+  }
+  
+  .slide-down-panel-inner {
+    min-height: 0;
+  }
+  
+  .slide-down-panel-content {
+    opacity: 0;
+    transition: opacity 280ms cubic-bezier(0.25, 0.8, 0.25, 1);
+  }
+  
+  .slide-down-panel[data-open="true"] .slide-down-panel-content {
+    opacity: 1;
+  }
+  
+  @media (prefers-reduced-motion: reduce) {
+    .slide-down-panel,
+    .slide-down-panel-content {
+      transition: none !important;
+    }
+  }
+
   :root {
     --background: 210 40% 98%;
     --foreground: 222.2 84% 4.9%;

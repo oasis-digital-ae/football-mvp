@@ -1,6 +1,7 @@
 // Comprehensive input validation system
 import React from 'react';
 import { ValidationError } from './error-handling';
+import { sanitizeInput, sanitizeFormData, validateEmail } from './sanitization';
 
 // Validation rules
 export interface ValidationRule<T> {
@@ -108,6 +109,15 @@ export const ValidationRules = {
 
 // Specific validators for the application
 export const AppValidators = {
+  // User login validation
+  login: new Validator<{
+    email: string;
+    password: string;
+  }>()
+    .addRule('email', ValidationRules.required('Email is required'))
+    .addRule('email', ValidationRules.email())
+    .addRule('password', ValidationRules.required('Password is required')),
+
   // User registration validation
   userRegistration: new Validator<{
     email: string;
@@ -206,6 +216,35 @@ export function validateAndThrow<T>(validator: Validator<T>, data: T): void {
       .join(', ');
     throw new ValidationError(errorMessage);
   }
+}
+
+// Enhanced validation with sanitization
+export function validateAndSanitize<T>(validator: Validator<T>, data: T, sanitizationSchema?: Record<keyof T, 'html' | 'text' | 'email' | 'number' | 'url' | 'team' | 'database'>): { isValid: boolean; data: T; errors: Record<string, string> } {
+  // First sanitize the data if schema is provided
+  let sanitizedData = sanitizationSchema ? sanitizeFormData(data, sanitizationSchema) : data;
+  
+  // For email fields, use proper validation instead of just sanitization
+  if (sanitizationSchema) {
+    const enhancedData = { ...sanitizedData };
+    for (const [key, type] of Object.entries(sanitizationSchema)) {
+      if (type === 'email' && typeof enhancedData[key as keyof T] === 'string') {
+        const validatedEmail = validateEmail(enhancedData[key as keyof T] as string);
+        if (validatedEmail) {
+          enhancedData[key as keyof T] = validatedEmail as T[keyof T];
+        }
+      }
+    }
+    sanitizedData = enhancedData;
+  }
+  
+  // Then validate the sanitized data
+  const result = validator.validate(sanitizedData);
+  
+  return {
+    isValid: result.isValid,
+    data: sanitizedData,
+    errors: result.errors
+  };
 }
 
 export function validateForm<T>(validator: Validator<T>, data: T): ValidationResult {

@@ -5,8 +5,9 @@ import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { formatCurrency } from '@/shared/lib/formatters';
 import TeamLogo from '@/shared/components/TeamLogo';
-import { AppValidators, validateForm } from '@/shared/lib/validation';
+import { AppValidators, validateForm, validateAndSanitize } from '@/shared/lib/validation';
 import { ValidationError } from '@/shared/lib/error-handling';
+import { sanitizeInput } from '@/shared/lib/sanitization';
 
 interface PurchaseConfirmationModalProps {
   isOpen: boolean;
@@ -41,13 +42,18 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
   }, [isOpen]);
 
   const handleSharesChange = (value: string) => {
-    const numShares = parseInt(value) || 0;
+    // Sanitize and validate input
+    const sanitizedValue = sanitizeInput(value, 'number');
+    const numShares = parseInt(sanitizedValue) || 0;
     setShares(numShares);
     
-    // Validate the input using simplified modal validation
-    const validation = validateForm(AppValidators.sharePurchaseModal, {
+    // Validate the input using enhanced validation with sanitization
+    const validation = validateAndSanitize(AppValidators.sharePurchaseModal, {
       units: numShares,
       pricePerShare: pricePerShare
+    }, {
+      units: 'number',
+      pricePerShare: 'number'
     });
     
     setValidationErrors(validation.errors);
@@ -55,10 +61,13 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
 
   const handleConfirm = () => {
     try {
-      // Final validation before confirming using simplified modal validation
-      const validation = validateForm(AppValidators.sharePurchaseModal, {
+      // Final validation before confirming using enhanced validation with sanitization
+      const validation = validateAndSanitize(AppValidators.sharePurchaseModal, {
         units: shares,
         pricePerShare: pricePerShare
+      }, {
+        units: 'number',
+        pricePerShare: 'number'
       });
       
       if (!validation.isValid) {
@@ -66,7 +75,8 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
         return;
       }
       
-      onConfirm(shares);
+      // Use sanitized data
+      onConfirm(validation.data.units);
     } catch (error) {
       if (error instanceof ValidationError) {
         setValidationErrors({ general: error.message });

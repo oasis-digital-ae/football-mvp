@@ -154,7 +154,7 @@ export const seasonSimulationService = {
     console.log('\n🎉 2024-25 Premier League Season Simulation Completed!');
   },
 
-  // Get team performance summary
+  // Get team performance summary - OPTIMIZED to O(n) instead of O(n²)
   async getTeamPerformanceSummary(): Promise<{
     teamId: string;
     teamName: string;
@@ -166,19 +166,43 @@ export const seasonSimulationService = {
     losses: number;
     draws: number;
   }[]> {
-    const teams = await teamsService.getAll();
-    const fixtures = await fixturesService.getAll();
+    const [teams, fixtures] = await Promise.all([
+      teamsService.getAll(),
+      fixturesService.getAll()
+    ]);
     
+    // Create team lookup map for O(1) access
+    const teamMap = new Map(teams.map(team => [team.id, team]));
+    
+    // Create fixture lookup map grouped by team for O(1) access
+    const teamFixturesMap = new Map<number, any[]>();
+    
+    // Single pass through fixtures to group by team - O(n)
+    fixtures.forEach(fixture => {
+      if (fixture.home_team_id) {
+        if (!teamFixturesMap.has(fixture.home_team_id)) {
+          teamFixturesMap.set(fixture.home_team_id, []);
+        }
+        teamFixturesMap.get(fixture.home_team_id)!.push(fixture);
+      }
+      
+      if (fixture.away_team_id) {
+        if (!teamFixturesMap.has(fixture.away_team_id)) {
+          teamFixturesMap.set(fixture.away_team_id, []);
+        }
+        teamFixturesMap.get(fixture.away_team_id)!.push(fixture);
+      }
+    });
+    
+    // Process each team - O(n) where n is number of teams
     return teams.map(team => {
-      // Count wins, losses, draws for this team
-      const teamFixtures = fixtures.filter(f => 
-        f.home_team_id === team.id || f.away_team_id === team.id
-      );
+      const teamFixtures = teamFixturesMap.get(team.id) || [];
       
       let wins = 0;
       let losses = 0;
       let draws = 0;
       
+      // Single pass through team's fixtures - O(m) where m is fixtures per team
       teamFixtures.forEach(fixture => {
         if (fixture.result === 'pending') return;
         

@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useMemo, useCallback } from 'react';
 import { AppContext } from '@/features/trading/contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { formatCurrency, formatNumber } from '@/shared/lib/formatters';
@@ -8,18 +8,26 @@ const PortfolioPage: React.FC = () => {
   const { portfolio, getTransactionsByClub } = useContext(AppContext);
   const [selectedClub, setSelectedClub] = useState<{ id: string; name: string } | null>(null);
 
-  // Calculate KPIs
-  const totalInvested = portfolio.reduce((sum, item) => sum + (item.purchasePrice * item.units), 0);
-  const totalMarketValue = portfolio.reduce((sum, item) => sum + item.totalValue, 0);
-  const totalProfitLoss = totalMarketValue - totalInvested;
+  // Memoized KPI calculations
+  const { totalInvested, totalMarketValue, totalProfitLoss } = useMemo(() => {
+    const invested = portfolio.reduce((sum, item) => sum + (item.purchasePrice * item.units), 0);
+    const marketValue = portfolio.reduce((sum, item) => sum + item.totalValue, 0);
+    const profitLoss = marketValue - invested;
+    
+    return {
+      totalInvested: invested,
+      totalMarketValue: marketValue,
+      totalProfitLoss: profitLoss
+    };
+  }, [portfolio]);
 
-  const handleClubClick = (clubId: string, clubName: string) => {
+  const handleClubClick = useCallback((clubId: string, clubName: string) => {
     setSelectedClub({ id: clubId, name: clubName });
-  };
+  }, []);
 
-  const handleCloseModal = () => {
+  const handleCloseModal = useCallback(() => {
     setSelectedClub(null);
-  };
+  }, []);
 
   return (
     <div className="p-6">
@@ -73,7 +81,7 @@ const PortfolioPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {portfolio.map((item) => {
+                  {useMemo(() => portfolio.map((item) => {
                     const percentChange = ((item.currentPrice - item.purchasePrice) / item.purchasePrice) * 100;
                     const portfolioPercent = totalMarketValue > 0 ? (item.totalValue / totalMarketValue) * 100 : 0;
                     
@@ -97,7 +105,7 @@ const PortfolioPage: React.FC = () => {
                         </td>
                       </tr>
                     );
-                  })}
+                  }), [portfolio, totalMarketValue, handleClubClick])}
                 </tbody>
               </table>
             </div>

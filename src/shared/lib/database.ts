@@ -1,7 +1,25 @@
+// Legacy database service - use individual services from ./services/ instead
+// This file is kept for backward compatibility but should be migrated to use the new services
+
 import { supabase } from './supabase';
 import type { Club, Match, PortfolioItem, Transaction } from '@/shared/constants/clubs';
 import { logger } from './logger';
 import type { DatabasePositionWithTeam, DatabaseOrderWithTeam } from '@/shared/types/database.types';
+import { teamStateSnapshotService } from './team-state-snapshots';
+
+// Import services for backward compatibility
+import { 
+  teamsService as importedTeamsService, 
+  fixturesService as importedFixturesService, 
+  positionsService as importedPositionsService, 
+  ordersService as importedOrdersService, 
+  transfersLedgerService as importedTransfersLedgerService,
+  type DatabaseTeam,
+  type DatabaseFixture,
+  type DatabasePosition,
+  type DatabaseOrder,
+  type DatabaseTransferLedger
+} from './services';
 
 // Database service layer to replace localStorage usage
 
@@ -87,75 +105,10 @@ export const teamDetailsService = {
   }
 };
 
-export interface DatabaseTeam {
-  id: number;
-  name: string;
-  short_name: string;
-  external_id?: number;
-  logo_url?: string;
-  launch_price: number;
-  initial_market_cap: number;
-  market_cap: number;
-  shares_outstanding: number;
-  is_latest?: boolean;
-  created_at: string;
-  updated_at: string;
-}
+// Database interfaces are now imported from ./services
 
-export interface DatabaseFixture {
-  id: number;
-  home_team_id: number;
-  away_team_id: number;
-  kickoff_at: string;
-  buy_close_at: string;
-  snapshot_home_cap?: number;
-  snapshot_away_cap?: number;
-  result: 'home_win' | 'away_win' | 'draw' | 'pending';
-  status: 'scheduled' | 'closed' | 'applied' | 'postponed';
-  home_score?: number;
-  away_score?: number;
-  matchday?: number;
-  season?: number;
-  created_at: string;
-}
-
-export interface DatabaseOrder {
-  id: number;
-  user_id: string;
-  team_id: number;
-  order_type: 'BUY' | 'SELL';
-  quantity: number;
-  price_per_share: number;
-  total_amount: number;
-  status: 'PENDING' | 'FILLED' | 'CANCELLED';
-  executed_at?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface DatabasePosition {
-  id: number;
-  user_id: string; // Changed to string (UUID)
-  team_id: number;
-  quantity: number; // Changed from shares to quantity to match database
-  total_invested: number;
-  is_latest: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface DatabaseTransferLedger {
-  id: number;
-  fixture_id: number;
-  winner_team_id: number;
-  loser_team_id: number;
-  transfer_amount: number;
-  applied_at: string;
-  is_latest: boolean;
-}
-
-// Teams/Clubs operations
-export const teamsService = {
+// Teams/Clubs operations - Legacy implementation (use importedTeamsService instead)
+const legacyTeamsService = {
   async getAll(): Promise<DatabaseTeam[]> {
     const { data, error } = await supabase
       .from('teams')
@@ -491,6 +444,40 @@ export const teamsService = {
       const winnerNewCap = winnerTeam.market_cap + transferAmount;
       const loserNewCap = loserTeam.market_cap - transferAmount;
 
+      // Create snapshots for both teams BEFORE market cap changes to capture pre-match state
+      try {
+        // Create pre-match snapshots for both teams with fixture kickoff time as effective_at
+        const winnerSnapshotId = await teamStateSnapshotService.createMatchResultSnapshot({
+          teamId: winnerTeamId,
+          fixtureId: fixtureId,
+          matchResult: 'win',
+          priceImpact: transferAmount,
+          effectiveAt: fixture.kickoff_at // Use fixture time instead of NOW()
+        });
+
+        const loserSnapshotId = await teamStateSnapshotService.createMatchResultSnapshot({
+          teamId: loserTeamId,
+          fixtureId: fixtureId,
+          matchResult: 'loss',
+          priceImpact: -transferAmount,
+          effectiveAt: fixture.kickoff_at // Use fixture time instead of NOW()
+        });
+
+        logger.debug(`Created pre-match snapshots for fixture ${fixtureId} at ${fixture.kickoff_at}: Winner +${transferAmount}, Loser -${transferAmount}`);
+        console.log('✅ Snapshots created:', {
+          fixtureId,
+          kickoffAt: fixture.kickoff_at,
+          winnerTeamId,
+          loserTeamId,
+          transferAmount,
+          winnerSnapshotId,
+          loserSnapshotId
+        });
+      } catch (snapshotError) {
+        logger.warn('Failed to create pre-match snapshots:', snapshotError);
+        // Don't fail the entire operation if snapshot creation fails
+      }
+
       // Update winner team
       const { error: winnerError } = await supabase
         .from('teams')
@@ -540,6 +527,9 @@ export const teamsService = {
     const teamUpdates: { id: number; market_cap: number }[] = [];
     const ledgerInserts: any[] = [];
     
+    // OPTIMIZED: Create team lookup map for O(1) access instead of O(n) find
+    const teamMap = new Map(teamsData?.map(team => [team.id, team]) || []);
+    
     // Process all fixtures in memory first
     for (const fixture of fixtures) {
       if (fixture.result === 'pending') {
@@ -547,8 +537,8 @@ export const teamsService = {
       }
       
       // Get current market cap values from teamsData (not snapshot values)
-      const homeTeam = teamsData?.find(t => t.id === fixture.home_team_id);
-      const awayTeam = teamsData?.find(t => t.id === fixture.away_team_id);
+      const homeTeam = teamMap.get(fixture.home_team_id); // O(1) lookup instead of O(n) find
+      const awayTeam = teamMap.get(fixture.away_team_id); // O(1) lookup instead of O(n) find
       
       if (!homeTeam || !awayTeam) {
         console.warn(`Missing team data for fixture ${fixture.id}`);
@@ -584,7 +574,7 @@ export const teamsService = {
         const loserNewCap = loserCurrentCap - transferAmount;
         
         // Ensure market caps never go negative (enforce constraint)
-        const finalLoserCap = Math.max(loserNewCap, 100000); // Minimum $100k market cap
+        const finalLoserCap = Math.max(loserNewCap, 10); // Minimum $10 market cap
         
         // Add to batch updates
         teamUpdates.push({ id: winnerTeamId, market_cap: winnerNewCap });
@@ -766,7 +756,7 @@ export const teamsService = {
 };
 
 // Transfers Ledger operations
-export const transfersLedgerService = {
+const legacyTransfersLedgerService = {
   async getAll(): Promise<DatabaseTransferLedger[]> {
     const { data, error } = await supabase
       .from('transfers_ledger')
@@ -811,7 +801,7 @@ export const transfersLedgerService = {
 };
 
 // Fixtures operations
-export const fixturesService = {
+const legacyFixturesService = {
   async getAll(): Promise<DatabaseFixture[]> {
     const { data, error } = await supabase
       .from('fixtures')
@@ -1007,7 +997,7 @@ export const fixturesService = {
 };
 
 // Orders operations
-export const ordersService = {
+const legacyOrdersService = {
   async createOrder(order: Omit<DatabaseOrder, 'id' | 'executed_at' | 'created_at' | 'updated_at'>): Promise<DatabaseOrder> {
     // Buy window enforcement disabled for MVP - can be re-enabled later
     logger.debug('Creating order without buy window enforcement (MVP mode)');
@@ -1071,7 +1061,7 @@ export const ordersService = {
 };
 
 // Positions operations
-export const positionsService = {
+const legacyPositionsService = {
   async getUserPositions(userId: string): Promise<DatabasePositionWithTeam[]> {
     // Get all positions for user (will filter to latest after migration)
     const { data, error } = await supabase
@@ -1118,17 +1108,20 @@ export const positionsService = {
 
   async addPosition(userId: string, teamId: number, quantity: number, pricePerShare: number): Promise<void> {
     // Get the current latest position for this user-team combination
-    const { data: currentPosition, error: fetchError } = await supabase
+    const { data: currentPositions, error: fetchError } = await supabase
       .from('positions')
       .select('quantity, total_invested')
       .eq('user_id', userId)
       .eq('team_id', teamId)
       .eq('is_latest', true)
-      .single();
+      .order('created_at', { ascending: false })
+      .limit(1);
 
-    if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 = no rows returned
+    if (fetchError) {
       throw fetchError;
     }
+
+    const currentPosition = currentPositions?.[0] || null;
 
     let newQuantity: number;
     let newTotalInvested: number;
@@ -1272,4 +1265,14 @@ export const convertPositionToPortfolioItem = (position: DatabasePositionWithTea
     profitLoss: (currentPrice - avgCost) * position.quantity // Changed from shares to quantity
   };
 };
+
+// Export the imported services for backward compatibility
+export const teamsService = importedTeamsService;
+export const fixturesService = importedFixturesService;
+export const positionsService = importedPositionsService;
+export const ordersService = importedOrdersService;
+export const transfersLedgerService = importedTransfersLedgerService;
+
+// Export types
+export type { DatabaseTeam, DatabaseFixture, DatabasePosition, DatabaseOrder, DatabaseTransferLedger };
 
