@@ -51,48 +51,51 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
 
     setOrdersLoading(true);
     try {
-      // Get orders for the team
+      // Get orders with their immutable market cap data
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select('*')
+        .select(`
+          *,
+          market_cap_before,
+          market_cap_after,
+          shares_outstanding_before,
+          shares_outstanding_after
+        `)
         .eq('team_id', teamId)
         .eq('status', 'FILLED')
         .order('executed_at', { ascending: false });
 
       if (ordersError) throw ordersError;
 
-      // Get current team data
-      const { data: team, error: teamError } = await supabase
-        .from('teams')
-        .select('market_cap, shares_outstanding')
-        .eq('id', teamId)
-        .single();
-
-      if (teamError) throw teamError;
-
-      // Calculate market cap impact for each order
+      // Use immutable data - NO RECALCULATION based on current state
       const ordersWithImpact = ordersData.map((order, index) => {
-        const previousOrders = ordersData.slice(index + 1);
-        const cumulativeMarketCapImpact = previousOrders.reduce((sum, prevOrder) => {
-          return sum + (prevOrder.total_amount || 0);
-        }, 0);
-
-        const marketCapBeforeAllOrders = team.market_cap - cumulativeMarketCapImpact - order.total_amount;
-        const marketCapAfterThisOrder = marketCapBeforeAllOrders + order.total_amount;
+        // Use stored immutable snapshots instead of recalculating
+        const marketCapBefore = order.market_cap_before || 0;
+        const marketCapAfter = order.market_cap_after || 0;
+        const sharesOutstandingBefore = order.shares_outstanding_before || 0;
+        const sharesOutstandingAfter = order.shares_outstanding_after || 0;
+        
+        const navBefore = sharesOutstandingBefore > 0 ? 
+          marketCapBefore / sharesOutstandingBefore : 
+          20.00;
+        
+        const navAfter = sharesOutstandingAfter > 0 ? 
+          marketCapAfter / sharesOutstandingAfter : 
+          20.00;
 
         return {
           ...order,
           market_cap_impact: order.total_amount,
-          market_cap_before: Math.max(marketCapBeforeAllOrders, 0.01),
-          market_cap_after: marketCapAfterThisOrder,
-          share_price_before: marketCapBeforeAllOrders / (team.shares_outstanding - order.quantity),
-          share_price_after: marketCapAfterThisOrder / team.shares_outstanding,
+          market_cap_before: marketCapBefore, // IMMUTABLE - never changes
+          market_cap_after: marketCapAfter,   // IMMUTABLE - never changes
+          share_price_before: navBefore,
+          share_price_after: navAfter,
           cash_added_to_market_cap: order.total_amount,
           order_sequence: ordersData.length - index
         };
       });
 
-      setOrders(ordersWithImpact.reverse());
+      setOrders(ordersWithImpact);
     } catch (error) {
       // Handle error silently in production, track for monitoring
       if (process.env.NODE_ENV === 'development') {
@@ -110,45 +113,94 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
 
     setChartLoading(true);
     try {
-      // Get timeline data directly from total_ledger
+      // Try to get timeline data from total_ledger function
       const { data: timelineData, error } = await supabase.rpc('get_team_complete_timeline', { 
         p_team_id: teamId 
       });
 
-      if (error) throw error;
+      if (error) {
+        console.warn('Timeline function failed, trying direct query:', error);
+        // Fallback: get data directly from total_ledger table
+        const { data: directData, error: directError } = await supabase
+          .from('total_ledger')
+          .select('*')
+          .eq('team_id', teamId)
+          .in('ledger_type', ['initial_state', 'match_win', 'match_loss', 'match_draw'])
+          .order('event_date', { ascending: true });
+
+        if (directError) throw directError;
+        
+        if (!directData || directData.length === 0) {
+          setChartData([]);
+          return;
+        }
+
+        // Process direct data
+        const chartPoints: ChartDataPoint[] = [];
+        let dayCounter = 0;
+
+        directData.forEach((event: any) => {
+          const sharePrice = parseFloat(event.share_price_after || event.share_price_before || '0');
+          
+          if (sharePrice > 0) {
+            chartPoints.push({
+              x: dayCounter,
+              y: sharePrice,
+              label: event.ledger_type === 'initial_state' ? 'Initial' : `Day ${dayCounter}`,
+              type: event.ledger_type === 'initial_state' ? 'initial' : 'match',
+              priceImpact: event.price_impact || 0
+            });
+            
+            dayCounter++;
+          }
+        });
+
+        console.log('Chart data processed (direct query):', {
+          totalEvents: directData.length,
+          chartPoints: chartPoints.length,
+          points: chartPoints.map(p => ({ x: p.x, y: p.y, label: p.label, type: p.type }))
+        });
+        setChartData(chartPoints);
+        return;
+      }
 
       if (!timelineData || timelineData.length === 0) {
         setChartData([]);
         return;
       }
 
-      // Process timeline events chronologically from total_ledger
+      // Process timeline events chronologically (earliest first for proper chart progression)
       const sortedEvents = timelineData.sort((a: any, b: any) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime());
       
       const chartPoints: ChartDataPoint[] = [];
-      let dayCounter = 1;
+      let dayCounter = 0;
 
       sortedEvents.forEach((event: any) => {
         // Use actual share price from total_ledger
         const sharePrice = parseFloat(event.share_price_after || event.share_price_before || '0');
         
-        // Include initial state and match events
+        // Include initial state and match events only
         if (event.event_type === 'initial' || event.event_type === 'match') {
           // Ensure we have valid data
           if (sharePrice > 0) {
             chartPoints.push({
-              x: event.event_type === 'initial' ? 0 : dayCounter, // Start at 0 for initial, then increment days
+              x: dayCounter,
               y: sharePrice,
-              label: event.event_type === 'initial' ? 'Initial' : `Day ${dayCounter}`
+              label: event.event_type === 'initial' ? 'Initial' : `Day ${dayCounter}`,
+              type: event.event_type === 'initial' ? 'initial' : 'match',
+              priceImpact: event.event_type === 'match' ? parseFloat(event.price_impact || '0') : 0
             });
             
-            if (event.event_type === 'match') {
-              dayCounter++;
-            }
+            dayCounter++;
           }
         }
       });
 
+      console.log('Chart data processed (timeline function):', {
+        totalEvents: timelineData.length,
+        chartPoints: chartPoints.length,
+        points: chartPoints.map(p => ({ x: p.x, y: p.y, label: p.label, type: p.type }))
+      });
       setChartData(chartPoints);
     } catch (error) {
       // Handle error silently in production
@@ -185,15 +237,15 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
         return;
       }
 
-      // Process timeline data into display format
+      // Process timeline data into display format (only matches, no purchases)
       const processedEvents = [];
       for (const event of timelineData.data || []) {
-        if (event.event_type === 'initial') {
-          continue; // Skip initial event
+        if (event.event_type === 'initial' || event.event_type === 'purchase') {
+          continue; // Skip initial event and purchase events (handled in Orders tab)
         }
 
         const isMatch = event.event_type === 'match';
-        const isPurchase = event.event_type === 'purchase';
+        const isPurchase = false; // No purchases in matches tab
 
         // Calculate user P/L for matches if user has position
         let userPL = 0;
@@ -222,6 +274,9 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
           isPurchase: isPurchase
         });
       }
+
+      // Sort events by date (latest first)
+      processedEvents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       setUserPosition(positionResult);
       setMatchHistory(processedEvents);
@@ -265,10 +320,10 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
 
   // Load chart data when switching to chart tab
   useEffect(() => {
-    if (activeTab === 'chart' && teamId && chartData.length === 0) {
+    if (activeTab === 'chart' && teamId && !chartLoaded) {
       loadChartData();
     }
-  }, [activeTab, teamId, loadChartData, chartData.length]);
+  }, [activeTab, teamId, loadChartData, chartLoaded]);
 
   // Reset data when panel closes or team changes
   useEffect(() => {
@@ -432,12 +487,10 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                 <div>
                                   <span className="text-gray-600 dark:text-gray-400">Market Cap Impact:</span>
                                   <div className="font-medium">
-                                    {formatCurrency(event.marketCapBefore)} → {formatCurrency(event.marketCapAfter)} 
-                                    {event.priceImpactPercent !== 0 && (
-                                      <span className={`ml-2 ${event.priceImpactPercent > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                        {event.priceImpactPercent > 0 ? '+' : ''}{event.priceImpactPercent.toFixed(1)}%
-                                      </span>
-                                    )}
+                                    {formatCurrency(event.marketCapBefore)} → {formatCurrency(event.marketCapAfter)}
+                                    <span className={`ml-2 ${event.priceImpactPercent > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                      ({event.priceImpactPercent > 0 ? '+' : ''}{formatCurrency(event.marketCapAfter - event.marketCapBefore)})
+                                    </span>
                                   </div>
                                 </div>
                                 
@@ -445,6 +498,11 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                   <span className="text-gray-600 dark:text-gray-400">Share Price:</span>
                                   <div className="font-medium">
                                     ${event.sharePriceBefore.toFixed(1)} → ${event.sharePriceAfter.toFixed(1)}
+                                    {event.priceImpactPercent !== 0 && (
+                                      <span className={`ml-2 ${event.priceImpactPercent > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {event.priceImpactPercent > 0 ? '+' : ''}{event.priceImpactPercent.toFixed(1)}%
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -458,14 +516,6 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                 </div>
                               )}
 
-                              {event.userPL !== 0 && (
-                                <div className="mt-2 text-sm">
-                                  <span className="text-gray-600 dark:text-gray-400">Your P/L:</span>
-                                  <span className={`font-medium ml-2 ${event.userPL > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    {event.userPL > 0 ? '+' : ''}{formatCurrency(event.userPL)}
-                                  </span>
-                                </div>
-                              )}
                             </div>
                           ))}
                         </div>

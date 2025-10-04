@@ -163,10 +163,9 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
 
   const loadUserPositionAndReturn = async (userId: string, teamId: number) => {
     try {
-      const positions = await positionsService.getUserPositions(userId);
-      const position = positions.find(p => p.team_id === teamId);
-      setUserPosition(position || null);
-      return position || null; // Return the position directly
+      const position = await positionsService.getUserPosition(userId, teamId);
+      setUserPosition(position);
+      return position; // Return the position directly
     } catch (error) {
       console.error('Error loading user position:', error);
       return null;

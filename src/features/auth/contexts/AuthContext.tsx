@@ -37,22 +37,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const ensureProfile = async (authUser: User) => {
     try {
-      // Check if profile exists using id directly (since auth_user_id doesn't exist)
-      const { data, error } = await supabase
+      // Use upsert to handle existing profiles gracefully
+      const { error } = await supabase
         .from('profiles')
-        .select('id')
-        .eq('id', authUser.id)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (!data) {
-        // Create minimal profile row using id directly
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert({ id: authUser.id, username: authUser.email ?? null });
-        
-        if (insertError) throw insertError;
+        .upsert(
+          { 
+            id: authUser.id, 
+            username: authUser.email ?? `user_${authUser.id.slice(0, 8)}` 
+          },
+          { 
+            onConflict: 'id',
+            ignoreDuplicates: false 
+          }
+        );
+      
+      if (error) {
+        // If it's a duplicate key error, that's actually fine - profile already exists
+        if (error.code === '23505') {
+          console.log('Profile already exists, continuing...');
+          return;
+        }
+        throw error;
       }
     } catch (e) {
       // Log only; do not block auth flow

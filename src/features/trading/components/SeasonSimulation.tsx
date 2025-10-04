@@ -247,13 +247,7 @@ const SeasonSimulation: React.FC = () => {
 
             console.log('TRUNCATE result:', { truncateError });
 
-            // Clear all team state snapshots (except initial ones)
-            const { error: snapshotsError } = await supabase
-                .from('team_state_snapshots')
-                .delete()
-                .neq('snapshot_type', 'initial');
-
-            console.log('Snapshots deletion result:', { snapshotsError });
+            // Note: total_ledger is not touched by this reset function
 
             // Verify deletion by checking what's left
             const { data: profilesAfter, error: profilesAfterError } = await supabase
@@ -286,9 +280,7 @@ const SeasonSimulation: React.FC = () => {
                 const positionsDeleted = (positionsBefore?.length || 0) - (positionsAfter?.length || 0);
                 const ordersDeleted = (ordersBefore?.length || 0) - (ordersAfter?.length || 0);
                 
-                const snapshotStatus = snapshotsError ? `⚠️ Snapshot cleanup failed: ${snapshotsError.message}` : '📈 All snapshots cleared!';
-                
-                setSimulationResults(`✅ Successfully deleted all profiles and investments!\n🗑️ Profiles deleted: ${profilesDeleted}\n📊 Positions deleted: ${positionsDeleted}\n📋 Orders deleted: ${ordersDeleted}\n${snapshotStatus}\n\nBefore: P:${profilesBefore?.length || 0}, Pos:${positionsBefore?.length || 0}, O:${ordersBefore?.length || 0}\nAfter: P:${profilesAfter?.length || 0}, Pos:${positionsAfter?.length || 0}, O:${ordersAfter?.length || 0}`);
+                setSimulationResults(`✅ Successfully deleted all profiles and investments!\n🗑️ Profiles deleted: ${profilesDeleted}\n📊 Positions deleted: ${positionsDeleted}\n📋 Orders deleted: ${ordersDeleted}\n\nBefore: P:${profilesBefore?.length || 0}, Pos:${positionsBefore?.length || 0}, O:${ordersBefore?.length || 0}\nAfter: P:${profilesAfter?.length || 0}, Pos:${positionsAfter?.length || 0}, O:${ordersAfter?.length || 0}`);
             }
             
         } catch (error) {

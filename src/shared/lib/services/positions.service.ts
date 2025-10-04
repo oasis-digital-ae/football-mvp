@@ -24,7 +24,7 @@ export interface DatabasePositionWithTeam extends DatabasePosition {
 
 export const positionsService = {
   async getUserPositions(userId: string): Promise<DatabasePositionWithTeam[]> {
-    // Get all positions for user (will filter to latest after migration)
+    // Get all positions for user (now one record per team)
     const { data, error } = await supabase
       .from('positions')
       .select(`
@@ -36,19 +36,36 @@ export const positionsService = {
 
     if (error) throw error;
     
-    // Filter to get only the latest position per team (until is_latest column is added)
-    const latestPositions = new Map<number, DatabasePositionWithTeam>();
-    (data || []).forEach(position => {
-      if (!latestPositions.has(position.team_id)) {
-        latestPositions.set(position.team_id, position);
+    return (data || []) as DatabasePositionWithTeam[];
+  },
+
+  async getUserPosition(userId: string, teamId: number): Promise<DatabasePositionWithTeam | null> {
+    // Get a specific position for a user and team
+    const { data, error } = await supabase
+      .from('positions')
+      .select(`
+        *,
+        team:teams(name, market_cap, shares_outstanding)
+      `)
+      .eq('user_id', userId)
+      .eq('team_id', teamId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No rows returned - user has no position in this team
+        return null;
       }
-    });
+      throw error;
+    }
     
-    return Array.from(latestPositions.values());
+    return data as DatabasePositionWithTeam;
   },
 
   async getUserPositionHistory(userId: string, teamId?: number): Promise<DatabasePositionWithTeam[]> {
     // Get all position history for a user (or specific team)
+    // Note: With simplified positions table, this will return the same as getUserPositions
+    // Complete transaction history is available in the orders table
     let query = supabase
       .from('positions')
       .select(`
@@ -68,7 +85,7 @@ export const positionsService = {
   },
 
   async getByUserIdAndTeamId(userId: string, teamId: number): Promise<DatabasePositionWithTeam | null> {
-    // Get the latest position for a specific user and team
+    // Get the position for a specific user and team
     const { data, error } = await supabase
       .from('positions')
       .select(`
@@ -77,12 +94,16 @@ export const positionsService = {
       `)
       .eq('user_id', userId)
       .eq('team_id', teamId)
-      .eq('is_latest', true)
-      .order('created_at', { ascending: false })
-      .limit(1);
+      .single();
 
-    if (error) throw error;
-    return (data && data.length > 0) ? data[0] as DatabasePositionWithTeam : null;
+    if (error) {
+      // Handle "no rows" case gracefully
+      if (error.code === 'PGRST116') {
+        return null; // No position found for this user-team combination
+      }
+      throw error; // Re-throw other errors
+    }
+    return data as DatabasePositionWithTeam | null;
   },
 
   async addPosition(userId: string, teamId: number, quantity: number, pricePerShare: number): Promise<void> {
@@ -91,59 +112,83 @@ export const positionsService = {
     const sanitizedQuantity = Math.max(0, Math.floor(quantity));
     const sanitizedPricePerShare = Math.max(0, pricePerShare);
 
-    // Get the current latest position for this user-team combination
+    const newPurchaseCost = sanitizedQuantity * sanitizedPricePerShare;
+
+    console.log(`🚀 Starting addPosition: User=${sanitizedUserId}, Team=${teamId}, Qty=${sanitizedQuantity}, Price=${sanitizedPricePerShare}`);
+
+    // Get the current position for this user-team combination
     const { data: currentPositions, error: fetchError } = await supabase
       .from('positions')
-      .select('quantity, total_invested')
+      .select('quantity, total_invested, id')
       .eq('user_id', sanitizedUserId)
       .eq('team_id', teamId)
-      .eq('is_latest', true)
-      .order('created_at', { ascending: false })
-      .limit(1);
+      .single();
 
-    if (fetchError) {
+    if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 = no rows returned
+      console.error('Error fetching current position:', fetchError);
       throw fetchError;
     }
 
-    const currentPosition = currentPositions?.[0] || null;
-
+    const currentPosition = currentPositions || null;
     let newQuantity: number;
     let newTotalInvested: number;
 
     if (currentPosition) {
       // User already has shares - add to existing position
-      const newPurchaseCost = sanitizedQuantity * sanitizedPricePerShare;
-      
       newQuantity = currentPosition.quantity + sanitizedQuantity;
       newTotalInvested = currentPosition.total_invested + newPurchaseCost;
       
-      // Mark the current position as not latest
-      await supabase
+      console.log(`🔄 Updating position: ${currentPosition.quantity} + ${sanitizedQuantity} = ${newQuantity} shares, $${currentPosition.total_invested} + $${newPurchaseCost} = $${newTotalInvested}`);
+      console.log(`📍 Current position ID: ${currentPosition.id}`);
+      
+      // Update the existing position
+      const updateData = {
+        quantity: newQuantity,
+        total_invested: newTotalInvested,
+        updated_at: new Date().toISOString()
+      };
+
+      const { error: updateError } = await supabase
         .from('positions')
-        .update({ is_latest: false })
-        .eq('user_id', sanitizedUserId)
-        .eq('team_id', teamId)
-        .eq('is_latest', true);
+        .update(updateData)
+        .eq('id', currentPosition.id);
+
+      if (updateError) {
+        console.error('Error updating existing position:', updateError);
+        throw updateError;
+      }
+      
+      console.log(`✅ Position updated successfully: ${newQuantity} shares, $${newTotalInvested}`);
+      
     } else {
       // First purchase for this team
       newQuantity = sanitizedQuantity;
-      newTotalInvested = sanitizedQuantity * sanitizedPricePerShare;
+      newTotalInvested = newPurchaseCost;
+      
+      console.log(`🆕 First purchase: ${newQuantity} shares, $${newTotalInvested}`);
+      
+      // Insert new position record
+      console.log(`🎯 Inserting new position...`);
+      const insertData = {
+        user_id: sanitizedUserId,
+        team_id: teamId,
+        quantity: newQuantity,
+        total_invested: newTotalInvested
+      };
+
+      const { error: insertError } = await supabase
+        .from('positions')
+        .insert(insertData);
+
+      if (insertError) {
+        console.error('Error inserting new position:', insertError);
+        throw insertError;
+      }
+      
+      console.log(`🎯 Position added successfully: ${newQuantity} shares, $${newTotalInvested}`);
     }
-
-    // Insert new position record with is_latest = true
-    const insertData: any = {
-      user_id: sanitizedUserId,
-      team_id: teamId,
-      quantity: newQuantity,
-      total_invested: newTotalInvested,
-      is_latest: true
-    };
-
-    const { error: insertError } = await supabase
-      .from('positions')
-      .insert(insertData);
-
-    if (insertError) throw insertError;
+    
+    console.log(`🏁 addPosition completed successfully!`);
   },
 
   async upsertPosition(position: Omit<DatabasePosition, 'id'>): Promise<void> {

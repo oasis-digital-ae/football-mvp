@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Club, Match, PortfolioItem, Transaction, PREMIER_LEAGUE_CLUBS } from '@/shared/constants/clubs';
 import { toast } from '@/shared/components/ui/use-toast';
-import { teamsService, positionsService, ordersService, convertTeamToClub, convertPositionToPortfolioItem } from '@/shared/lib/database';
+import { teamsService, positionsService, convertTeamToClub } from '@/shared/lib/database';
 import { footballApiService } from '@/shared/lib/football-api';
 import { supabase } from '@/shared/lib/supabase';
 import type { Standing, Scorer, FootballMatch } from '@/shared/lib/football-api';
@@ -111,6 +111,11 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
       // Load user portfolio from positions table
       const dbPositions = await positionsService.getUserPositions(user.id);
       logger.db('Loaded user positions', { count: dbPositions.length });
+      
+      // Debug: Log all positions for this user
+      dbPositions.forEach(pos => {
+        logger.debug(`Position: Team ${pos.team_id} (${pos.team?.name}), Quantity: ${pos.quantity}, Total Invested: ${pos.total_invested}, Latest: ${pos.is_latest}`);
+      });
 
       // Convert positions to portfolio items - OPTIMIZED with Map lookup
       const clubMap = new Map(convertedClubs.map(club => [club.id, club]));
@@ -145,51 +150,42 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
       logger.db('Final portfolio calculated', { count: portfolio.length });
       setPortfolio(portfolio);
       
-      // Load user transactions from position history
-      const dbPositionHistory = await positionsService.getUserPositionHistory(user.id);
+      // Load user transactions from orders table
       const convertedTransactions: Transaction[] = [];
       
-      // Group positions by team to create transaction history
-      const teamPositions = new Map<number, DatabasePositionWithTeam[]>();
-      dbPositionHistory.forEach(pos => {
-        if (!teamPositions.has(pos.team_id)) {
-          teamPositions.set(pos.team_id, []);
-        }
-        teamPositions.get(pos.team_id)!.push(pos);
-      });
-      
-      // Create transactions from position history
-      teamPositions.forEach((positions, teamId) => {
-        // Sort by created_at to get chronological order
-        const sortedPositions = positions.sort((a, b) => 
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        );
-        
-        let previousQuantity = 0;
-        let previousTotalInvested = 0;
-        
-        sortedPositions.forEach((position, index) => {
-          const quantityChange = position.quantity - previousQuantity;
-          const totalInvestedChange = position.total_invested - previousTotalInvested;
-          
-          if (quantityChange > 0) { // Only show purchases (positive quantity changes)
-            const avgPrice = totalInvestedChange / quantityChange;
-            
-            convertedTransactions.push({
-              id: `${position.id}-${index}`,
-              clubId: position.team_id.toString(),
-              clubName: position.team?.name || 'Unknown',
-              units: quantityChange,
-              pricePerUnit: avgPrice,
-              totalValue: totalInvestedChange,
-              date: new Date(position.created_at).toLocaleDateString()
-            });
-          }
-          
-          previousQuantity = position.quantity;
-          previousTotalInvested = position.total_invested;
+      // Get individual transactions from orders table (not positions)
+      const { data: userOrders, error: ordersError } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          team:teams(name)
+        `)
+        .eq('user_id', user.id)
+        .eq('status', 'FILLED')
+        .eq('order_type', 'BUY')
+        .order('executed_at', { ascending: false });
+
+      if (ordersError) {
+        logger.error('Error loading user orders:', ordersError);
+        throw ordersError;
+      }
+
+      // Convert orders to transactions
+      if (userOrders) {
+        logger.db('Loading user orders for transactions', { count: userOrders.length });
+        userOrders.forEach((order) => {
+          convertedTransactions.push({
+            id: order.id.toString(),
+            clubId: order.team_id.toString(),
+            clubName: order.team?.name || 'Unknown',
+            units: order.quantity,
+            pricePerUnit: order.price_per_share,
+            totalValue: order.total_amount,
+            date: new Date(order.executed_at || order.created_at).toLocaleDateString()
+          });
         });
-      });
+        logger.db('Converted orders to transactions', { count: convertedTransactions.length });
+      }
       
       setTransactions(convertedTransactions);
       
@@ -221,6 +217,9 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
     if (!user) {
       throw new AuthenticationError('You must be logged in to purchase shares');
     }
+
+    // Add a small delay to prevent rapid-fire purchase conflicts
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // Validate input
     if (!clubId || units <= 0) {
@@ -269,86 +268,63 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
       if (profile) {
         profileId = profile.id;
       } else {
-        // Create new profile (using id directly as auth user ID)
+        // Use upsert to handle existing profiles gracefully
         const { data: newProfile, error: createError } = await supabase
           .from('profiles')
-          .insert({ id: user.id, username: user.email ?? null })
+          .upsert(
+            { 
+              id: user.id, 
+              username: user.email ?? `user_${user.id.slice(0, 8)}` 
+            },
+            { 
+              onConflict: 'id',
+              ignoreDuplicates: false 
+            }
+          )
           .select('id')
           .single();
         
-        if (createError || !newProfile) {
+        if (createError) {
+          // If it's a duplicate key error, that's actually fine - profile already exists
+          if (createError.code === '23505') {
+            profileId = user.id; // Use the user ID directly
+          } else {
+            throw new DatabaseError('Failed to create user profile');
+          }
+        } else if (!newProfile) {
           throw new DatabaseError('Failed to create user profile');
+        } else {
+          profileId = newProfile.id;
         }
-        profileId = newProfile.id;
       }
 
-      // Create order
-      const order = await ordersService.createOrder({
-        user_id: profileId,
-        team_id: teamIdInt,
-        order_type: 'BUY',
-        quantity: units,
-        price_per_share: nav,
-        total_amount: totalCost,
-        status: 'FILLED'
-      });
+      // CRITICAL: Use atomic transaction for purchase
+      logger.debug(`Processing atomic purchase: User ${profileId}, Team ${teamIdInt}, Units ${units}, Price ${nav}`);
+      
+      const { data: result, error: atomicError } = await supabase.rpc(
+        'process_share_purchase_atomic',
+        {
+          p_user_id: profileId,
+          p_team_id: teamIdInt,
+          p_shares: units,
+          p_price_per_share: nav,
+          p_total_amount: totalCost
+        }
+      );
 
-      // Proper NAV approach: market cap increases by purchase amount, shares increase by units
-      const newMarketCap = team.market_cap + totalCost;
-      const newSharesOutstanding = team.shares_outstanding + units;
-
-      logger.debug('Purchase update', {
-        teamId: teamIdInt,
-        teamName: team.name,
-        oldMarketCap: team.market_cap,
-        oldSharesOutstanding: team.shares_outstanding,
-        totalCost,
-        units,
-        newMarketCap,
-        newSharesOutstanding
-      });
-
-      try {
-        await teamsService.updateById(teamIdInt, {
-          market_cap: newMarketCap,
-          shares_outstanding: newSharesOutstanding
-        });
-        logger.debug('Team update completed successfully');
-      } catch (updateError) {
-        logger.error('Team update failed:', updateError);
-        throw new DatabaseError('Failed to update team market cap');
+      if (atomicError) {
+        logger.error('Atomic purchase failed:', atomicError);
+        throw new DatabaseError(`Purchase failed: ${atomicError.message}`);
       }
 
-      // Create snapshot for share purchase
-      try {
-        const snapshotId = await teamStateSnapshotService.createSharePurchaseSnapshot({
-          teamId: teamIdInt,
-          orderId: order.id,
-          sharesTraded: units,
-          tradeAmount: totalCost
-        });
-        logger.debug(`Created snapshot for share purchase: ${units} shares, $${totalCost}, snapshot ID: ${snapshotId}`);
-        console.log('✅ Share purchase snapshot created:', {
-          teamId: teamIdInt,
-          orderId: order.id,
-          sharesTraded: units,
-          tradeAmount: totalCost,
-          snapshotId
-        });
-      } catch (snapshotError) {
-        logger.warn('Failed to create share purchase snapshot:', snapshotError);
-        console.error('❌ Failed to create share purchase snapshot:', snapshotError);
-        // Don't fail the entire operation if snapshot creation fails
+      if (!result?.success) {
+        throw new BusinessLogicError('Purchase transaction failed');
       }
 
-      // Add position using transaction history approach
-      await positionsService.addPosition(profileId, teamIdInt, units, nav);
-
-      // Cash injection is automatically tracked via the orders table
-      logger.debug(`Purchase completed: ${units} shares of ${team.name} for ${totalCost}, market cap: ${team.market_cap} -> ${newMarketCap}`);
+      logger.debug(`Atomic purchase completed successfully:`, result);
 
       // Wait a moment for database to sync, then refresh data
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       logger.debug('Refreshing data after purchase...');
       await loadData();

@@ -2,6 +2,7 @@
 import { supabase } from '../supabase';
 import { logger } from '../logger';
 import { sanitizeInput } from '../sanitization';
+import { buyWindowService } from '../buy-window.service';
 
 export interface DatabaseOrder {
   id: number;
@@ -15,6 +16,11 @@ export interface DatabaseOrder {
   executed_at?: string;
   created_at: string;
   updated_at: string;
+  // CRITICAL: Immutable market cap snapshots
+  market_cap_before?: number;
+  market_cap_after?: number;
+  shares_outstanding_before?: number;
+  shares_outstanding_after?: number;
 }
 
 export interface DatabaseOrderWithTeam extends DatabaseOrder {
@@ -25,10 +31,28 @@ export interface DatabaseOrderWithTeam extends DatabaseOrder {
 
 export const ordersService = {
   async createOrder(order: Omit<DatabaseOrder, 'id' | 'executed_at' | 'created_at' | 'updated_at'>): Promise<DatabaseOrder> {
-    // Buy window enforcement disabled for MVP - can be re-enabled later
-    logger.debug('Creating order without buy window enforcement (MVP mode)');
+    // CRITICAL: Validate buy window before processing
+    await buyWindowService.validateBuyWindow(order.team_id);
     
-    // Sanitize inputs
+    logger.debug('Creating order with buy window validation passed');
+    
+    // Get current team state BEFORE processing to capture immutable snapshots
+    const { data: team, error: teamError } = await supabase
+      .from('teams')
+      .select('market_cap, shares_outstanding')
+      .eq('id', order.team_id)
+      .single();
+    
+    if (teamError) throw teamError;
+    
+    // Calculate market cap states for immutable snapshots
+    const marketCapBefore = team.market_cap;
+    const sharesOutstandingBefore = team.shares_outstanding;
+    
+    const marketCapAfter = marketCapBefore + order.total_amount;
+    const sharesOutstandingAfter = sharesOutstandingBefore + order.quantity;
+    
+    // Sanitize inputs and add immutable snapshots
     const sanitizedOrder = {
       ...order,
       user_id: sanitizeInput(order.user_id, 'database'),
@@ -36,7 +60,12 @@ export const ordersService = {
       quantity: Math.max(1, Math.floor(order.quantity)),
       price_per_share: Math.max(0, order.price_per_share),
       total_amount: Math.max(0, order.total_amount),
-      status: order.status as 'PENDING' | 'FILLED' | 'CANCELLED'
+      status: order.status as 'PENDING' | 'FILLED' | 'CANCELLED',
+      // CRITICAL: Store immutable market cap snapshots
+      market_cap_before: marketCapBefore,
+      market_cap_after: marketCapAfter,
+      shares_outstanding_before: sharesOutstandingBefore,
+      shares_outstanding_after: sharesOutstandingAfter
     };
     
     const { data, error } = await supabase
@@ -46,6 +75,8 @@ export const ordersService = {
       .single();
     
     if (error) throw error;
+    
+    logger.debug(`Order created with immutable snapshots: Market cap ${marketCapBefore} → ${marketCapAfter}`);
     return data;
   },
 
