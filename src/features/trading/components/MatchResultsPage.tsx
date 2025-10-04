@@ -103,7 +103,7 @@ const MatchResultsPage: React.FC = () => {
 
       {/* Filter Controls */}
       <Card className="trading-card">
-        <CardContent className="p-4">
+        <CardContent className="p-3 sm:p-4">
           <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
             <Button 
               onClick={() => setFilter('all')} 
@@ -176,72 +176,77 @@ const MatchResultsPage: React.FC = () => {
           {filteredFixtures
             .sort((a, b) => new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime())
             .map((fixture) => (
-            <Card key={fixture.id} className="football-card group">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className="text-sm text-gray-400 font-medium bg-gray-700/50 px-3 py-1 rounded-full">
+            <Card key={fixture.id} className="trading-card group">
+              <CardContent className="p-4 sm:p-6">
+                {/* Mobile-first header layout */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="text-xs sm:text-sm text-gray-400 font-medium bg-gray-700/50 px-2 sm:px-3 py-1 rounded-full">
                       Matchday {fixture.matchday}
                     </div>
                     {getStatusBadge(fixture.status)}
                     {fixture.result !== 'pending' && getResultBadge(fixture.result)}
                   </div>
-                  <div className="text-sm text-gray-400 font-medium">
+                  <div className="text-xs sm:text-sm text-gray-400 font-medium">
                     {formatDate(fixture.kickoff_at)}
                   </div>
                 </div>
                 
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 text-center">
-                    <div className="text-lg font-semibold text-white flex items-center justify-center gap-3">
+                {/* Mobile-first match content */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  {/* Home Team */}
+                  <div className="flex-1 text-center sm:text-left">
+                    <div className="text-sm sm:text-lg font-semibold text-white flex items-center justify-center sm:justify-start gap-2 sm:gap-3">
                       <div className="team-logo-container">
                         <TeamLogo 
                           teamName={fixture.home_team?.name || 'Home Team'} 
                           externalId={fixture.home_team?.external_id ? parseInt(fixture.home_team.external_id) : undefined}
-                          size="md" 
+                          size="sm" 
                         />
                       </div>
                       <ClickableTeamName
                         teamName={fixture.home_team?.name || 'Home Team'}
                         teamId={fixture.home_team?.external_id ? parseInt(fixture.home_team.external_id) : undefined}
-                        className="hover:text-trading-primary transition-colors duration-200"
+                        className="hover:text-trading-primary transition-colors duration-200 text-xs sm:text-base"
                       />
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-6 mx-8">
-                    <div className="text-4xl font-bold text-white bg-gradient-card px-4 py-2 rounded-lg">
+                  {/* Score Section */}
+                  <div className="flex items-center justify-center gap-3 sm:gap-6">
+                    <div className="text-2xl sm:text-4xl font-bold text-white bg-gradient-card px-3 sm:px-4 py-2 rounded-lg">
                       {fixture.home_score !== null ? fixture.home_score : '-'}
                     </div>
-                    <div className="text-gray-400 font-semibold">vs</div>
-                    <div className="text-4xl font-bold text-white bg-gradient-card px-4 py-2 rounded-lg">
+                    <div className="text-gray-400 font-semibold text-sm sm:text-base">vs</div>
+                    <div className="text-2xl sm:text-4xl font-bold text-white bg-gradient-card px-3 sm:px-4 py-2 rounded-lg">
                       {fixture.away_score !== null ? fixture.away_score : '-'}
                     </div>
                   </div>
                   
-                  <div className="flex-1 text-center">
-                    <div className="text-lg font-semibold text-white flex items-center justify-center gap-3">
+                  {/* Away Team */}
+                  <div className="flex-1 text-center sm:text-right">
+                    <div className="text-sm sm:text-lg font-semibold text-white flex items-center justify-center sm:justify-end gap-2 sm:gap-3">
+                      <ClickableTeamName
+                        teamName={fixture.away_team?.name || 'Away Team'}
+                        teamId={fixture.away_team?.external_id ? parseInt(fixture.away_team.external_id) : undefined}
+                        className="hover:text-trading-primary transition-colors duration-200 text-xs sm:text-base"
+                      />
                       <div className="team-logo-container">
                         <TeamLogo 
                           teamName={fixture.away_team?.name || 'Away Team'} 
                           externalId={fixture.away_team?.external_id ? parseInt(fixture.away_team.external_id) : undefined}
-                          size="md" 
+                          size="sm" 
                         />
                       </div>
-                      <ClickableTeamName
-                        teamName={fixture.away_team?.name || 'Away Team'}
-                        teamId={fixture.away_team?.external_id ? parseInt(fixture.away_team.external_id) : undefined}
-                        className="hover:text-trading-primary transition-colors duration-200"
-                      />
                     </div>
                   </div>
                 </div>
 
                 {fixture.status === 'scheduled' && (
-                  <div className="mt-6 pt-4 border-t border-trading-primary/30">
+                  <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-trading-primary/30">
                     <div className="text-center">
-                      <div className="inline-flex items-center gap-2 bg-gradient-warning/20 text-warning px-4 py-2 rounded-full text-sm font-semibold">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="inline-flex items-center gap-2 bg-gradient-warning/20 text-warning px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-semibold">
+                        <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         Buy window closes: {formatDate(fixture.buy_close_at)}

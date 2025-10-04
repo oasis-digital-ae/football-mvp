@@ -413,7 +413,7 @@ const SeasonSimulation: React.FC = () => {
     };
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
             {/* Per-Game Simulation Card */}
             <Card>
                 <CardHeader>
@@ -427,36 +427,41 @@ const SeasonSimulation: React.FC = () => {
                         </TabsList>
                         
                         <TabsContent value="available" className="space-y-4">
-                            <div className="flex gap-4">
-                            <Select value={selectedGameId} onValueChange={setSelectedGameId}>
+                            {/* Mobile-first controls layout */}
+                            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                                <Select value={selectedGameId} onValueChange={setSelectedGameId}>
                                     <SelectTrigger className="flex-1">
                                         <SelectValue placeholder="Select a game to simulate" />
-                                </SelectTrigger>
-                                <SelectContent>
+                                    </SelectTrigger>
+                                    <SelectContent>
                                         {availableGames.map((game) => {
                                             const homeTeam = teams.find(t => t.id === game.home_team_id);
                                             const awayTeam = teams.find(t => t.id === game.away_team_id);
                                             return (
-                                        <SelectItem key={game.id} value={game.id}>
+                                                <SelectItem key={game.id} value={game.id}>
                                                     {homeTeam?.name || 'Home'} vs {awayTeam?.name || 'Away'}
-                                        </SelectItem>
+                                                </SelectItem>
                                             );
                                         })}
-                                </SelectContent>
-                            </Select>
-                                <Button
-                                    onClick={() => simulateSingleGame(selectedGameId)}
-                                    disabled={isLoading || !selectedGameId}
-                                >
-                                    {isLoading ? 'Simulating...' : 'Simulate Selected Game'}
-                                </Button>
-                        <Button
-                            onClick={simulateNextGame}
-                            disabled={isLoading || !nextGame}
-                                    variant="outline"
-                        >
-                            {isLoading ? 'Simulating...' : 'Simulate Next Game'}
-                        </Button>
+                                    </SelectContent>
+                                </Select>
+                                <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+                                    <Button
+                                        onClick={() => simulateSingleGame(selectedGameId)}
+                                        disabled={isLoading || !selectedGameId}
+                                        className="flex-1 sm:flex-none"
+                                    >
+                                        {isLoading ? 'Simulating...' : 'Simulate Selected Game'}
+                                    </Button>
+                                    <Button
+                                        onClick={simulateNextGame}
+                                        disabled={isLoading || !nextGame}
+                                        variant="outline"
+                                        className="flex-1 sm:flex-none"
+                                    >
+                                        {isLoading ? 'Simulating...' : 'Simulate Next Game'}
+                                    </Button>
+                                </div>
                             </div>
                             
                             {/* Debug Info */}
@@ -526,12 +531,13 @@ const SeasonSimulation: React.FC = () => {
                     <CardTitle>🔄 Reset Marketplace</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="flex gap-4 flex-wrap">
+                    {/* Mobile-first button layout */}
+                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                         <Button
                             onClick={resetMarketplaceComplete}
                             disabled={isLoading}
                             variant="default"
-                            className="bg-green-600 hover:bg-green-700"
+                            className="bg-green-600 hover:bg-green-700 flex-1 sm:flex-none"
                         >
                             {isLoading ? 'Resetting...' : '🔄 Complete Marketplace Reset'}
                         </Button>
@@ -539,7 +545,7 @@ const SeasonSimulation: React.FC = () => {
                             onClick={resetMarketCapsOnly}
                             disabled={isLoading}
                             variant="secondary"
-                            className="bg-blue-600 hover:bg-blue-700"
+                            className="bg-blue-600 hover:bg-blue-700 flex-1 sm:flex-none"
                         >
                             {isLoading ? 'Resetting...' : 'Reset Market Caps Only'}
                         </Button>
@@ -547,44 +553,50 @@ const SeasonSimulation: React.FC = () => {
                             onClick={resetAllProfilesAndInvestments}
                             disabled={isLoading}
                             variant="destructive"
-                            className="bg-red-600 hover:bg-red-700"
+                            className="bg-red-600 hover:bg-red-700 flex-1 sm:flex-none"
                         >
                             {isLoading ? 'Resetting...' : 'Reset All Profiles & Investments'}
                         </Button>
                     </div>
 
-                    <div className="text-sm text-gray-400">
-                        <p><strong>🔄 Complete Marketplace Reset:</strong></p>
-                        <ul className="list-disc list-inside ml-4 space-y-1">
-                            <li>All team market caps to $100</li>
-                            <li>All shares outstanding to 5</li>
-                            <li>All fixtures reset to pending</li>
-                            <li>Clear ALL ledger data (total_ledger)</li>
-                            <li>Clear ALL transfer data (transfers_ledger)</li>
-                            <li>Clear ALL orders and positions</li>
-                            <li>Create fresh initial ledger entries</li>
-                        </ul>
-                        <p className="mt-2 text-red-400">⚠️ This will delete ALL user data and investments</p>
+                    <div className="text-xs sm:text-sm text-gray-400 space-y-3">
+                        <div>
+                            <p className="font-semibold mb-2">🔄 Complete Marketplace Reset:</p>
+                            <ul className="list-disc list-inside ml-3 sm:ml-4 space-y-1">
+                                <li>All team market caps to $100</li>
+                                <li>All shares outstanding to 5</li>
+                                <li>All fixtures reset to pending</li>
+                                <li>Clear ALL ledger data (total_ledger)</li>
+                                <li>Clear ALL transfer data (transfers_ledger)</li>
+                                <li>Clear ALL orders and positions</li>
+                                <li>Create fresh initial ledger entries</li>
+                            </ul>
+                            <p className="mt-2 text-red-400 text-xs sm:text-sm">⚠️ This will delete ALL user data and investments</p>
+                        </div>
                         
-                        <p className="mt-4"><strong>Reset Market Caps Only:</strong></p>
-                        <ul className="list-disc list-inside ml-4 space-y-1">
-                            <li>All team market caps to $100</li>
-                            <li>All shares outstanding to 5</li>
-                            <li>All games to scheduled status</li>
-                            <li>Clear all match scores and snapshots</li>
-                            <li>Clear all team state snapshots (except initial)</li>
-                            <li>Recreate fresh initial snapshots</li>
-                        </ul>
-                        <p className="mt-2 text-yellow-400">⚠️ User investments will be preserved</p>
+                        <div>
+                            <p className="font-semibold mb-2">Reset Market Caps Only:</p>
+                            <ul className="list-disc list-inside ml-3 sm:ml-4 space-y-1">
+                                <li>All team market caps to $100</li>
+                                <li>All shares outstanding to 5</li>
+                                <li>All games to scheduled status</li>
+                                <li>Clear all match scores and snapshots</li>
+                                <li>Clear all team state snapshots (except initial)</li>
+                                <li>Recreate fresh initial snapshots</li>
+                            </ul>
+                            <p className="mt-2 text-yellow-400 text-xs sm:text-sm">⚠️ User investments will be preserved</p>
+                        </div>
                         
-                        <p className="mt-4"><strong>Reset All Profiles & Investments:</strong></p>
-                        <ul className="list-disc list-inside ml-4 space-y-1">
-                            <li>Delete ALL user profiles from database</li>
-                            <li>Delete ALL user positions</li>
-                            <li>Delete ALL user orders</li>
-                            <li>Clear all team state snapshots (except initial)</li>
-                        </ul>
-                        <p className="mt-2 text-red-400">⚠️ This action CANNOT be undone!</p>
+                        <div>
+                            <p className="font-semibold mb-2">Reset All Profiles & Investments:</p>
+                            <ul className="list-disc list-inside ml-3 sm:ml-4 space-y-1">
+                                <li>Delete ALL user profiles from database</li>
+                                <li>Delete ALL user positions</li>
+                                <li>Delete ALL user orders</li>
+                                <li>Clear all team state snapshots (except initial)</li>
+                            </ul>
+                            <p className="mt-2 text-red-400 text-xs sm:text-sm">⚠️ This action CANNOT be undone!</p>
+                        </div>
                     </div>
                 </CardContent>
             </Card>
