@@ -12,7 +12,6 @@ import { fixturesService } from '@/shared/lib/database';
 import type { DatabaseFixture } from '@/shared/lib/database';
 import { FixtureSync } from './FixtureSync';
 import { TeamSync } from './TeamSync';
-import { TeamOrderTimeline } from './TeamOrderTimeline';
 import { useToast } from '@/shared/hooks/use-toast';
 import { ChevronDown, ChevronUp, Activity, Users } from 'lucide-react';
 import { useRealtimeMarket } from '@/shared/hooks/useRealtimeMarket';
@@ -515,10 +514,6 @@ export const ClubValuesPage: React.FC = () => {
         <FixtureSync />
       </div>
       
-      {/* Order History Timeline */}
-      <div className="mt-6">
-        <TeamOrderTimeline />
-      </div>
       
       <PurchaseConfirmationModal
         isOpen={confirmationData !== null}

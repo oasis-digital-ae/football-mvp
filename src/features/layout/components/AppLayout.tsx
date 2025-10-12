@@ -5,7 +5,6 @@ import ClubValuesPage from '../../trading/components/ClubValuesPage';
 import PortfolioPage from '../../trading/components/PortfolioPage';
 import MatchResultsPage from '../../trading/components/MatchResultsPage';
 import StandingsPage from '../../trading/components/StandingsPage';
-import LaunchPage from '../../trading/components/LaunchPage';
 import SeasonSimulation from '../../trading/components/SeasonSimulation';
 import { AdminDashboard } from '../../admin/components/AdminDashboard';
 
@@ -23,8 +22,6 @@ const AppLayout: React.FC = () => {
         return <MatchResultsPage />;
       case 'standings':
         return <StandingsPage />;
-      case 'launch':
-        return <LaunchPage />;
       case 'season-simulation':
         return <SeasonSimulation />;
       case 'admin':

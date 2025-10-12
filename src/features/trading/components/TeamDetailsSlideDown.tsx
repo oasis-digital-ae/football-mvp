@@ -219,17 +219,45 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
 
     setLoading(true);
     try {
-      // Fetch user position and timeline的数据 in parallel
-      const [positionResult, timelineData] = await Promise.all([
+      // Fetch user position, orders, and match data in parallel
+      const [positionResult, ordersData, matchData] = await Promise.all([
         positionsService.getByUserIdAndTeamId(userId, teamId),
-        supabase.rpc('get_team_complete_timeline', { p_team_id: teamId })
+        supabase
+          .from('orders')
+          .select(`
+            id,
+            user_id,
+            team_id,
+            order_type,
+            quantity,
+            price_per_share,
+            total_amount,
+            status,
+            executed_at,
+            created_at,
+            market_cap_before,
+            market_cap_after,
+            shares_outstanding_before,
+            shares_outstanding_after,
+            profiles!inner(username, full_name),
+            teams!inner(name, market_cap, shares_outstanding)
+          `)
+          .eq('team_id', teamId)
+          .eq('status', 'FILLED')
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('total_ledger')
+          .select('*')
+          .eq('team_id', teamId)
+          .in('ledger_type', ['match_win', 'match_loss', 'match_draw'])
+          .order('created_at', { ascending: true })
       ]);
 
-      if (timelineData.error) {
+      if (ordersData.error || matchData.error) {
         // Handle error silently in production
         if (process.env.NODE_ENV === 'development') {
-          console.error('Failed to get team timeline:', timelineData.error);
-          console.error('Error details:', JSON.stringify(timelineData.error, null, 2));
+          console.error('Failed to get team data:', ordersData.error || matchData.error);
+          console.error('Error details:', JSON.stringify(ordersData.error || matchData.error, null, 2));
         }
         setMatchHistory([]);
         setLoading(false);
@@ -237,15 +265,47 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
         return;
       }
 
-      // Process timeline data into display format (only matches, no purchases)
+      // Process orders into timeline events
       const processedEvents = [];
-      for (const event of timelineData.data || []) {
-        if (event.event_type === 'initial' || event.event_type === 'purchase') {
-          continue; // Skip initial event and purchase events (handled in Orders tab)
+      
+      // Add purchase events from orders
+      for (const order of ordersData.data || []) {
+        const isPurchase = true;
+        const isMatch = false;
+        
+        // Calculate user P/L for purchases if user has position
+        let userPL = 0;
+        if (positionResult && positionResult.quantity > 0) {
+          const currentPrice = order.teams?.market_cap / order.teams?.shares_outstanding || order.price_per_share;
+          userPL = (currentPrice - order.price_per_share) * order.quantity;
         }
 
-        const isMatch = event.event_type === 'match';
-        const isPurchase = false; // No purchases in matches tab
+        processedEvents.push({
+          event_type: 'share_purchase',
+          date: order.executed_at || order.created_at,
+          description: `Purchase: ${order.quantity} shares @ ${formatCurrency(order.price_per_share)}`,
+          marketCapBefore: order.market_cap_before,
+          marketCapAfter: order.market_cap_after,
+          sharesOutstanding: order.shares_outstanding_after,
+          sharePriceBefore: order.market_cap_before / order.shares_outstanding_before,
+          sharePriceAfter: order.market_cap_after / order.shares_outstanding_after,
+          priceImpact: order.market_cap_after - order.market_cap_before,
+          priceImpactPercent: order.market_cap_before > 0 ? ((order.market_cap_after - order.market_cap_before) / order.market_cap_before) * 100 : 0,
+          sharesTraded: order.quantity,
+          tradeAmount: order.total_amount,
+          opponentName: '',
+          matchResult: '',
+          score: '',
+          userPL: userPL,
+          isMatch: isMatch,
+          isPurchase: isPurchase
+        });
+      }
+
+      // Add match events from total_ledger
+      for (const event of matchData.data || []) {
+        const isMatch = ['match_win', 'match_loss', 'match_draw'].includes(event.ledger_type);
+        const isPurchase = false;
 
         // Calculate user P/L for matches if user has position
         let userPL = 0;
@@ -253,22 +313,27 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
           userPL = (event.share_price_after - event.share_price_before) * positionResult.quantity;
         }
 
+        // Determine match result
+        let matchResult = 'draw';
+        if (event.ledger_type === 'match_win') matchResult = 'win';
+        else if (event.ledger_type === 'match_loss') matchResult = 'loss';
+
         processedEvents.push({
-          event_type: event.event_type,
-          date: event.event_date,
-          description: event.description,
+          event_type: event.ledger_type,
+          date: event.created_at,
+          description: event.event_description || 'Match Result',
           marketCapBefore: event.market_cap_before,
           marketCapAfter: event.market_cap_after,
-          sharesOutstanding: event.shares_outstanding,
+          sharesOutstanding: event.shares_outstanding_after,
           sharePriceBefore: event.share_price_before,
           sharePriceAfter: event.share_price_after,
-          priceImpact: event.price_impact,
-          priceImpactPercent: event.market_cap_before > 0 ? (event.price_impact / event.market_cap_before) * 100 : 0,
+          priceImpact: event.market_cap_after - event.market_cap_before,
+          priceImpactPercent: event.market_cap_before > 0 ? ((event.market_cap_after - event.market_cap_before) / event.market_cap_before) * 100 : 0,
           sharesTraded: event.shares_traded,
-          tradeAmount: event.trade_amount,
-          opponentName: event.opponent_name,
-          matchResult: event.match_result,
-          score: event.score,
+          tradeAmount: event.amount_transferred,
+          opponentName: '',
+          matchResult: matchResult,
+          score: '',
           userPL: userPL,
           isMatch: isMatch,
           isPurchase: isPurchase
@@ -480,42 +545,44 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                     {event.description}
                                   </span>
                                 </div>
-                                <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${getResultColor(event.matchResult || 'purchase')}`}>
-                                  {getResultIcon(event.matchResult || 'purchase')}
-                                  <span>{getResultBadge(event.matchResult || 'purchase')}</span>
+                                <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${
+                                  event.isPurchase ? 'bg-blue-500 text-white' : getResultColor(event.matchResult || 'purchase')
+                                }`}>
+                                  {event.isPurchase ? <DollarSign className="w-4 h-4" /> : getResultIcon(event.matchResult || 'purchase')}
+                                  <span>{event.isPurchase ? 'BUY' : getResultBadge(event.matchResult || 'purchase')}</span>
                                 </div>
                               </div>
                               
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
-                                <div>
-                                  <span className="text-gray-600 dark:text-gray-400">Market Cap Impact:</span>
-                                  <div className="font-medium">
-                                    {formatCurrency(event.marketCapBefore)} → {formatCurrency(event.marketCapAfter)}
-                                    <span className={`ml-2 ${event.priceImpactPercent > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                      ({event.priceImpactPercent > 0 ? '+' : ''}{formatCurrency(event.marketCapAfter - event.marketCapBefore)})
-                                    </span>
-                                  </div>
-                                </div>
-                                
-                                <div>
-                                  <span className="text-gray-600 dark:text-gray-400">Share Price:</span>
-                                  <div className="font-medium">
-                                    ${event.sharePriceBefore.toFixed(1)} → ${event.sharePriceAfter.toFixed(1)}
-                                    {event.priceImpactPercent !== 0 && (
-                                      <span className={`ml-2 ${event.priceImpactPercent > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                        {event.priceImpactPercent > 0 ? '+' : ''}{event.priceImpactPercent.toFixed(1)}%
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {event.isPurchase && (
-                                <div className="mt-2 text-sm">
-                                  <span className="text-gray-600 dark:text-gray-400">Cash Injection:</span>
+                              {event.isPurchase ? (
+                                <div className="text-sm">
+                                  <span className="text-gray-600 dark:text-gray-400">Cash Added:</span>
                                   <span className="font-medium text-blue-600 ml-2">
-                                    {formatCurrency(event.tradeAmount)} ({event.sharesTraded} shares)
+                                    {formatCurrency(event.tradeAmount)}
                                   </span>
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
+                                  <div>
+                                    <span className="text-gray-600 dark:text-gray-400">Market Cap Impact:</span>
+                                    <div className="font-medium">
+                                      {formatCurrency(event.marketCapBefore)} → {formatCurrency(event.marketCapAfter)}
+                                      <span className={`ml-2 ${event.priceImpactPercent > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        ({event.priceImpactPercent > 0 ? '+' : ''}{formatCurrency(event.marketCapAfter - event.marketCapBefore)})
+                                      </span>
+                                    </div>
+                                  </div>
+                                  
+                                  <div>
+                                    <span className="text-gray-600 dark:text-gray-400">Share Price:</span>
+                                    <div className="font-medium">
+                                      ${event.sharePriceBefore.toFixed(1)} → ${event.sharePriceAfter.toFixed(1)}
+                                      {event.priceImpactPercent !== 0 && (
+                                        <span className={`ml-2 ${event.priceImpactPercent > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                          {event.priceImpactPercent > 0 ? '+' : ''}{event.priceImpactPercent.toFixed(1)}%
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
                               )}
 
