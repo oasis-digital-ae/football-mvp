@@ -1,12 +1,17 @@
-import React, { useContext, useState, useMemo, useCallback } from 'react';
+import React, { useContext, useState, useMemo, useCallback, useEffect } from 'react';
 import { AppContext } from '@/features/trading/contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { formatCurrency, formatNumber } from '@/shared/lib/formatters';
 import TransactionHistoryModal from './TransactionHistoryModal';
+import { useAuth } from '@/features/auth/contexts/AuthContext';
+import { realtimeService } from '@/shared/lib/services/realtime.service';
+import { useToast } from '@/shared/hooks/use-toast';
 
 const PortfolioPage: React.FC = () => {
   const { portfolio, getTransactionsByClub } = useContext(AppContext);
   const [selectedClub, setSelectedClub] = useState<{ id: string; name: string } | null>(null);
+  const { user } = useAuth();
+  const { toast } = useToast();
 
   // Memoized KPI calculations
   const { totalInvested, totalMarketValue, totalProfitLoss } = useMemo(() => {
@@ -28,6 +33,27 @@ const PortfolioPage: React.FC = () => {
   const handleCloseModal = useCallback(() => {
     setSelectedClub(null);
   }, []);
+
+  // Realtime portfolio updates
+  useEffect(() => {
+    if (!user) return;
+    
+    const channel = realtimeService.subscribeToPortfolio(user.id, (position) => {
+      // Show notification when portfolio updates
+      toast({
+        title: "Portfolio Updated",
+        description: "Your portfolio has been updated with the latest changes.",
+        duration: 3000,
+      });
+      
+      // Note: The portfolio will be refreshed automatically by the AppContext
+      // when the underlying data changes through other realtime subscriptions
+    });
+
+    return () => {
+      realtimeService.unsubscribe(channel);
+    };
+  }, [user, toast]);
 
   return (
     <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">

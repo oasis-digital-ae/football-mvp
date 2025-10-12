@@ -6,7 +6,15 @@
 -- WARNING: This will delete ALL data!
 
 -- =====================================================
--- 1. CLEAR ALL DATA (in dependency order)
+-- 1. SAVE ADMIN USERS
+-- =====================================================
+
+-- Save admin users before reset to preserve admin status
+CREATE TEMP TABLE IF NOT EXISTS temp_admin_users AS
+SELECT id FROM profiles WHERE is_admin = true;
+
+-- =====================================================
+-- 2. CLEAR ALL DATA (in dependency order)
 -- =====================================================
 
 -- Clear transfers ledger first (references fixtures)
@@ -28,7 +36,7 @@ DELETE FROM teams;
 DELETE FROM profiles;
 
 -- =====================================================
--- 2. RESET SEQUENCES
+-- 3. RESET SEQUENCES
 -- =====================================================
 
 -- Reset auto-increment sequences
@@ -39,7 +47,7 @@ ALTER SEQUENCE positions_id_seq RESTART WITH 1;
 ALTER SEQUENCE transfers_ledger_id_seq RESTART WITH 1;
 
 -- =====================================================
--- 3. INSERT INITIAL TEAMS DATA
+-- 4. INSERT INITIAL TEAMS DATA
 -- =====================================================
 
 -- Insert Premier League teams with initial values
@@ -66,15 +74,33 @@ INSERT INTO teams (external_id, name, short_name, logo_url, launch_price, initia
 (715, 'Ipswich Town FC', 'IPS', 'https://crests.football-data.org/715.png', 20.00, 100.00, 100.00, 5, 5, 5);
 
 -- =====================================================
--- 4. SUCCESS MESSAGE
+-- 5. RESTORE ADMIN STATUS
+-- =====================================================
+
+-- Restore admin status for users who were admins before reset
+-- This works after users log back in and profiles are recreated by auth triggers
+UPDATE profiles 
+SET is_admin = true 
+WHERE id IN (SELECT id FROM temp_admin_users);
+
+-- Clean up temporary table
+DROP TABLE IF EXISTS temp_admin_users;
+
+-- =====================================================
+-- 6. SUCCESS MESSAGE
 -- =====================================================
 
 DO $$
+DECLARE
+    v_admin_count INTEGER;
 BEGIN
+    SELECT COUNT(*) INTO v_admin_count FROM profiles WHERE is_admin = true;
+    
     RAISE NOTICE '✅ Database reset complete!';
     RAISE NOTICE '📊 Teams: 20 Premier League teams inserted';
     RAISE NOTICE '💰 Initial values: $100 market cap, $20 launch price, 5 shares';
     RAISE NOTICE '🔄 All sequences reset to 1';
     RAISE NOTICE '🗑️ All user data cleared';
+    RAISE NOTICE '👑 Admin users preserved: %', v_admin_count;
 END $$;
 

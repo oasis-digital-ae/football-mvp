@@ -9,12 +9,14 @@ interface UserProfile {
   birthday: string;
   country: string;
   phone: string;
+  is_admin?: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
+  isAdmin: boolean;
   signUp: (email: string, password: string, userData: Omit<UserProfile, 'id' | 'email'>) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -139,6 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user,
       profile,
       loading,
+      isAdmin: profile?.is_admin ?? false,
       signUp,
       signIn,
       signOut

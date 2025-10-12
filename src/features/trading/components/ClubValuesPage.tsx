@@ -12,8 +12,12 @@ import { fixturesService } from '@/shared/lib/database';
 import type { DatabaseFixture } from '@/shared/lib/database';
 import { FixtureSync } from './FixtureSync';
 import { TeamSync } from './TeamSync';
+import { TeamOrderTimeline } from './TeamOrderTimeline';
 import { useToast } from '@/shared/hooks/use-toast';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Activity, Users } from 'lucide-react';
+import { useRealtimeMarket } from '@/shared/hooks/useRealtimeMarket';
+import { useRealtimeOrders } from '@/shared/hooks/useRealtimeOrders';
+import { useRealtimePresence } from '@/shared/hooks/useRealtimePresence';
 
 export const ClubValuesPage: React.FC = () => {
   const { clubs, matches, purchaseClub, user } = useAppContext();
@@ -26,11 +30,41 @@ export const ClubValuesPage: React.FC = () => {
     externalId?: number;
     pricePerShare: number;
   } | null>(null);
+  const [isPurchasing, setIsPurchasing] = useState(false);
+  const [purchasingClubId, setPurchasingClubId] = useState<string | null>(null);
+
+  // Realtime subscriptions
+  const { lastUpdate, isConnected: marketConnected } = useRealtimeMarket();
+  const { recentOrders, isConnected: ordersConnected, clearOrders } = useRealtimeOrders();
+  const { activeUsers, isConnected: presenceConnected } = useRealtimePresence('marketplace');
 
   // Load fixtures on component mount and when clubs change
   useEffect(() => {
     loadFixtures();
   }, [clubs]); // Refresh fixtures when clubs data changes (e.g., after simulation)
+
+  // Show toast when market updates
+  useEffect(() => {
+    if (lastUpdate) {
+      toast({
+        title: "Market Update",
+        description: `${lastUpdate.team.name} price updated!`,
+        duration: 3000,
+      });
+    }
+  }, [lastUpdate, toast]);
+
+  // Show toast when new orders come in
+  useEffect(() => {
+    if (recentOrders.length > 0) {
+      const latestOrder = recentOrders[0];
+      toast({
+        title: "New Trade",
+        description: `${latestOrder.order.quantity} shares traded`,
+        duration: 2000,
+      });
+    }
+  }, [recentOrders.length, toast]);
 
   const loadFixtures = async () => {
     try {
@@ -110,6 +144,9 @@ export const ClubValuesPage: React.FC = () => {
   }, [clubs]);
 
   const handlePurchaseClick = useCallback((clubId: string) => {
+    // Prevent multiple clicks while a purchase is in progress
+    if (isPurchasing) return;
+    
     const club = clubs.find(c => c.id === clubId);
     if (!club) return;
     
@@ -121,10 +158,13 @@ export const ClubValuesPage: React.FC = () => {
       externalId: club.externalId ? parseInt(club.externalId) : undefined,
       pricePerShare
     });
-  }, [clubs]);
+  }, [clubs, isPurchasing]);
   
   const confirmPurchase = useCallback(async (shares: number) => {
-    if (!confirmationData) return;
+    if (!confirmationData || isPurchasing) return;
+    
+    setIsPurchasing(true);
+    setPurchasingClubId(confirmationData.clubId);
     
     try {
       await purchaseClub(confirmationData.clubId, shares);
@@ -140,8 +180,11 @@ export const ClubValuesPage: React.FC = () => {
         description: error?.message || 'An unknown error occurred',
         variant: "destructive",
       });
+    } finally {
+      setIsPurchasing(false);
+      setPurchasingClubId(null);
     }
-  }, [confirmationData, purchaseClub, toast]);
+  }, [confirmationData, purchaseClub, toast, isPurchasing]);
 
   return (
     <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
@@ -311,9 +354,10 @@ export const ClubValuesPage: React.FC = () => {
                           <Button
                             onClick={() => handlePurchaseClick(club.id)}
                             size="sm"
-                            className="bg-gradient-success hover:bg-gradient-success/80 text-white font-semibold px-4 py-2 rounded-lg transition-all duration-200 hover:scale-105"
+                            disabled={isPurchasing}
+                            className="bg-gradient-success hover:bg-gradient-success/80 text-white font-semibold px-4 py-2 rounded-lg transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                           >
-                            Buy
+                            {isPurchasing && purchasingClubId === club.id ? 'Processing...' : 'Buy'}
                           </Button>
                         </td>
                       </tr>
@@ -392,9 +436,10 @@ export const ClubValuesPage: React.FC = () => {
                     <Button
                       onClick={() => handlePurchaseClick(club.id)}
                       size="sm"
-                      className="bg-gradient-success hover:bg-gradient-success/80 text-white font-semibold px-3 py-1 text-xs rounded-md"
+                      disabled={isPurchasing}
+                      className="bg-gradient-success hover:bg-gradient-success/80 text-white font-semibold px-3 py-1 text-xs rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Buy
+                      {isPurchasing && purchasingClubId === club.id ? 'Processing...' : 'Buy'}
                     </Button>
                   </div>
                   
@@ -470,6 +515,11 @@ export const ClubValuesPage: React.FC = () => {
         <FixtureSync />
       </div>
       
+      {/* Order History Timeline */}
+      <div className="mt-6">
+        <TeamOrderTimeline />
+      </div>
+      
       <PurchaseConfirmationModal
         isOpen={confirmationData !== null}
         onClose={() => setConfirmationData(null)}
@@ -478,7 +528,93 @@ export const ClubValuesPage: React.FC = () => {
         clubId={confirmationData?.clubId}
         externalId={confirmationData?.externalId}
         pricePerShare={confirmationData?.pricePerShare || 0}
+        isProcessing={isPurchasing}
       />
+
+      {/* Realtime UI Components */}
+      
+      {/* Live Trade Feed */}
+      <div className="fixed bottom-4 right-4 w-80 z-50">
+        <Card className="bg-gray-900/95 backdrop-blur-sm border-gray-700">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <Activity className={`h-4 w-4 ${ordersConnected ? 'text-green-500 animate-pulse' : 'text-gray-500'}`} />
+                <span>Live Trade Feed</span>
+                {recentOrders.length > 0 && (
+                  <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                    {recentOrders.length}
+                  </span>
+                )}
+              </div>
+              {recentOrders.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearOrders}
+                  className="h-6 w-6 p-0 text-gray-400 hover:text-white"
+                >
+                  ×
+                </Button>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {recentOrders.length > 0 ? (
+                recentOrders.map((orderItem, idx) => (
+                  <div key={idx} className="text-xs bg-gray-800/50 p-2 rounded border border-gray-700/50">
+                    <div className="flex justify-between items-center">
+                      <span className="text-green-400 font-medium">
+                        {orderItem.order.quantity} shares
+                      </span>
+                      <span className="text-white">
+                        {formatCurrency(orderItem.order.price_per_share)}
+                      </span>
+                    </div>
+                    <div className="text-gray-400 text-xs mt-1">
+                      {new Date(orderItem.timestamp).toLocaleTimeString()}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-gray-400 text-xs text-center py-4">
+                  {ordersConnected ? 'Waiting for trades...' : 'Connecting...'}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Active Users Indicator */}
+      <div className="fixed top-4 right-4 z-50">
+        <Card className="bg-gray-900/95 backdrop-blur-sm border-gray-700">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 text-sm">
+              <Users className={`h-4 w-4 ${presenceConnected ? 'text-blue-500' : 'text-gray-500'}`} />
+              <span className="text-white">
+                {activeUsers} active
+              </span>
+              <div className={`w-2 h-2 rounded-full ${presenceConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`} />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Market Connection Status */}
+      <div className="fixed bottom-4 left-4 z-50">
+        <Card className="bg-gray-900/95 backdrop-blur-sm border-gray-700">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 text-sm">
+              <div className={`w-2 h-2 rounded-full ${marketConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+              <span className="text-white">
+                {marketConnected ? 'Live Market' : 'Connecting...'}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
     </div>
   );

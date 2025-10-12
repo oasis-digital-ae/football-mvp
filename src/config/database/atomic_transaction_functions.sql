@@ -72,6 +72,32 @@ BEGIN
     v_shares_outstanding_before, v_shares_outstanding_after
   ) RETURNING id INTO v_order_id;
   
+  -- Log the purchase for audit trail
+  INSERT INTO audit_log (
+    user_id,
+    action,
+    table_name,
+    record_id,
+    new_values,
+    created_at
+  ) VALUES (
+    p_user_id,
+    'share_purchase',
+    'orders',
+    v_order_id,
+    jsonb_build_object(
+      'team_id', p_team_id,
+      'shares', p_shares,
+      'price_per_share', p_price_per_share,
+      'total_amount', p_total_amount,
+      'market_cap_before', v_market_cap_before,
+      'market_cap_after', v_market_cap_after,
+      'shares_outstanding_before', v_shares_outstanding_before,
+      'shares_outstanding_after', v_shares_outstanding_after
+    ),
+    NOW()
+  );
+  
   -- Update team market cap and shares atomically
   UPDATE teams SET
     market_cap = v_market_cap_after,

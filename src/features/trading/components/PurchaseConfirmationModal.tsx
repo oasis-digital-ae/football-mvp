@@ -18,6 +18,7 @@ interface PurchaseConfirmationModalProps {
   externalId?: number;
   pricePerShare: number;
   maxShares?: number;
+  isProcessing?: boolean;
 }
 
 export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps> = ({
@@ -28,7 +29,8 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
   clubId,
   externalId,
   pricePerShare,
-  maxShares = 10000
+  maxShares = 10000,
+  isProcessing = false
 }) => {
   const [shares, setShares] = useState<number>(1);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -60,6 +62,9 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
   };
 
   const handleConfirm = () => {
+    // Prevent multiple clicks while processing
+    if (isProcessing) return;
+    
     try {
       // Final validation before confirming using enhanced validation with sanitization
       const validation = validateAndSanitize(AppValidators.sharePurchaseModal, {
@@ -174,10 +179,10 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={!isValid || shares <= 0}
+            disabled={!isValid || shares <= 0 || isProcessing}
             className="flex-1 bg-gradient-success hover:bg-gradient-success/80 disabled:bg-gray-600 text-white font-semibold transition-all duration-200 disabled:hover:scale-100"
           >
-            Confirm Purchase
+            {isProcessing ? 'Processing...' : 'Confirm Purchase'}
           </Button>
         </DialogFooter>
       </DialogContent>

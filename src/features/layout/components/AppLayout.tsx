@@ -7,6 +7,7 @@ import MatchResultsPage from '../../trading/components/MatchResultsPage';
 import StandingsPage from '../../trading/components/StandingsPage';
 import LaunchPage from '../../trading/components/LaunchPage';
 import SeasonSimulation from '../../trading/components/SeasonSimulation';
+import { AdminDashboard } from '../../admin/components/AdminDashboard';
 
 const AppLayout: React.FC = () => {
   const { currentPage, setCurrentPage } = useAppContext();
@@ -26,6 +27,8 @@ const AppLayout: React.FC = () => {
         return <LaunchPage />;
       case 'season-simulation':
         return <SeasonSimulation />;
+      case 'admin':
+        return <AdminDashboard />;
       default:
         return <ClubValuesPage />;
     }
