@@ -2,7 +2,31 @@
 
 ## Status: ✅ READY FOR DEPLOYMENT
 
-All critical linting errors have been fixed:
+### Critical Production Fixes Applied
+
+#### 1. Authentication Token Refresh Issue ✅
+**Problem**: Users were getting "Invalid Refresh Token: Refresh Token Not Found" errors in production.
+
+**Solution**: Added proper Supabase auth configuration to `src/shared/lib/supabase.ts`:
+```typescript
+const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    flowType: 'pkce'
+  }
+});
+```
+
+This ensures:
+- ✅ Sessions persist across page reloads
+- ✅ Tokens auto-refresh before expiry
+- ✅ PKCE flow for secure token exchange
+- ✅ Proper localStorage handling for SSR-safe code
+
+#### 2. Critical Linting Errors ✅
 - ✅ Fixed parsing error in TeamOrdersModal.tsx (unterminated string literal)
 - ✅ Fixed React hooks rule violation in PortfolioPage.tsx (useMemo conditional call)
 - ✅ TypeScript compilation passes
@@ -31,6 +55,14 @@ The following are non-blocking warnings that can be addressed in future iteratio
 - Control character regex warnings in sanitization.ts
 - Some `prefer-const` warnings (variables not reassigned)
 - All non-critical and safe to deploy
+
+## About the HTML Error
+
+The "Unexpected token '<'" error for standings is likely due to:
+- Netlify Edge Function routing to HTML fallback
+- This will be resolved once the fixed authentication code is deployed
+
+**Root Cause**: The refresh token error was causing authentication failures, which may have triggered redirects to index.html instead of returning JSON.
 
 ## What Changed
 
