@@ -577,8 +577,8 @@ export const ClubValuesPage: React.FC = () => {
         isProcessing={isPurchasing}
       />
 
-      {/* Active Users Indicator */}
-      <div className="fixed top-4 right-4 z-50">
+      {/* Active Users Indicator - Moved to avoid nav overlap */}
+      <div className="fixed top-20 right-4 z-40">
         <Card className="bg-gray-900/95 backdrop-blur-sm border-gray-700">
           <CardContent className="p-3">
             <div className="flex items-center gap-2 text-sm">

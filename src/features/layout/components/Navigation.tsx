@@ -46,9 +46,9 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
   return (
     <nav className="bg-gradient-primary border-b border-trading-primary/20 backdrop-blur-md sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16 gap-4">
+        <div className="flex justify-between items-center h-16 gap-6">
           {/* Logo and Brand */}
-          <div className="flex items-center space-x-3 flex-shrink-0 pr-4">
+          <div className="flex items-center space-x-3 flex-shrink-0">
             <div className="flex items-center justify-center w-10 h-10 bg-trading-primary rounded-full primary-glow flex-shrink-0">
               <Trophy className="w-6 h-6 text-white" />
             </div>
@@ -57,8 +57,8 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
             </h1>
           </div>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-1">
+          {/* Desktop Navigation - Centered */}
+          <div className="hidden md:flex items-center space-x-1 flex-1 justify-center max-w-2xl mx-auto">
             {pages.map((page) => {
               const Icon = page.icon;
               const isActive = currentPage === page.id;
@@ -69,7 +69,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
                   variant="ghost"
                   onClick={() => onPageChange(page.id)}
                   className={`
-                    flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200
+                    flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-200
                     ${isActive 
                       ? 'bg-trading-primary text-white border border-trading-primary shadow-lg' 
                       : 'text-gray-300 hover:text-white hover:bg-white/10'
@@ -83,34 +83,34 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
             })}
           </div>
 
-          {/* User Menu */}
-          <div className="flex items-center space-x-3">
+          {/* User Menu - Improved spacing */}
+          <div className="flex items-center space-x-2 flex-shrink-0">
             {profile && (
               <>
-                <div className="hidden sm:flex items-center space-x-3 text-gray-300">
-                  <div className="flex items-center space-x-2 px-3 py-1.5 bg-gray-700/50 rounded-lg border border-gray-600">
-                    <Wallet className="w-4 h-4 text-trading-primary" />
-                    <span className="text-sm font-semibold">{formatCurrency(walletBalance)}</span>
+                <div className="hidden md:flex items-center space-x-2 text-gray-300">
+                  <div className="flex items-center space-x-1.5 px-2.5 py-1.5 bg-gray-700/50 rounded-lg border border-gray-600">
+                    <Wallet className="w-4 h-4 text-trading-primary flex-shrink-0" />
+                    <span className="text-sm font-semibold whitespace-nowrap">{formatCurrency(walletBalance)}</span>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <User className="w-4 h-4" />
-                    <span className="text-sm font-medium">{profile.full_name}</span>
+                  <div className="hidden lg:flex items-center space-x-1.5 px-2">
+                    <User className="w-4 h-4 flex-shrink-0" />
+                    <span className="text-sm font-medium whitespace-nowrap truncate max-w-[120px]">{profile.full_name}</span>
                   </div>
                 </div>
                 <Button
                   onClick={() => setDepositModalOpen(true)}
-                  className="hidden sm:flex items-center space-x-2 bg-trading-primary hover:bg-trading-primary/80 text-white px-3 py-1.5"
+                  className="hidden sm:flex items-center space-x-1.5 bg-trading-primary hover:bg-trading-primary/80 text-white px-3 py-1.5 flex-shrink-0"
                   size="sm"
                 >
-                  <Wallet className="w-4 h-4" />
-                  <span>Deposit</span>
+                  <Wallet className="w-3.5 h-3.5" />
+                  <span className="text-sm">Deposit</span>
                 </Button>
               </>
             )}
             <Button 
               variant="ghost" 
               onClick={handleSignOut} 
-              className="text-gray-300 hover:text-white hover:bg-white/10 p-2"
+              className="text-gray-300 hover:text-white hover:bg-white/10 p-2 flex-shrink-0"
               title="Sign Out"
             >
               <LogOut className="w-4 h-4" />
