@@ -13,7 +13,7 @@ import type { DatabaseFixture } from '@/shared/lib/database';
 import { FixtureSync } from './FixtureSync';
 import { TeamSync } from './TeamSync';
 import { useToast } from '@/shared/hooks/use-toast';
-import { ChevronDown, ChevronUp, Activity, Users } from 'lucide-react';
+import { ChevronDown, ChevronUp, Users } from 'lucide-react';
 import { useRealtimeMarket } from '@/shared/hooks/useRealtimeMarket';
 import { useRealtimeOrders } from '@/shared/hooks/useRealtimeOrders';
 import { useRealtimePresence } from '@/shared/hooks/useRealtimePresence';
@@ -37,9 +37,9 @@ export const ClubValuesPage: React.FC = () => {
   const [purchasingClubId, setPurchasingClubId] = useState<string | null>(null);
   const [buyWindowStatuses, setBuyWindowStatuses] = useState<Map<string, any>>(new Map());
 
-  // Realtime subscriptions
-  const { lastUpdate, isConnected: marketConnected } = useRealtimeMarket();
-  const { recentOrders, isConnected: ordersConnected, clearOrders } = useRealtimeOrders();
+  // Realtime subscriptions (for toast notifications)
+  const { lastUpdate } = useRealtimeMarket();
+  const { recentOrders } = useRealtimeOrders();
   const { activeUsers, isConnected: presenceConnected } = useRealtimePresence('marketplace');
 
   // Load fixtures on component mount and when clubs change
@@ -577,62 +577,6 @@ export const ClubValuesPage: React.FC = () => {
         isProcessing={isPurchasing}
       />
 
-      {/* Realtime UI Components */}
-      
-      {/* Live Trade Feed */}
-      <div className="fixed bottom-4 right-4 w-80 z-50">
-        <Card className="bg-gray-900/95 backdrop-blur-sm border-gray-700">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between text-sm">
-              <div className="flex items-center gap-2">
-                <Activity className={`h-4 w-4 ${ordersConnected ? 'text-green-500 animate-pulse' : 'text-gray-500'}`} />
-                <span>Live Trade Feed</span>
-                {recentOrders.length > 0 && (
-                  <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
-                    {recentOrders.length}
-                  </span>
-                )}
-              </div>
-              {recentOrders.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearOrders}
-                  className="h-6 w-6 p-0 text-gray-400 hover:text-white"
-                >
-                  ×
-                </Button>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {recentOrders.length > 0 ? (
-                recentOrders.map((orderItem, idx) => (
-                  <div key={idx} className="text-xs bg-gray-800/50 p-2 rounded border border-gray-700/50">
-                    <div className="flex justify-between items-center">
-                      <span className="text-green-400 font-medium">
-                        {orderItem.order.quantity} shares
-                      </span>
-                      <span className="text-white">
-                        {formatCurrency(orderItem.order.price_per_share)}
-                      </span>
-                    </div>
-                    <div className="text-gray-400 text-xs mt-1">
-                      {new Date(orderItem.timestamp).toLocaleTimeString()}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-gray-400 text-xs text-center py-4">
-                  {ordersConnected ? 'Waiting for trades...' : 'Connecting...'}
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Active Users Indicator */}
       <div className="fixed top-4 right-4 z-50">
         <Card className="bg-gray-900/95 backdrop-blur-sm border-gray-700">
@@ -643,20 +587,6 @@ export const ClubValuesPage: React.FC = () => {
                 {activeUsers} active
               </span>
               <div className={`w-2 h-2 rounded-full ${presenceConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`} />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Market Connection Status */}
-      <div className="fixed bottom-4 left-4 z-50">
-        <Card className="bg-gray-900/95 backdrop-blur-sm border-gray-700">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2 text-sm">
-              <div className={`w-2 h-2 rounded-full ${marketConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-              <span className="text-white">
-                {marketConnected ? 'Live Market' : 'Connecting...'}
-              </span>
             </div>
           </CardContent>
         </Card>

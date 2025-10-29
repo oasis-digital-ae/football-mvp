@@ -46,17 +46,15 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
   return (
     <nav className="bg-gradient-primary border-b border-trading-primary/20 backdrop-blur-md sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex justify-between items-center h-16 gap-4">
           {/* Logo and Brand */}
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center justify-center w-10 h-10 bg-trading-primary rounded-full primary-glow">
+          <div className="flex items-center space-x-3 flex-shrink-0 pr-4">
+            <div className="flex items-center justify-center w-10 h-10 bg-trading-primary rounded-full primary-glow flex-shrink-0">
               <Trophy className="w-6 h-6 text-white" />
             </div>
-            <div className="hidden sm:block">
-              <h1 className="text-xl font-bold text-white gradient-text">
-                Premier League Trading
-              </h1>
-            </div>
+            <h1 className="text-xl font-bold text-white whitespace-nowrap">
+              Premier League Trading
+            </h1>
           </div>
 
           {/* Desktop Navigation */}
