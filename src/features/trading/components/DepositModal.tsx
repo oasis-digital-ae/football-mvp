@@ -10,7 +10,18 @@ import { useAuth } from '@/features/auth/contexts/AuthContext';
 import { walletService } from '@/shared/lib/services/wallet.service';
 import { Wallet, Loader2 } from 'lucide-react';
 
-const stripePromise = loadStripe((import.meta as any).env?.VITE_STRIPE_PUBLISHABLE_KEY || '');
+// Load Stripe with publishable key
+const getStripePublishableKey = () => {
+  const env = (import.meta as any).env;
+  return env?.VITE_STRIPE_PUBLISHABLE_KEY || '';
+};
+
+const stripePublishableKey = getStripePublishableKey();
+const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
+
+if (!stripePublishableKey) {
+  console.error('Missing VITE_STRIPE_PUBLISHABLE_KEY environment variable');
+}
 
 interface DepositModalProps {
   isOpen: boolean;
@@ -27,6 +38,7 @@ const DepositForm: React.FC<{ clientSecret: string; onSuccess: () => void; onClo
   const elements = useElements();
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [paymentElementReady, setPaymentElementReady] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,7 +72,24 @@ const DepositForm: React.FC<{ clientSecret: string; onSuccess: () => void; onClo
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <PaymentElement />
+      {stripe && elements ? (
+        <>
+          <PaymentElement 
+            onReady={() => {
+              setPaymentElementReady(true);
+            }}
+            onLoadError={(event) => {
+              console.error('Payment Element load error:', event);
+              setError('Failed to load payment form. Please try again.');
+            }}
+          />
+        </>
+      ) : (
+        <div className="text-center py-4">
+          <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
+          <p className="text-sm text-gray-400">Loading payment form...</p>
+        </div>
+      )}
       {error && <div className="text-red-400 text-sm">{error}</div>}
       <div className="flex gap-3">
         <Button type="button" variant="outline" onClick={onClose} className="flex-1">
@@ -68,7 +97,7 @@ const DepositForm: React.FC<{ clientSecret: string; onSuccess: () => void; onClo
         </Button>
         <Button
           type="submit"
-          disabled={!stripe || isProcessing}
+          disabled={!stripe || !elements || !paymentElementReady || isProcessing}
           className="flex-1 bg-trading-primary hover:bg-trading-primary/80"
         >
           {isProcessing ? (
@@ -106,6 +135,11 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose, onS
       return;
     }
 
+    if (!stripePublishableKey) {
+      setError('Stripe is not configured. Please contact support.');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -121,12 +155,21 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose, onS
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create payment intent');
+        const errorText = await response.text();
+        console.error('Payment intent creation failed:', response.status, errorText);
+        throw new Error(errorText || 'Failed to create payment intent');
       }
 
       const data = await response.json();
+      
+      if (!data.clientSecret) {
+        console.error('No clientSecret in response:', data);
+        throw new Error('Invalid response from server');
+      }
+      
       setClientSecret(data.clientSecret);
     } catch (err: any) {
+      console.error('Error creating payment intent:', err);
       setError(err.message || 'Failed to start payment');
     } finally {
       setIsLoading(false);
@@ -138,12 +181,32 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose, onS
     onClose();
   };
 
-  const options: StripeElementsOptions = clientSecret
+  const options: StripeElementsOptions | undefined = clientSecret && stripePromise
     ? {
         clientSecret,
         appearance: { theme: 'night' as const },
       }
-    : {};
+    : undefined;
+
+  if (!stripePublishableKey) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="bg-gray-800/95 backdrop-blur-md border border-trading-primary/30 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-center gradient-text flex items-center justify-center gap-2">
+              <Wallet className="w-5 h-5" />
+              Deposit Funds
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="text-red-400 text-sm text-center">
+              Stripe is not configured. Please contact support.
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -156,7 +219,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose, onS
         </DialogHeader>
 
         <div className="py-4 space-y-4">
-          {!clientSecret ? (
+          {!clientSecret || !options ? (
             <>
               <div className="space-y-2">
                 <Label htmlFor="amount" className="text-gray-300">
@@ -193,9 +256,11 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose, onS
               </Button>
             </>
           ) : (
-            <Elements stripe={stripePromise} options={options}>
-              <DepositForm clientSecret={clientSecret} onSuccess={handleSuccess} onClose={onClose} />
-            </Elements>
+            stripePromise && (
+              <Elements stripe={stripePromise} options={options}>
+                <DepositForm clientSecret={clientSecret} onSuccess={handleSuccess} onClose={onClose} />
+              </Elements>
+            )
           )}
         </div>
       </DialogContent>
