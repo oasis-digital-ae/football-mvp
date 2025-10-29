@@ -19,10 +19,12 @@ import { useRealtimeOrders } from '@/shared/hooks/useRealtimeOrders';
 import { useRealtimePresence } from '@/shared/hooks/useRealtimePresence';
 import BuyWindowIndicator from '@/shared/components/BuyWindowIndicator';
 import { buyWindowService } from '@/shared/lib/buy-window.service';
+import { useAuth } from '@/features/auth/contexts/AuthContext';
 
 export const ClubValuesPage: React.FC = () => {
-  const { clubs, matches, purchaseClub, user } = useAppContext();
+  const { clubs, matches, purchaseClub, user, refreshData } = useAppContext();
   const { toast } = useToast();
+  const { refreshWalletBalance } = useAuth();
   const [selectedClub, setSelectedClub] = useState<string | null>(null);
   const [fixtures, setFixtures] = useState<DatabaseFixture[]>([]);
   const [confirmationData, setConfirmationData] = useState<{
@@ -193,22 +195,43 @@ export const ClubValuesPage: React.FC = () => {
     try {
       await purchaseClub(confirmationData.clubId, shares);
       setConfirmationData(null);
-      toast({
-        title: "Purchase Successful",
-        description: `Successfully purchased ${shares} shares of ${confirmationData.clubName}`,
-      });
+      
+      // Immediately refresh wallet balance
+      refreshWalletBalance();
+      
+      // Refresh all data (portfolio, clubs, etc.)
+      await refreshData();
+      
+      // Double-check wallet balance after a short delay (for webhook updates)
+      setTimeout(() => {
+        refreshWalletBalance();
+        refreshData();
+      }, 1500);
+      
+      // Success toast is shown in AppContext.purchaseClub
     } catch (error: any) {
       console.error('Purchase failed:', error);
+      
+      // Extract user-friendly error message
+      let errorMessage = 'An unknown error occurred';
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
+      // Show error toast with clear message
       toast({
         title: "Purchase Failed",
-        description: error?.message || 'An unknown error occurred',
+        description: errorMessage,
         variant: "destructive",
+        duration: 5000, // Show for 5 seconds so user can read it
       });
     } finally {
       setIsPurchasing(false);
       setPurchasingClubId(null);
     }
-  }, [confirmationData, purchaseClub, toast, isPurchasing]);
+  }, [confirmationData, purchaseClub, toast, isPurchasing, refreshWalletBalance, refreshData]);
 
   return (
     <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">

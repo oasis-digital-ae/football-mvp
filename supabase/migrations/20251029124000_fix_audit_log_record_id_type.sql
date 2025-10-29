@@ -1,4 +1,5 @@
--- Update process_share_purchase_atomic to check and deduct wallet balance
+-- Fix audit_log record_id type issue in process_share_purchase_atomic
+-- This migration updates the function to use integer instead of text for record_id
 
 CREATE OR REPLACE FUNCTION public.process_share_purchase_atomic(
   p_user_id uuid,
@@ -184,7 +185,7 @@ BEGIN
     p_user_id,
     'share_purchase',
     'orders',
-    v_order_id,  -- record_id is integer, no need to cast
+    v_order_id,  -- record_id is integer, use integer directly
     json_build_object(
       'team_id', p_team_id,
       'shares', p_shares,

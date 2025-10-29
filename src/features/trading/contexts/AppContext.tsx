@@ -87,6 +87,19 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
   const [liveMatches, setLiveMatches] = useState<FootballMatch[]>([]);
   const [loading, setLoading] = useState(true);
   
+  // Poll portfolio and market data periodically (realtime not available)
+  useEffect(() => {
+    if (!user) return;
+
+    // Refresh data periodically to catch updates
+    const interval = setInterval(() => {
+      loadData();
+    }, 10000); // Poll every 10 seconds
+
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   // Load data from database
   const loadData = withErrorHandling(async () => {
     if (!user) return;
@@ -333,30 +346,63 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
 
       if (atomicError) {
         logger.error('Atomic purchase failed:', atomicError);
-        throw new DatabaseError(`Purchase failed: ${atomicError.message}`);
+        
+        // Parse error message for user-friendly display
+        let errorMessage = atomicError.message || 'Purchase failed';
+        
+        // Handle specific error cases
+        if (errorMessage.includes('Insufficient balance')) {
+          errorMessage = 'Insufficient wallet balance. Please deposit funds before purchasing.';
+        } else if (errorMessage.includes('row-level security')) {
+          errorMessage = 'Purchase failed due to security policy. Please try again or contact support.';
+        } else if (errorMessage.includes('Price mismatch')) {
+          errorMessage = 'Price has changed. Please refresh and try again.';
+        } else if (errorMessage.includes('Team not found')) {
+          errorMessage = 'Team not found. Please refresh the page.';
+        }
+        
+        throw new DatabaseError(errorMessage);
       }
 
       if (!result?.success) {
-        throw new BusinessLogicError('Purchase transaction failed');
+        const errorMsg = result?.error || 'Purchase transaction failed';
+        let friendlyMessage = errorMsg;
+        
+        if (errorMsg.includes('Insufficient balance')) {
+          friendlyMessage = 'Insufficient wallet balance. Please deposit funds before purchasing.';
+        }
+        
+        throw new BusinessLogicError(friendlyMessage);
       }
 
       logger.debug(`Atomic purchase completed successfully:`, result);
 
-      // Wait a moment for database to sync, then refresh data
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      // Refresh data immediately after purchase
       logger.debug('Refreshing data after purchase...');
       await loadData();
       logger.debug('Data refresh completed');
       
+      // Trigger wallet balance refresh via custom event (since we can't import hook here)
+      // Components that use useAuth will handle the refresh
+      window.dispatchEvent(new CustomEvent('wallet-balance-changed'));
+      
       toast({
         title: "Purchase Successful",
-        description: `Bought ${units} share(s) of ${team.name} for $${nav.toFixed(2)} per share`,
+        description: `Successfully purchased ${units} share(s) of ${team.name} at $${nav.toFixed(2)} per share. Your wallet balance has been updated.`,
+        variant: "default",
       });
 
     } catch (error) {
       logger.error('Error purchasing shares:', error);
-      throw error; // Re-throw to be handled by withErrorHandling
+      
+      // Throw with user-friendly error message
+      if (error instanceof BusinessLogicError || error instanceof DatabaseError) {
+        throw error; // Already has user-friendly message
+      } else if (error instanceof Error) {
+        throw new DatabaseError(`Purchase failed: ${error.message}`);
+      } else {
+        throw new DatabaseError('Purchase failed. Please try again.');
+      }
     }
   }, 'purchaseClub');
 

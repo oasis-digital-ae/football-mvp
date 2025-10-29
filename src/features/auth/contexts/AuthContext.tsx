@@ -101,6 +101,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, []);
 
+  // Poll wallet balance periodically (realtime not available)
+  useEffect(() => {
+    if (!user) return;
+
+    // Refresh balance immediately
+    refreshWalletBalance();
+
+    // Then poll every 5 seconds for updates (lightweight polling)
+    const interval = setInterval(() => {
+      refreshWalletBalance();
+    }, 5000);
+
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  // Listen for manual wallet balance refresh events (e.g., after purchase/deposit)
+  useEffect(() => {
+    const handleWalletChange = () => {
+      refreshWalletBalance();
+    };
+
+    window.addEventListener('wallet-balance-changed', handleWalletChange);
+    return () => window.removeEventListener('wallet-balance-changed', handleWalletChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   const fetchProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -132,6 +159,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
   };
+
+  // Listen for manual wallet balance refresh events
+  useEffect(() => {
+    const handleWalletChange = () => {
+      refreshWalletBalance();
+    };
+
+    window.addEventListener('wallet-balance-changed', handleWalletChange);
+    return () => window.removeEventListener('wallet-balance-changed', handleWalletChange);
+  }, [user]);
 
   const signUp = async (email: string, password: string, userData: Omit<UserProfile, 'id' | 'email'>) => {
     const { data, error } = await supabase.auth.signUp({

@@ -152,8 +152,12 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
         isOpen={depositModalOpen}
         onClose={() => setDepositModalOpen(false)}
         onSuccess={() => {
-          refreshWalletBalance();
           setDepositModalOpen(false);
+          // Refresh balance immediately, then poll for webhook update
+          refreshWalletBalance();
+          setTimeout(() => {
+            refreshWalletBalance();
+          }, 1500); // Give webhook time to process
         }}
       />
     </nav>
