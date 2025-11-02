@@ -26,4 +26,4 @@
 # Scheduled function configuration
 # This ensures Netlify recognizes the scheduled function
 [functions."update-matches"]
-  schedule = "*/5 * * * *"  # Every 5 minutes
+  schedule = "*/30 * * * *"  # Every 30 minutes

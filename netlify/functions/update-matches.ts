@@ -1,5 +1,5 @@
 // Scheduled background function to update match data from Football API
-// Runs every 5 minutes automatically via Netlify scheduled functions
+// Runs every 30 minutes automatically via Netlify scheduled functions
 // Processes all fixtures in a single run
 // Maximum execution time: 15 minutes (Netlify background function limit)
 
@@ -78,8 +78,8 @@ function convertMatchStatusToFixtureStatus(status: string): 'scheduled' | 'close
 }
 
 // Use schedule() wrapper to create a scheduled function
-// This will run every 5 minutes automatically
-export const handler = schedule('*/5 * * * *', async (event: HandlerEvent): Promise<HandlerResponse> => {
+// This will run every 30 minutes automatically
+export const handler = schedule('*/30 * * * *', async (event: HandlerEvent): Promise<HandlerResponse> => {
   console.log('🏈 Match update function started');
   const startTime = Date.now();
   
@@ -138,8 +138,8 @@ async function processUpdate() {
     // Initialize Supabase client
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-    // Sync fixtures from API (run every 5 minutes to catch new fixtures quickly)
-    // Check if we should sync fixtures (run sync if last sync was more than 5 minutes ago, or never)
+    // Sync fixtures from API (run every 30 minutes)
+    // Check if we should sync fixtures (run sync if last sync was more than 30 minutes ago, or never)
     const shouldSyncFixtures = await shouldRunFixtureSync(supabase);
     if (shouldSyncFixtures) {
       try {
@@ -153,7 +153,7 @@ async function processUpdate() {
         // Don't throw - continue with match updates even if sync fails
       }
     } else {
-      console.log('⏭️ Skipping fixture sync (last sync was less than 5 minutes ago)');
+      console.log('⏭️ Skipping fixture sync (last sync was less than 30 minutes ago)');
     }
 
     // Get fixtures that need updates
@@ -301,7 +301,7 @@ async function processUpdate() {
   }
 }
 
-// Check if we should run fixture sync (every 5 minutes to catch new fixtures quickly)
+// Check if we should run fixture sync (every 30 minutes)
 async function shouldRunFixtureSync(supabase: any): Promise<boolean> {
   try {
     // Check when fixtures were last updated
@@ -318,10 +318,10 @@ async function shouldRunFixtureSync(supabase: any): Promise<boolean> {
     }
 
     const lastUpdate = new Date(latestFixture.updated_at);
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
     
-    // Sync if last update was more than 5 minutes ago (syncs on every function run)
-    return lastUpdate < fiveMinutesAgo;
+    // Sync if last update was more than 30 minutes ago
+    return lastUpdate < thirtyMinutesAgo;
   } catch (error) {
     // On error, run sync to be safe
     console.warn('⚠️ Error checking sync status, will sync fixtures:', error);
