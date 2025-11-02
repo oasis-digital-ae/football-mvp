@@ -35,6 +35,48 @@ interface MatchData {
   };
 }
 
+interface FootballMatch {
+  id: number;
+  utcDate: string;
+  status: string;
+  matchday: number;
+  homeTeam: { id: number; name: string };
+  awayTeam: { id: number; name: string };
+  score: {
+    fullTime: {
+      home: number | null;
+      away: number | null;
+    };
+  };
+}
+
+// Helper functions for status conversion
+function convertMatchStatus(status: string, score: any): 'home_win' | 'away_win' | 'draw' | 'pending' {
+  if (status !== 'FINISHED') return 'pending';
+  
+  if (score?.fullTime?.home === null || score?.fullTime?.home === undefined) return 'pending';
+  if (score?.fullTime?.away === null || score?.fullTime?.away === undefined) return 'pending';
+  
+  if (score.fullTime.home > score.fullTime.away) return 'home_win';
+  if (score.fullTime.away > score.fullTime.home) return 'away_win';
+  return 'draw';
+}
+
+function convertMatchStatusToFixtureStatus(status: string): 'scheduled' | 'closed' | 'applied' | 'postponed' {
+  switch (status) {
+    case 'SCHEDULED':
+    case 'TIMED': return 'scheduled';
+    case 'LIVE':
+    case 'IN_PLAY':
+    case 'PAUSED': return 'closed';
+    case 'FINISHED': return 'applied';
+    case 'POSTPONED':
+    case 'SUSPENDED':
+    case 'CANCELLED': return 'postponed';
+    default: return 'scheduled';
+  }
+}
+
 // Use schedule() wrapper to create a scheduled function
 // This will run every 5 minutes automatically
 export const handler = schedule('*/5 * * * *', async (event: HandlerEvent): Promise<HandlerResponse> => {
@@ -76,6 +118,7 @@ async function processUpdate() {
     updated: 0,
     errors: 0,
     snapshots: 0,
+    fixturesSynced: 0,
   };
 
   try {
@@ -94,6 +137,24 @@ async function processUpdate() {
 
     // Initialize Supabase client
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+    // Sync fixtures from API (run every 5 minutes to catch new fixtures quickly)
+    // Check if we should sync fixtures (run sync if last sync was more than 5 minutes ago, or never)
+    const shouldSyncFixtures = await shouldRunFixtureSync(supabase);
+    if (shouldSyncFixtures) {
+      try {
+        console.log('🔄 Syncing fixtures from Football API...');
+        const syncResult = await syncFixturesFromAPI(supabase);
+        results.fixturesSynced = syncResult;
+        console.log(`✅ Synced ${syncResult} fixtures from API`);
+      } catch (error) {
+        console.error('❌ Error syncing fixtures:', error);
+        results.errors++;
+        // Don't throw - continue with match updates even if sync fails
+      }
+    } else {
+      console.log('⏭️ Skipping fixture sync (last sync was less than 5 minutes ago)');
+    }
 
     // Get fixtures that need updates
     // - Status is scheduled or closed
@@ -230,7 +291,7 @@ async function processUpdate() {
       }
     }
 
-    console.log(`✅ Match update complete: ${results.updated} updated, ${results.snapshots} snapshots, ${results.errors} errors`);
+    console.log(`✅ Match update complete: ${results.updated} updated, ${results.snapshots} snapshots, ${results.fixturesSynced} fixtures synced, ${results.errors} errors`);
 
     return results;
   } catch (error) {
@@ -238,6 +299,162 @@ async function processUpdate() {
     results.errors++;
     throw error; // Re-throw to be caught by handler
   }
+}
+
+// Check if we should run fixture sync (every 5 minutes to catch new fixtures quickly)
+async function shouldRunFixtureSync(supabase: any): Promise<boolean> {
+  try {
+    // Check when fixtures were last updated
+    const { data: latestFixture } = await supabase
+      .from('fixtures')
+      .select('updated_at')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!latestFixture || !latestFixture.updated_at) {
+      // No fixtures exist, should sync
+      return true;
+    }
+
+    const lastUpdate = new Date(latestFixture.updated_at);
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    
+    // Sync if last update was more than 5 minutes ago (syncs on every function run)
+    return lastUpdate < fiveMinutesAgo;
+  } catch (error) {
+    // On error, run sync to be safe
+    console.warn('⚠️ Error checking sync status, will sync fixtures:', error);
+    return true;
+  }
+}
+
+// Sync fixtures from Football API
+async function syncFixturesFromAPI(supabase: any): Promise<number> {
+  // Fetch Premier League matches for current season (2025)
+  const response = await fetch(`${FOOTBALL_API_BASE_URL}/competitions/PL/matches?season=2025`, {
+    headers: {
+      'X-Auth-Token': API_KEY!,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch fixtures from API: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  const matches: FootballMatch[] = data.matches || [];
+
+  if (matches.length === 0) {
+    console.log('⚠️ No matches returned from API');
+    return 0;
+  }
+
+  // Log matchday distribution for debugging
+  const matchdayCounts = new Map<number, number>();
+  matches.forEach(match => {
+    const count = matchdayCounts.get(match.matchday) || 0;
+    matchdayCounts.set(match.matchday, count + 1);
+  });
+  const matchdays = Array.from(matchdayCounts.keys()).sort((a, b) => a - b);
+  console.log(`📊 Fetched ${matches.length} matches from API. Matchdays: ${matchdays.join(', ')}`);
+  console.log(`📊 Matchday distribution: ${Array.from(matchdayCounts.entries()).map(([md, count]) => `MD${md}:${count}`).join(', ')}`);
+
+  // Get teams for mapping
+  const { data: teams, error: teamsError } = await supabase
+    .from('teams')
+    .select('id, name, external_id');
+
+  if (teamsError || !teams || teams.length === 0) {
+    throw new Error('Failed to fetch teams from database');
+  }
+
+  // Create team mapping by name
+  const teamMapping = new Map<string, number>();
+  teams.forEach((team: any) => {
+    teamMapping.set(team.name, team.id);
+  });
+
+  // Prepare fixture data for upsert
+  const fixtureData: Array<{
+    external_id: string;
+    home_team_id: number;
+    away_team_id: number;
+    kickoff_at: string;
+    buy_close_at: string;
+    status: 'scheduled' | 'closed' | 'applied' | 'postponed';
+    result: 'home_win' | 'away_win' | 'draw' | 'pending';
+    home_score: number;
+    away_score: number;
+    matchday: number;
+    season: number;
+    updated_at: string;
+  }> = [];
+  let skippedCount = 0;
+
+  for (const match of matches) {
+    const homeTeamId = teamMapping.get(match.homeTeam.name);
+    const awayTeamId = teamMapping.get(match.awayTeam.name);
+
+    if (!homeTeamId || !awayTeamId) {
+      console.warn(`⚠️ Skipping match: teams not found for ${match.homeTeam.name} vs ${match.awayTeam.name}`);
+      skippedCount++;
+      continue;
+    }
+
+    const kickoffTime = new Date(match.utcDate);
+    const buyCloseTime = new Date(kickoffTime.getTime() - 30 * 60 * 1000);
+
+    fixtureData.push({
+      external_id: match.id.toString(),
+      home_team_id: homeTeamId,
+      away_team_id: awayTeamId,
+      kickoff_at: kickoffTime.toISOString(),
+      buy_close_at: buyCloseTime.toISOString(),
+      status: convertMatchStatusToFixtureStatus(match.status),
+      result: convertMatchStatus(match.status, match.score),
+      home_score: match.score?.fullTime?.home || 0,
+      away_score: match.score?.fullTime?.away || 0,
+      matchday: match.matchday,
+      season: 2025,
+      updated_at: new Date().toISOString(),
+    });
+  }
+
+  if (fixtureData.length === 0) {
+    console.log('⚠️ No fixtures to sync after team mapping');
+    return 0;
+  }
+
+  // Upsert fixtures - update all fields including dates when fixture already exists
+  const { data: upsertedFixtures, error: upsertError } = await supabase
+    .from('fixtures')
+    .upsert(fixtureData, {
+      onConflict: 'external_id',
+      ignoreDuplicates: false,
+    })
+    .select('id, external_id');
+
+  if (upsertError) {
+    throw new Error(`Failed to upsert fixtures: ${upsertError.message}`);
+  }
+
+  const syncedCount = upsertedFixtures?.length || 0;
+  
+  // Log synced matchday distribution
+  const syncedMatchdayCounts = new Map<number, number>();
+  fixtureData.forEach(fixture => {
+    const count = syncedMatchdayCounts.get(fixture.matchday) || 0;
+    syncedMatchdayCounts.set(fixture.matchday, count + 1);
+  });
+  const syncedMatchdays = Array.from(syncedMatchdayCounts.keys()).sort((a, b) => a - b);
+  console.log(`✅ Synced ${syncedCount} fixtures. Matchdays synced: ${syncedMatchdays.join(', ')}`);
+  
+  if (skippedCount > 0) {
+    console.log(`⚠️ Skipped ${skippedCount} fixtures due to team mapping issues`);
+  }
+
+  return syncedCount;
 }
 
 // Note: Schedule is configured using schedule() wrapper above
