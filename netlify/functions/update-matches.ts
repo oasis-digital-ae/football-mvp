@@ -7,12 +7,23 @@ import type { HandlerEvent, HandlerResponse } from '@netlify/functions';
 import { schedule } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL!;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+// Helper function to get environment variables with fallbacks
+function getEnvVar(...names: string[]): string | undefined {
+  for (const name of names) {
+    const value = process.env[name];
+    if (value) return value;
+  }
+  return undefined;
+}
+
+// Support multiple environment variable naming conventions
+// Try VITE_ prefix first (for consistency with client), then without prefix
+const SUPABASE_URL = getEnvVar('VITE_SUPABASE_URL', 'SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL');
+const SUPABASE_SERVICE_KEY = getEnvVar('SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SERVICE_KEY');
+const API_KEY = getEnvVar('VITE_FOOTBALL_API_KEY', 'FOOTBALL_API_KEY');
 
 // Football API configuration
 const FOOTBALL_API_BASE_URL = 'https://api.football-data.org/v4';
-const API_KEY = process.env.VITE_FOOTBALL_API_KEY!;
 
 interface MatchData {
   status: 'SCHEDULED' | 'LIVE' | 'IN_PLAY' | 'FINISHED' | 'PAUSED' | 'POSTPONED' | 'SUSPENDED' | 'CANCELLED';
@@ -68,6 +79,19 @@ async function processUpdate() {
   };
 
   try {
+    // Validate required environment variables
+    if (!SUPABASE_URL) {
+      throw new Error('Missing SUPABASE_URL. Please set VITE_SUPABASE_URL, SUPABASE_URL, or NEXT_PUBLIC_SUPABASE_URL in Netlify environment variables.');
+    }
+
+    if (!SUPABASE_SERVICE_KEY) {
+      throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY. Please set SUPABASE_SERVICE_ROLE_KEY in Netlify environment variables.');
+    }
+
+    if (!API_KEY) {
+      throw new Error('Missing FOOTBALL_API_KEY. Please set VITE_FOOTBALL_API_KEY or FOOTBALL_API_KEY in Netlify environment variables.');
+    }
+
     // Initialize Supabase client
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 

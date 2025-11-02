@@ -109,13 +109,13 @@ export const BuyWindowIndicator: React.FC<BuyWindowIndicatorProps> = ({
       </div>
       
       {/* Status Text */}
-      <span className={status.isOpen ? 'text-green-400 font-medium' : 'text-red-400 font-medium'}>
+      <span className={status.isOpen ? 'text-green-500 font-medium' : 'text-red-500 font-medium'}>
         {status.isOpen ? 'Open' : 'Closed'}
       </span>
       
       {/* Time Display */}
       {showCountdown && timeLeft && (
-        <span className={`${status.isOpen ? 'text-green-300' : 'text-red-300'}`}>
+        <span className={`${status.isOpen ? 'text-green-400' : 'text-red-400'}`}>
           {timeLeft}
         </span>
       )}
