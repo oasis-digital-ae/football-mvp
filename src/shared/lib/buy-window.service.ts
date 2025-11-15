@@ -310,10 +310,16 @@ export const buyWindowService = {
         nextAction: status.nextCloseTime ? `Closes at ${status.nextCloseTime.toLocaleString()}` : undefined
       };
     } else {
+      // Check if match is in progress (nextCloseTime is undefined but match is live)
+      const isMatchInProgress = !status.nextCloseTime && 
+                                 status.nextKickoffTime && 
+                                 status.reason?.includes('Match in progress');
+      
       return {
         isOpen: false,
         message: status.reason || 'Trading is closed',
-        nextAction: status.nextKickoffTime ? `Next match at ${status.nextKickoffTime.toLocaleString()}` : undefined
+        nextAction: isMatchInProgress ? 'will reopen after match' : 
+                   (status.nextKickoffTime ? `Next match at ${status.nextKickoffTime.toLocaleString()}` : undefined)
       };
     }
   },
@@ -335,10 +341,16 @@ export const buyWindowService = {
         nextAction: status.nextCloseTime ? `Closes at ${status.nextCloseTime.toLocaleString()}` : undefined
       };
     } else {
+      // Check if match is in progress (nextCloseTime is undefined but match is live)
+      const isMatchInProgress = !status.nextCloseTime && 
+                                 status.nextKickoffTime && 
+                                 status.reason?.includes('Match in progress');
+      
       return {
         isOpen: false,
         message: status.reason || 'Trading is closed',
-        nextAction: status.nextKickoffTime ? `Next match at ${status.nextKickoffTime.toLocaleString()}` : undefined
+        nextAction: isMatchInProgress ? 'will reopen after match' : 
+                   (status.nextKickoffTime ? `Next match at ${status.nextKickoffTime.toLocaleString()}` : undefined)
       };
     }
   }

@@ -13,14 +13,14 @@ import { Wallet, Loader2 } from 'lucide-react';
 // Load Stripe with publishable key
 const getStripePublishableKey = () => {
   const env = (import.meta as any).env;
-  return env?.VITE_STRIPE_PUBLISHABLE_KEY || '';
+  return env?.VITE_STRIPE_PUBLISHABLE_KEY_LIVE || '';
 };
 
 const stripePublishableKey = getStripePublishableKey();
 const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
 
 if (!stripePublishableKey) {
-  console.error('Missing VITE_STRIPE_PUBLISHABLE_KEY environment variable');
+  console.error('Missing VITE_STRIPE_PUBLISHABLE_KEY_LIVE environment variable');
 }
 
 interface DepositModalProps {

@@ -128,10 +128,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           logger.warn('Wallet balance realtime not active (replication not enabled). Using polling fallback.');
           // Fallback to polling
           pollingInterval = setInterval(() => {
-            refreshWalletBalance();
+      refreshWalletBalance();
           }, 30000); // Poll every 30 seconds
         }
-      }, 5000);
+    }, 5000);
     } catch (error) {
       logger.warn('Failed to set up wallet balance realtime subscription:', error);
       // Start polling immediately if realtime fails

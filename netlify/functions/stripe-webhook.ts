@@ -12,8 +12,8 @@ export const handler: Handler = async (event) => {
     // Validate required environment variables
     const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY_LIVE;
+    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET_LIVE;
 
     if (!supabaseUrl || !supabaseServiceKey) {
       console.error('Missing Supabase credentials:', {
@@ -24,12 +24,12 @@ export const handler: Handler = async (event) => {
     }
 
     if (!stripeSecretKey) {
-      console.error('Missing Stripe secret key');
+      console.error('Missing Stripe secret key (STRIPE_SECRET_KEY_LIVE)');
       return { statusCode: 500, body: 'Server configuration error: Missing Stripe credentials' };
     }
 
     if (!endpointSecret) {
-      console.error('Missing webhook secret');
+      console.error('Missing webhook secret (STRIPE_WEBHOOK_SECRET_LIVE)');
       return { statusCode: 500, body: 'Server configuration error: Missing webhook secret' };
     }
 

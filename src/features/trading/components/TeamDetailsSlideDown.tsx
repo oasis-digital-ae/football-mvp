@@ -194,27 +194,27 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
           };
         } else {
           // Process match events
-          const matchResult = event.ledger_type === 'match_win' ? 'win' : 
-                             event.ledger_type === 'match_loss' ? 'loss' : 'draw';
-          const description = event.event_description || 'Match Result';
+        const matchResult = event.ledger_type === 'match_win' ? 'win' : 
+                           event.ledger_type === 'match_loss' ? 'loss' : 'draw';
+        const description = event.event_description || 'Match Result';
           const priceImpact = parseFloat(event.market_cap_after?.toString() || '0') - parseFloat(event.market_cap_before?.toString() || '0');
           const priceImpactPercent = event.market_cap_before > 0 
             ? ((priceImpact / parseFloat(event.market_cap_before.toString())) * 100)
             : 0;
 
-          return {
-            date: event.event_date,
-            description,
+        return {
+          date: event.event_date,
+          description,
             marketCapBefore: parseFloat(event.market_cap_before?.toString() || '0'),
             marketCapAfter: parseFloat(event.market_cap_after?.toString() || '0'),
             sharePriceBefore: parseFloat(event.share_price_before?.toString() || '0'),
             sharePriceAfter: parseFloat(event.share_price_after?.toString() || '0'),
             priceImpact,
             priceImpactPercent,
-            matchResult,
-            isMatch: true,
-            isPurchase: false
-          };
+          matchResult,
+          isMatch: true,
+          isPurchase: false
+        };
         }
       });
 
@@ -415,16 +415,16 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                               </div>
                               
                               <div className={`grid gap-3 sm:gap-4 text-sm ${event.isPurchase ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
-                                <div>
-                                  <span className="text-gray-600 dark:text-gray-400">Market Cap Impact:</span>
-                                  <div className="font-medium">
-                                    {formatCurrency(event.marketCapBefore)} → {formatCurrency(event.marketCapAfter)}
+                                  <div>
+                                    <span className="text-gray-600 dark:text-gray-400">Market Cap Impact:</span>
+                                    <div className="font-medium">
+                                      {formatCurrency(event.marketCapBefore)} → {formatCurrency(event.marketCapAfter)}
                                     <span className={`ml-2 ${event.priceImpact >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                       ({event.priceImpact >= 0 ? '+' : ''}{formatCurrency(event.priceImpact)})
-                                    </span>
+                                      </span>
+                                    </div>
                                   </div>
-                                </div>
-                                
+                                  
                                 {!event.isPurchase && (
                                   <div>
                                     <span className="text-gray-600 dark:text-gray-400">Share Price:</span>
@@ -438,7 +438,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                     </div>
                                   </div>
                                 )}
-                              </div>
+                                </div>
 
                             </div>
                           ))}

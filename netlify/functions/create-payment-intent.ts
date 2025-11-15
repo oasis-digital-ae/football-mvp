@@ -8,9 +8,9 @@ export const handler: Handler = async (event) => {
 
   try {
     // Validate environment variables
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY_LIVE;
     if (!stripeSecretKey) {
-      console.error('Missing STRIPE_SECRET_KEY');
+      console.error('Missing STRIPE_SECRET_KEY_LIVE');
       return { 
         statusCode: 500, 
         body: JSON.stringify({ error: 'Server configuration error: Missing Stripe credentials' }) 

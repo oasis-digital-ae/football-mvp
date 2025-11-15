@@ -107,17 +107,17 @@ export const ClubValuesPage: React.FC = () => {
       const statuses = new Map();
       clubs.forEach(club => {
         const status = buyWindowService.getBuyWindowDisplayInfoSync(parseInt(club.id), fixtures);
-        statuses.set(club.id, status);
+          statuses.set(club.id, status);
       });
       setBuyWindowStatuses(statuses);
     };
 
     // Calculate immediately when clubs or fixtures change
     calculateBuyWindowStatuses();
-    
+      
     // Refresh every 30 seconds (recalculate from current fixtures)
     const interval = setInterval(calculateBuyWindowStatuses, 30000);
-    return () => clearInterval(interval);
+      return () => clearInterval(interval);
   }, [clubs, fixtures]);
 
   // Memoized function to count games played for a club using fixture data
