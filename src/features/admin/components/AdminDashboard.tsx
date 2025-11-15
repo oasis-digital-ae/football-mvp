@@ -15,19 +15,47 @@ import { SeasonUpdatePanel } from './SeasonUpdatePanel';
 import { MarketCapProcessingPanel } from './MarketCapProcessingPanel';
 import { adminService } from '@/shared/lib/services/admin.service';
 import { useAuth } from '@/features/auth/contexts/AuthContext';
+import { useAppContext } from '@/features/trading/contexts/AppContext';
 
 export const AdminDashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const { setCurrentPage } = useAppContext();
 
+  // Redirect if user is not admin
   useEffect(() => {
-    // Log admin dashboard access
-    if (user) {
+    if (!isAdmin) {
+      setCurrentPage('marketplace');
+    }
+  }, [isAdmin, setCurrentPage]);
+
+  // Log admin dashboard access
+  useEffect(() => {
+    if (user && isAdmin) {
       adminService.logAdminAction('dashboard_viewed', {
         userId: user.id,
         timestamp: new Date().toISOString()
       });
     }
-  }, [user]);
+  }, [user, isAdmin]);
+
+  // Don't render if user is not admin
+  if (!isAdmin) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2 text-destructive">
+            <AlertTriangle className="h-5 w-5" />
+            <span>Access Denied</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            You do not have permission to access the admin panel.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <AdminErrorBoundary>

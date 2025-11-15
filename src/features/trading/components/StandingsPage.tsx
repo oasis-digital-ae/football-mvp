@@ -12,18 +12,18 @@ const StandingsPage: React.FC = () => {
   const [standings, setStandings] = useState<Standing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedSeason, setSelectedSeason] = useState(2024);
+  const season = 2025; // Fixed to 2025-26 season
 
   useEffect(() => {
     loadStandings();
-  }, [selectedSeason]);
+  }, []);
 
   const loadStandings = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const premierLeagueData = await footballApiService.getPremierLeagueData(selectedSeason);
+      const premierLeagueData = await footballApiService.getPremierLeagueData(season);
       setStandings(premierLeagueData.standings);
     } catch (err) {
       console.error('Error loading standings:', err);
@@ -90,37 +90,9 @@ const StandingsPage: React.FC = () => {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white">Premier League Standings</h1>
-          <p className="text-gray-400 mt-1">Season {selectedSeason}-{selectedSeason + 1}</p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant={selectedSeason === 2025 ? "default" : "outline"}
-            onClick={() => setSelectedSeason(2025)}
-            size="sm"
-            className={selectedSeason === 2025 ? "" : ""}
-          >
-            2025-26
-          </Button>
-          <Button
-            variant={selectedSeason === 2024 ? "default" : "outline"}
-            onClick={() => setSelectedSeason(2024)}
-            size="sm"
-            className=""
-          >
-            2024-25
-          </Button>
-          <Button
-            variant={selectedSeason === 2023 ? "default" : "outline"}
-            onClick={() => setSelectedSeason(2023)}
-            size="sm"
-            className=""
-          >
-            2023-24
-          </Button>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold text-white">Premier League Standings</h1>
+        <p className="text-gray-400 mt-1">Season 2025-26</p>
       </div>
 
       <Card>

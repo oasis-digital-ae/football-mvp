@@ -23,10 +23,10 @@ interface NavigationProps {
 }
 
 const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) => {
-  const { signOut, profile, walletBalance, refreshWalletBalance } = useAuth();
+  const { signOut, profile, walletBalance, refreshWalletBalance, isAdmin } = useAuth();
   const [depositModalOpen, setDepositModalOpen] = useState(false);
   
-  const pages = [
+  const allPages = [
     { id: 'marketplace', label: 'Marketplace', icon: TrendingUp },
     { id: 'portfolio', label: 'Portfolio', icon: Briefcase },
     { id: 'match-results', label: 'Fixtures', icon: Calendar },
@@ -34,6 +34,14 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
     { id: 'season-simulation', label: 'Simulation', icon: Settings },
     { id: 'admin', label: 'Admin', icon: Shield }
   ];
+  
+  // Filter out admin and simulation pages if user is not admin
+  const pages = allPages.filter(page => {
+    if (page.id === 'admin' || page.id === 'season-simulation') {
+      return isAdmin;
+    }
+    return true;
+  });
 
   const handleSignOut = async () => {
     try {

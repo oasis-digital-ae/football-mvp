@@ -23,7 +23,7 @@ import { useAuth } from '@/features/auth/contexts/AuthContext';
 export const ClubValuesPage: React.FC = () => {
   const { clubs, matches, purchaseClub, user, refreshData } = useAppContext();
   const { toast } = useToast();
-  const { refreshWalletBalance } = useAuth();
+  const { refreshWalletBalance, isAdmin } = useAuth();
   const [selectedClub, setSelectedClub] = useState<string | null>(null);
   const [fixtures, setFixtures] = useState<DatabaseFixture[]>([]);
   const [confirmationData, setConfirmationData] = useState<{
@@ -559,15 +559,19 @@ export const ClubValuesPage: React.FC = () => {
       </Card>
       
       
-      {/* Team Sync Component */}
-      <div className="mt-6">
-        <TeamSync />
-      </div>
+      {/* Team Sync Component - Admin Only */}
+      {isAdmin && (
+        <div className="mt-6">
+          <TeamSync />
+        </div>
+      )}
       
-      {/* Fixture Sync Component */}
-      <div className="mt-6">
-        <FixtureSync />
-      </div>
+      {/* Fixture Sync Component - Admin Only */}
+      {isAdmin && (
+        <div className="mt-6">
+          <FixtureSync />
+        </div>
+      )}
       
       
       <PurchaseConfirmationModal

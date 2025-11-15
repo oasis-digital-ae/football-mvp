@@ -8,10 +8,13 @@ import { teamsService, fixturesService, positionsService } from '@/shared/lib/da
 import { matchProcessingService } from '@/shared/lib/match-processing';
 import { teamStateSnapshotService } from '@/shared/lib/team-state-snapshots';
 import { useAuth } from '@/features/auth/contexts/AuthContext';
+import { useAppContext } from '@/features/trading/contexts/AppContext';
 import { supabase } from '@/shared/lib/supabase';
+import { AlertTriangle } from 'lucide-react';
 
 const SeasonSimulation: React.FC = () => {
-    const { user } = useAuth();
+    const { user, isAdmin } = useAuth();
+    const { setCurrentPage } = useAppContext();
     const [isLoading, setIsLoading] = useState(false);
     const [simulationResults, setSimulationResults] = useState<string>('');
     const [availableGames, setAvailableGames] = useState<any[]>([]);
@@ -62,10 +65,19 @@ const SeasonSimulation: React.FC = () => {
         }
     }, []); // Empty dependency array - only create function once
 
+    // Redirect if user is not admin
+    useEffect(() => {
+        if (!isAdmin) {
+            setCurrentPage('marketplace');
+        }
+    }, [isAdmin, setCurrentPage]);
+
     // Load available games on component mount only
     useEffect(() => {
-        loadAvailableGames();
-    }, [loadAvailableGames]);
+        if (isAdmin) {
+            loadAvailableGames();
+        }
+    }, [loadAvailableGames, isAdmin]);
 
     const simulateSingleGame = async (gameId?: string) => {
         if (!user) {
@@ -411,6 +423,25 @@ const SeasonSimulation: React.FC = () => {
             setIsLoading(false);
         }
     };
+
+    // Don't render if user is not admin
+    if (!isAdmin) {
+        return (
+            <Card className="w-full">
+                <CardHeader>
+                    <CardTitle className="flex items-center space-x-2 text-destructive">
+                        <AlertTriangle className="h-5 w-5" />
+                        <span>Access Denied</span>
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                        You do not have permission to access the simulation panel.
+                    </p>
+                </CardContent>
+            </Card>
+        );
+    }
 
     return (
         <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
