@@ -175,10 +175,14 @@ export const adminService = {
 
       // Convert each order to UserInvestment format (one row per trade)
       const userInvestments: UserInvestment[] = (ordersData || []).map(order => {
+        // Type assertion for joined relations (Supabase infers them as arrays but they're objects)
+        const team = (order.teams as any) || {};
+        const profile = (order.profiles as any) || {};
+        
         // Calculate current value from team data (Fixed Shares Model)
         // Price = market_cap / total_shares (1000 fixed)
-        const teamMarketCap = order.teams?.market_cap || 0;
-        const teamTotalShares = order.teams?.total_shares || 1000; // Fixed at 1000 shares
+        const teamMarketCap = team.market_cap || 0;
+        const teamTotalShares = team.total_shares || 1000; // Fixed at 1000 shares
         const currentSharePrice = teamTotalShares > 0 ? teamMarketCap / teamTotalShares : 0;
         const currentValue = order.quantity * currentSharePrice;
         // For BUY: profitLoss = currentValue - cost
@@ -189,12 +193,12 @@ export const adminService = {
 
         return {
           userId: order.user_id,
-          username: order.profiles?.username || 'Unknown',
-          fullName: order.profiles?.full_name,
+          username: profile.username || 'Unknown',
+          fullName: profile.full_name,
           totalInvested: order.total_amount,
           numberOfTeams: 1, // Each row represents one team purchase
           largestPosition: {
-            teamName: order.teams?.name || 'Unknown',
+            teamName: team.name || 'Unknown',
             amount: order.total_amount
           },
           firstInvestmentDate: order.created_at && !isNaN(new Date(order.created_at).getTime()) 
@@ -210,7 +214,7 @@ export const adminService = {
           orderType: order.order_type,
           shares: order.quantity,
           pricePerShare: order.price_per_share,
-          teamName: order.teams?.name || 'Unknown',
+          teamName: team.name || 'Unknown',
           executedAt: order.executed_at,
           marketCapBefore: order.market_cap_before,
           marketCapAfter: order.market_cap_after, // In Fixed Shares Model: market_cap_before === market_cap_after for trades
@@ -341,21 +345,26 @@ export const adminService = {
       if (fixturesError) throw fixturesError;
 
       // Convert orders to timeline events
-      const orderEvents: TimelineEvent[] = (ordersData || []).map(order => ({
-        type: 'order' as const,
-        timestamp: new Date(order.executed_at),
-        data: {
-          id: order.id,
-          username: order.profiles?.username || 'Unknown',
-          teamName: order.teams?.name || 'Unknown',
-          orderType: order.order_type as 'BUY' | 'SELL',
-          quantity: order.quantity,
-          pricePerShare: order.price_per_share,
-          totalAmount: order.total_amount,
-          marketCapBefore: order.market_cap_before,
-          marketCapAfter: order.market_cap_after
-        } as OrderEvent
-      }));
+      const orderEvents: TimelineEvent[] = (ordersData || []).map(order => {
+        const team = (order.teams as any) || {};
+        const profile = (order.profiles as any) || {};
+        
+        return {
+          type: 'order' as const,
+          timestamp: new Date(order.executed_at),
+          data: {
+            id: order.id,
+            username: profile.username || 'Unknown',
+            teamName: team.name || 'Unknown',
+            orderType: order.order_type as 'BUY' | 'SELL',
+            quantity: order.quantity,
+            pricePerShare: order.price_per_share,
+            totalAmount: order.total_amount,
+            marketCapBefore: order.market_cap_before,
+            marketCapAfter: order.market_cap_after
+          } as OrderEvent
+        };
+      });
 
       // Convert fixtures to timeline events
       const fixtureEvents: TimelineEvent[] = (fixturesData || []).map(fixture => {
@@ -367,13 +376,16 @@ export const adminService = {
           (fixture.result === 'away_win' ? marketCapBefore * 1.1 : 
            fixture.result === 'home_win' ? marketCapBefore * 0.9 : marketCapBefore);
 
+        const homeTeam = (fixture.home_team as any) || {};
+        const awayTeam = (fixture.away_team as any) || {};
+
         return {
           type: 'fixture' as const,
           timestamp: new Date(fixture.kickoff_at),
           data: {
             id: fixture.id,
-            homeTeam: fixture.home_team?.name || 'Unknown',
-            awayTeam: fixture.away_team?.name || 'Unknown',
+            homeTeam: homeTeam.name || 'Unknown',
+            awayTeam: awayTeam.name || 'Unknown',
             homeScore: fixture.home_score,
             awayScore: fixture.away_score,
             result: fixture.result as 'home_win' | 'away_win' | 'draw',
@@ -464,6 +476,238 @@ export const adminService = {
     } catch (error) {
       logger.error('Error logging admin action:', error);
       // Don't throw - audit logging shouldn't break the main flow
+    }
+  },
+
+  /**
+   * Get financial overview for admin dashboard
+   */
+  async getFinancialOverview(): Promise<{
+    totalPlatformValue: number;
+    totalUserDeposits: number;
+    totalUserWallets: number;
+    totalInvested: number;
+    platformRevenue: number;
+  }> {
+    try {
+      // Get total platform value (sum of all team market caps)
+      const { data: teams, error: teamsError } = await supabase
+        .from('teams')
+        .select('market_cap');
+
+      if (teamsError) {
+        logger.error('Error fetching teams for financial overview:', teamsError);
+        throw new Error(`Failed to fetch teams: ${teamsError.message}`);
+      }
+      const totalPlatformValue = (teams || []).reduce((sum, team) => sum + Number(team.market_cap || 0), 0);
+
+      // Get total user deposits (from wallet_transactions where type = 'deposit')
+      const { data: deposits, error: depositsError } = await supabase
+        .from('wallet_transactions')
+        .select('amount_cents')
+        .eq('type', 'deposit');
+
+      if (depositsError) {
+        logger.error('Error fetching deposits for financial overview:', depositsError);
+        throw new Error(`Failed to fetch deposits: ${depositsError.message}`);
+      }
+      const totalUserDeposits = (deposits || []).reduce((sum, tx) => sum + (Number(tx.amount_cents || 0) / 100), 0);
+
+      // Get total user wallets (sum of all wallet balances)
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('wallet_balance');
+
+      if (profilesError) {
+        logger.error('Error fetching profiles for financial overview:', profilesError);
+        throw new Error(`Failed to fetch profiles: ${profilesError.message}`);
+      }
+      const totalUserWallets = (profiles || []).reduce((sum, profile) => sum + (Number(profile.wallet_balance || 0)), 0);
+
+      // Get total invested (sum of all positions.total_invested)
+      const { data: positions, error: positionsError } = await supabase
+        .from('positions')
+        .select('total_invested')
+        .gt('quantity', 0);
+
+      if (positionsError) {
+        logger.error('Error fetching positions for financial overview:', positionsError);
+        throw new Error(`Failed to fetch positions: ${positionsError.message}`);
+      }
+      const totalInvested = (positions || []).reduce((sum, pos) => sum + (Number(pos.total_invested || 0)), 0);
+
+      // Platform revenue = total deposits - total wallets (money in system)
+      const platformRevenue = totalUserDeposits - totalUserWallets;
+
+      return {
+        totalPlatformValue,
+        totalUserDeposits,
+        totalUserWallets,
+        totalInvested,
+        platformRevenue
+      };
+    } catch (error) {
+      logger.error('Error fetching financial overview:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get all wallet transactions across users
+   */
+  async getAllWalletTransactions(limit = 1000): Promise<Array<{
+    id: number;
+    user_id: string;
+    username: string;
+    amount_cents: number;
+    currency: string;
+    type: string;
+    ref?: string;
+    created_at: string;
+  }>> {
+    try {
+      // First get wallet transactions
+      const { data: transactions, error: transactionsError } = await supabase
+        .from('wallet_transactions')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (transactionsError) throw transactionsError;
+
+      // Then get usernames for each user_id
+      const userIds = [...new Set((transactions || []).map(tx => tx.user_id))];
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .in('id', userIds);
+
+      // Don't throw on profiles error, just log it - we can still return transactions
+      if (profilesError) {
+        logger.warn('Error fetching profiles for wallet transactions:', profilesError);
+      }
+
+      const profilesMap = new Map((profiles || []).map(p => [p.id, p.username]));
+
+      return (transactions || []).map(tx => ({
+        id: tx.id,
+        user_id: tx.user_id,
+        username: profilesMap.get(tx.user_id) || 'Unknown',
+        amount_cents: tx.amount_cents,
+        currency: tx.currency,
+        type: tx.type,
+        ref: tx.ref,
+        created_at: tx.created_at
+      }));
+    } catch (error) {
+      logger.error('Error fetching all wallet transactions:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get recent activity feed (trades, registrations, match results)
+   */
+  async getRecentActivity(limit = 10): Promise<Array<{
+    type: 'trade' | 'registration' | 'match';
+    timestamp: string;
+    description: string;
+    user_id?: string;
+    username?: string;
+  }>> {
+    try {
+      const activities: Array<{
+        type: 'trade' | 'registration' | 'match';
+        timestamp: string;
+        description: string;
+        user_id?: string;
+        username?: string;
+      }> = [];
+
+      // Get recent trades
+      const { data: recentTrades, error: tradesError } = await supabase
+        .from('orders')
+        .select(`
+          user_id,
+          executed_at,
+          created_at,
+          order_type,
+          total_amount,
+          profiles!inner(username),
+          teams!inner(name)
+        `)
+        .eq('status', 'FILLED')
+        .order('executed_at', { ascending: false })
+        .limit(5);
+
+      if (!tradesError && recentTrades) {
+        recentTrades.forEach((trade: any) => {
+          const team = trade.teams || {};
+          const profile = trade.profiles || {};
+          
+          activities.push({
+            type: 'trade',
+            timestamp: trade.executed_at || trade.created_at,
+            description: `${profile.username || 'User'} ${trade.order_type === 'BUY' ? 'bought' : 'sold'} ${trade.total_amount} worth of ${team.name || 'shares'}`,
+            user_id: trade.user_id,
+            username: profile.username
+          });
+        });
+      }
+
+      // Get recent user registrations
+      const { data: recentUsers, error: usersError } = await supabase
+        .from('profiles')
+        .select('id, username, created_at')
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (!usersError && recentUsers) {
+        recentUsers.forEach(user => {
+          activities.push({
+            type: 'registration',
+            timestamp: user.created_at,
+            description: `${user.username || 'New user'} registered`,
+            user_id: user.id,
+            username: user.username
+          });
+        });
+      }
+
+      // Get recent match results
+      const { data: recentMatches, error: matchesError } = await supabase
+        .from('fixtures')
+        .select(`
+          kickoff_at,
+          result,
+          home_score,
+          away_score,
+          home_team:teams!fixtures_home_team_id_fkey(name),
+          away_team:teams!fixtures_away_team_id_fkey(name)
+        `)
+        .eq('status', 'applied')
+        .order('kickoff_at', { ascending: false })
+        .limit(5);
+
+      if (!matchesError && recentMatches) {
+        recentMatches.forEach(match => {
+          const homeTeam = (match.home_team as any)?.name || 'Home';
+          const awayTeam = (match.away_team as any)?.name || 'Away';
+          activities.push({
+            type: 'match',
+            timestamp: match.kickoff_at,
+            description: `${homeTeam} ${match.home_score} - ${match.away_score} ${awayTeam}`,
+          });
+        });
+      }
+
+      // Sort by timestamp and return top N
+      return activities
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, limit);
+    } catch (error) {
+      logger.error('Error fetching recent activity:', error);
+      throw error;
     }
   }
 };

@@ -4,15 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
-import { Shield, AlertTriangle, RefreshCw } from 'lucide-react';
-import { SystemStatsCard } from './SystemStatsCard';
-import { UserInvestmentsTable } from './UserInvestmentsTable';
-import { TradeHistoryTable } from './TradeHistoryTable';
-import { SystemActivityCard } from './SystemActivityCard';
+import { Shield, AlertTriangle, RefreshCw, Users, TrendingUp, BarChart3, Calendar, DollarSign, Database } from 'lucide-react';
+import { DashboardOverview } from './DashboardOverview';
+import { UsersManagementPanel } from './UsersManagementPanel';
+import { TradingActivityTable } from './TradingActivityTable';
+import { TeamsManagementPanel } from './TeamsManagementPanel';
+import { MatchesManagementPanel } from './MatchesManagementPanel';
+import { FinancialOverviewPanel } from './FinancialOverviewPanel';
 import { AuditLogViewer } from './AuditLogViewer';
 import { AdminErrorBoundary } from './AdminErrorBoundary';
-import { SeasonUpdatePanel } from './SeasonUpdatePanel';
-import { MarketCapProcessingPanel } from './MarketCapProcessingPanel';
 import { adminService } from '@/shared/lib/services/admin.service';
 import { useAuth } from '@/features/auth/contexts/AuthContext';
 import { useAppContext } from '@/features/trading/contexts/AppContext';
@@ -94,66 +94,60 @@ export const AdminDashboard: React.FC = () => {
 
         {/* Main Content */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="overview">System Overview</TabsTrigger>
-            <TabsTrigger value="users">User Investments</TabsTrigger>
-            <TabsTrigger value="trades">Trade History</TabsTrigger>
-            <TabsTrigger value="season">Season Management</TabsTrigger>
-            <TabsTrigger value="market">Market Data</TabsTrigger>
-            <TabsTrigger value="audit">Audit Logs</TabsTrigger>
-          </TabsList>
+          <Tabs defaultValue="dashboard" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-7">
+              <TabsTrigger value="dashboard" className="flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                <span className="hidden sm:inline">Dashboard</span>
+              </TabsTrigger>
+              <TabsTrigger value="users" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                <span className="hidden sm:inline">Users & Wallets</span>
+              </TabsTrigger>
+              <TabsTrigger value="trading" className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                <span className="hidden sm:inline">Trading Activity</span>
+              </TabsTrigger>
+              <TabsTrigger value="teams" className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden sm:inline">Teams & Market</span>
+              </TabsTrigger>
+              <TabsTrigger value="matches" className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                <span className="hidden sm:inline">Matches & Fixtures</span>
+              </TabsTrigger>
+              <TabsTrigger value="financial" className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                <span className="hidden sm:inline">Financial Overview</span>
+              </TabsTrigger>
+              <TabsTrigger value="audit" className="flex items-center gap-2">
+                <Database className="h-4 w-4" />
+                <span className="hidden sm:inline">System & Audit</span>
+              </TabsTrigger>
+            </TabsList>
 
-            <TabsContent value="overview" className="space-y-6">
-              <SystemStatsCard />
-              
-              {/* Additional Overview Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Quick Actions</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Button variant="outline" className="w-full justify-start">
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Refresh System Data
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start">
-                      <Shield className="h-4 w-4 mr-2" />
-                      View Audit Logs
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start">
-                      <AlertTriangle className="h-4 w-4 mr-2" />
-                      System Health Check
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">System Activity</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <SystemActivityCard />
-                  </CardContent>
-                </Card>
-              </div>
+            <TabsContent value="dashboard" className="space-y-6">
+              <DashboardOverview />
             </TabsContent>
 
             <TabsContent value="users" className="space-y-6">
-              <UserInvestmentsTable />
+              <UsersManagementPanel />
             </TabsContent>
 
-            <TabsContent value="trades" className="space-y-6">
-              <TradeHistoryTable />
+            <TabsContent value="trading" className="space-y-6">
+              <TradingActivityTable />
             </TabsContent>
 
-            <TabsContent value="season" className="space-y-6">
-              <SeasonUpdatePanel />
+            <TabsContent value="teams" className="space-y-6">
+              <TeamsManagementPanel />
             </TabsContent>
 
-            <TabsContent value="market" className="space-y-6">
-              <MarketCapProcessingPanel />
+            <TabsContent value="matches" className="space-y-6">
+              <MatchesManagementPanel />
+            </TabsContent>
+
+            <TabsContent value="financial" className="space-y-6">
+              <FinancialOverviewPanel />
             </TabsContent>
 
             <TabsContent value="audit" className="space-y-6">
