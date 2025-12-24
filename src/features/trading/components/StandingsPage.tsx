@@ -116,7 +116,7 @@ const StandingsPage: React.FC = () => {
                   <th className="w-16 px-3" style={{ textAlign: 'center' }}>GA</th>
                   <th className="w-16 px-3" style={{ textAlign: 'center' }}>GD</th>
                   <th className="w-16 px-3" style={{ textAlign: 'center' }}>Pts</th>
-                  <th className="w-32 px-3" style={{ textAlign: 'center' }}>Status</th>
+                  <th className="px-3" style={{ textAlign: 'center', minWidth: '140px' }}>Status</th>
                 </tr>
               </thead>
               <tbody>
