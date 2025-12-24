@@ -26,55 +26,22 @@ The application uses the following main tables:
 - **Match-based Transfers**: Automatic market cap transfers on match results
 - **Row Level Security**: User data isolation
 
-## 🚀 Essential Scripts
+## 🚀 Database Migrations
 
-### Setup & Migration
-- **`remove_is_latest_constraint.sql`** - Migrates positions table to simplified structure
-- **`add_missing_premier_league_teams.sql`** - Adds Premier League teams
+All database migrations are located in the `supabase/migrations/` directory and should be run in chronological order (by filename timestamp). The Supabase CLI will automatically apply these migrations when you run:
 
-### Reset & Cleanup
-- **`reset_marketplace_complete.sql`** - Resets all marketplace data
-- **`reset_database_complete.sql`** - Complete database reset
-- **`reset_teams_only.sql`** - Reset only team data
-- **`reset_fixtures_for_simulation.sql`** - Reset fixtures for testing
+```bash
+supabase db push
+```
 
-### Performance & Optimization
-- **`performance_indexes.sql`** - Database performance indexes
-- **`advanced_performance_optimizations.sql`** - Advanced optimizations
-
-### CORS & Configuration
-- **`universal_cors_setup.sql`** - CORS configuration
-- **`netlify_cors_setup.sql`** - Netlify-specific CORS
-- **`local_cors_setup.sql`** - Local development CORS
-
-### Utilities
-- **`check_email_config.sql`** - Email configuration check
-
-## 🧹 Cleanup Summary
-
-**Removed 30+ unnecessary files:**
-- ❌ All schema export scripts (replaced by `COMPLETE_SCHEMA.md`)
-- ❌ All fix/legacy scripts (no longer needed)
-- ❌ All debug scripts (development completed)
-- ❌ All migration scripts (migrations completed)
-- ❌ All documentation markdown files (consolidated)
-- ❌ All snapshot system scripts (deprecated)
+Or you can apply them manually through the Supabase Dashboard SQL Editor.
 
 ## 📖 Usage
 
 ### Initial Setup
-1. Run `remove_is_latest_constraint.sql` to migrate to simplified positions
-2. Run `add_missing_premier_league_teams.sql` to add teams
-3. Run `performance_indexes.sql` for optimization
-
-### Reset Data
-- Use `reset_marketplace_complete.sql` for marketplace reset
-- Use `reset_database_complete.sql` for complete reset
-
-### CORS Setup
-- Use `universal_cors_setup.sql` for production
-- Use `netlify_cors_setup.sql` for Netlify deployment
-- Use `local_cors_setup.sql` for local development
+1. Ensure all migrations in `supabase/migrations/` are applied to your database
+2. The migrations include all necessary schema, functions, triggers, and RLS policies
+3. See `COMPLETE_SCHEMA.md` for detailed schema documentation
 
 ## 🎯 Schema Benefits
 

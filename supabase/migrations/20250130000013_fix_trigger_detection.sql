@@ -66,3 +66,4 @@ COMMENT ON FUNCTION public.prevent_profile_field_updates() IS
   'Prevents non-admin users from updating sensitive profile fields (is_admin, wallet_balance). Allows SECURITY DEFINER functions to update wallet_balance by detecting NULL auth.uid() or different user ID.';
 
 
+

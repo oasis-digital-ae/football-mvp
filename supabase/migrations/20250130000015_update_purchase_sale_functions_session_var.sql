@@ -214,3 +214,4 @@ $$;
 -- Note: The sale function already exists, so we'll update it to add the session variable
 
 
+

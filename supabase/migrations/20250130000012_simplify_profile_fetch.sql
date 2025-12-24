@@ -24,3 +24,4 @@ COMMENT ON FUNCTION public.create_or_update_profile_atomic(uuid, text, text, tex
   'Atomically creates or updates user profile. Uses INSERT ... ON CONFLICT for atomicity. SECURITY DEFINER allows bypassing RLS.';
 
 
+

@@ -28,6 +28,10 @@ import { usersService, type UserListItem, type UserDetails, type WalletTransacti
 import { formatCurrency } from '@/shared/lib/formatters';
 import { useToast } from '@/shared/hooks/use-toast';
 import { supabase } from '@/shared/lib/supabase';
+import {
+  calculatePercentChange,
+  calculateAverageCost
+} from '@/shared/lib/utils/calculations';
 
 type SortField = 'username' | 'wallet_balance' | 'total_invested' | 'portfolio_value' | 'profit_loss' | 'positions_count' | 'last_activity' | 'created_at';
 type SortDirection = 'asc' | 'desc';
@@ -552,10 +556,8 @@ export const UsersManagementPanel: React.FC = () => {
                       <TableBody>
                         {selectedUser.positions.map((pos, index) => {
                           const pricePerShare = pos.quantity > 0 ? pos.current_value / pos.quantity : 0;
-                          const investedPerShare = pos.quantity > 0 ? pos.total_invested / pos.quantity : 0;
-                          const percentChange = investedPerShare > 0 
-                            ? ((pricePerShare - investedPerShare) / investedPerShare) * 100 
-                            : 0;
+                          const investedPerShare = calculateAverageCost(pos.total_invested, pos.quantity);
+                          const percentChange = calculatePercentChange(pricePerShare, investedPerShare);
                           
                           return (
                             <TableRow key={index}>
@@ -631,5 +633,6 @@ export const UsersManagementPanel: React.FC = () => {
     </>
   );
 };
+
 
 

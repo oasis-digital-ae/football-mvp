@@ -5,6 +5,11 @@
 
 import { logger } from './logger';
 import type { Club, PortfolioItem } from '@/shared/constants/clubs';
+import {
+  calculateSharePrice,
+  calculateProfitLoss,
+  calculateLifetimePercentChange
+} from './utils/calculations';
 
 // Import types from services
 import type { DatabaseTeam } from './services/teams.service';
@@ -114,11 +119,12 @@ export const teamDetailsService = {
 export const convertTeamToClub = (team: DatabaseTeam): Club => {
   // Use total_shares (fixed at 1000) instead of shares_outstanding
   const totalShares = team.total_shares || 1000;
-  const currentNAV = totalShares > 0 ? 
-    team.market_cap / totalShares : 20.00;
   const launchPrice = team.launch_price;
-  const profitLoss = currentNAV - launchPrice;
-  const percentChange = launchPrice > 0 ? ((currentNAV - launchPrice) / launchPrice) * 100 : 0;
+  
+  // Use centralized calculation functions for consistency
+  const currentNAV = calculateSharePrice(team.market_cap, totalShares, launchPrice);
+  const profitLoss = calculateProfitLoss(currentNAV, launchPrice);
+  const percentChange = calculateLifetimePercentChange(currentNAV, launchPrice);
   
   return {
     id: team.id.toString(),

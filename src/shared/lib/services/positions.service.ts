@@ -298,24 +298,6 @@ export const positionsService = {
     console.log(`🏁 addPosition completed successfully!`);
   },
 
-  async upsertPosition(position: Omit<DatabasePosition, 'id'>): Promise<void> {
-    // This method is deprecated - use addPosition instead for transaction history
-    logger.warn('upsertPosition is deprecated - use addPosition for transaction history');
-    
-    // Sanitize inputs
-    const sanitizedPosition = {
-      ...position,
-      user_id: sanitizeInput(position.user_id, 'database')
-    };
-    
-    const { error } = await supabase
-      .from('positions')
-      .upsert(sanitizedPosition, {
-        onConflict: 'user_id,team_id,is_latest'
-      });
-    
-    if (error) throw error;
-  },
 
   async isTeamTradeable(teamId: number): Promise<{ tradeable: boolean; reason?: string; nextFixture?: { kickoff_at: string; buy_close_at: string } }> {
     const now = new Date();

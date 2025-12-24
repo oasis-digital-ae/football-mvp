@@ -12,7 +12,6 @@ import { withErrorHandling, DatabaseError, ValidationError, BusinessLogicError, 
 import ErrorBoundary from '@/shared/components/ErrorBoundary';
 import { teamStateSnapshotService } from '@/shared/lib/team-state-snapshots';
 import { buyWindowService } from '@/shared/lib/buy-window.service';
-import { matchSchedulerService } from '@/shared/lib/services/match-scheduler.service';
 import { realtimeService } from '@/shared/lib/services/realtime.service';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
@@ -747,14 +746,8 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
         return;
       }
       
-      // Process the first batch of fixtures
-      const { teamsService } = await import('@/shared/lib/database');
-      const teams = await teamsService.getAll();
-      
-      // Process match results
-      await teamsService.processBatchMatchResults(fixtures.slice(0, 5), teams);
-      
-      // Refresh data to show updated market caps
+      // Match results are processed automatically by database triggers
+      // when fixture results are updated, so we just need to refresh the data
       await loadData();
       
       toast({

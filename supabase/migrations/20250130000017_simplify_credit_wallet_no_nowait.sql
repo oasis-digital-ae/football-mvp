@@ -67,3 +67,4 @@ COMMENT ON FUNCTION public.credit_wallet(uuid, bigint, text, text) IS
   'Credits user wallet atomically. Simplified version without NOWAIT to avoid timeout issues.';
 
 
+

@@ -20,6 +20,11 @@ import BuyWindowIndicator from '@/shared/components/BuyWindowIndicator';
 import { buyWindowService } from '@/shared/lib/buy-window.service';
 import { useAuth } from '@/features/auth/contexts/AuthContext';
 import { supabase } from '@/shared/lib/supabase';
+import {
+  calculateMatchdayPercentChange,
+  calculateLifetimePercentChange,
+  calculateProfitLoss
+} from '@/shared/lib/utils/calculations';
 
 export const ClubValuesPage: React.FC = () => {
   const { clubs, matches, purchaseClub, user, refreshData } = useAppContext();
@@ -142,10 +147,8 @@ export const ClubValuesPage: React.FC = () => {
           const priceAfterPreviousMatch = lastMatch.before;
           const priceAfterLastMatch = lastMatch.after;
           
-          const change = priceAfterLastMatch - priceAfterPreviousMatch;
-          const percentChange = priceAfterPreviousMatch > 0 
-            ? (change / priceAfterPreviousMatch) * 100 
-            : 0;
+          const change = calculateProfitLoss(priceAfterLastMatch, priceAfterPreviousMatch);
+          const percentChange = calculateMatchdayPercentChange(priceAfterLastMatch, priceAfterPreviousMatch);
           
           changesMap.set(teamId.toString(), { change, percentChange });
         } else if (matches.length === 1) {
@@ -154,8 +157,8 @@ export const ClubValuesPage: React.FC = () => {
           const club = clubs.find(c => parseInt(c.id) === teamId);
           if (club) {
             const launchPrice = club.launchValue;
-            const change = match.after - launchPrice;
-            const percentChange = launchPrice > 0 ? (change / launchPrice) * 100 : 0;
+            const change = calculateProfitLoss(match.after, launchPrice);
+            const percentChange = calculateLifetimePercentChange(match.after, launchPrice);
             changesMap.set(teamId.toString(), { change, percentChange });
           }
         }
@@ -688,6 +691,7 @@ export const ClubValuesPage: React.FC = () => {
                           userId={user?.id}
                           fixtures={fixtures}
                           teams={memoizedTeams}
+                          launchPrice={club.launchValue}
                         />
                       </div>
                     </div>

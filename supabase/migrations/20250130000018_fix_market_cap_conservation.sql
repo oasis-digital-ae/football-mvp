@@ -159,26 +159,26 @@ BEGIN
   -- Calculate prices and after values using snapshot values (for accurate display)
   v_winner_price_before := CASE WHEN v_total_shares > 0 THEN ROUND(v_winner_before_cap / v_total_shares, 2) ELSE 20.00 END;
   v_loser_price_before := CASE WHEN v_total_shares > 0 THEN ROUND(v_loser_before_cap / v_total_shares, 2) ELSE 20.00 END;
-  
+
   -- Calculate after values based on snapshot + transfer (rounded)
   v_winner_after_cap := ROUND(v_winner_before_cap + v_transfer_amount, 2);
   v_loser_after_cap := ROUND(v_loser_before_cap - v_transfer_amount, 2);
-  
+
   -- Ensure loser doesn't go below minimum ($10)
   IF v_loser_after_cap < 10 THEN
     v_loser_after_cap := 10.00;
     -- Adjust winner's gain to maintain total conservation
     v_winner_after_cap := ROUND(v_winner_before_cap + (v_loser_before_cap - 10.00), 2);
   END IF;
-  
+
   -- Calculate new prices using total_shares (fixed denominator)
   v_winner_price_after := CASE WHEN v_total_shares > 0 THEN ROUND(v_winner_after_cap / v_total_shares, 2) ELSE 20.00 END;
   v_loser_price_after := CASE WHEN v_total_shares > 0 THEN ROUND(v_loser_after_cap / v_total_shares, 2) ELSE 20.00 END;
-  
+
   -- Get CURRENT market caps for updating teams table (to maintain consistency)
   SELECT market_cap INTO v_winner_current_cap FROM teams WHERE id = v_winner_team_id FOR UPDATE;
   SELECT market_cap INTO v_loser_current_cap FROM teams WHERE id = v_loser_team_id FOR UPDATE;
-  
+
   -- Check if entries already exist for win/loss
   SELECT EXISTS(
       SELECT 1 FROM total_ledger 
@@ -207,10 +207,10 @@ BEGIN
   ELSE
     v_actual_transfer := ROUND(v_winner_current_cap * 0.10, 2);
   END IF;
-  
+
   v_winner_new_cap := ROUND(v_winner_current_cap + v_actual_transfer, 2);
   v_loser_new_cap := ROUND(v_loser_current_cap - v_actual_transfer, 2);
-  
+
   -- Ensure loser doesn't go below minimum ($10)
   IF v_loser_new_cap < 10 THEN
     v_loser_new_cap := 10.00;
@@ -218,7 +218,7 @@ BEGIN
     v_actual_transfer := ROUND(v_loser_current_cap - 10.00, 2);
     v_winner_new_cap := ROUND(v_winner_current_cap + v_actual_transfer, 2);
   END IF;
-  
+
   -- Update teams atomically (only if entries don't exist)
   IF NOT v_home_entry_exists AND NOT v_away_entry_exists THEN
     UPDATE teams SET

@@ -177,3 +177,4 @@ COMMENT ON FUNCTION public.log_security_event(text, uuid, jsonb) IS
 GRANT EXECUTE ON FUNCTION public.log_security_event(text, uuid, jsonb) TO authenticated, anon;
 
 
+

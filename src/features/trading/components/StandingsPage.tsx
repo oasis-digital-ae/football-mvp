@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/components/ui/table';
 import { footballApiService } from '@/shared/lib/football-api';
 import type { Standing } from '@/shared/lib/football-api';
 import ClickableTeamName from '@/shared/components/ClickableTeamName';
@@ -102,40 +101,40 @@ const StandingsPage: React.FC = () => {
             League Table
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <Table className="bg-gray-800">
-              <TableHeader>
-                <TableRow className="border-gray-700 hover:bg-gray-700">
-                  <TableHead className="w-12 text-gray-300">Pos</TableHead>
-                  <TableHead className="min-w-[200px] text-gray-300">Team</TableHead>
-                  <TableHead className="w-16 text-center text-gray-300">P</TableHead>
-                  <TableHead className="w-16 text-center text-gray-300">W</TableHead>
-                  <TableHead className="w-16 text-center text-gray-300">D</TableHead>
-                  <TableHead className="w-16 text-center text-gray-300">L</TableHead>
-                  <TableHead className="w-16 text-center text-gray-300">GF</TableHead>
-                  <TableHead className="w-16 text-center text-gray-300">GA</TableHead>
-                  <TableHead className="w-16 text-center text-gray-300">GD</TableHead>
-                  <TableHead className="w-16 text-center text-gray-300">Pts</TableHead>
-                  <TableHead className="w-32 text-gray-300">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <table className="trading-table">
+              <thead>
+                <tr>
+                  <th className="w-12 px-3">Pos</th>
+                  <th className="min-w-[200px] px-3">Team</th>
+                  <th className="w-16 text-center px-3">P</th>
+                  <th className="w-16 text-center px-3">W</th>
+                  <th className="w-16 text-center px-3">D</th>
+                  <th className="w-16 text-center px-3">L</th>
+                  <th className="w-16 text-center px-3">GF</th>
+                  <th className="w-16 text-center px-3">GA</th>
+                  <th className="w-16 text-center px-3">GD</th>
+                  <th className="w-16 text-center px-3">Pts</th>
+                  <th className="w-32 px-3">Status</th>
+                </tr>
+              </thead>
+              <tbody>
                 {standings.map((standing, index) => (
-                  <TableRow 
+                  <tr 
                     key={standing.team.id}
-                    className={`border-gray-700 hover:bg-gray-700 ${
+                    className={`${
                       standing.position <= 4 ? 'bg-yellow-900/20' :
                       standing.position >= 18 ? 'bg-red-900/20' : ''
                     }`}
                   >
-                    <TableCell className="font-medium text-white">
+                    <td className="px-3 font-medium">
                       <div className="flex items-center gap-2">
                         {getPositionIcon(standing.position)}
                         {standing.position}
                       </div>
-                    </TableCell>
-                    <TableCell className="text-white">
+                    </td>
+                    <td className="px-3">
                       <div className="flex items-center gap-3">
                         <img 
                           src={standing.team.crest} 
@@ -148,27 +147,27 @@ const StandingsPage: React.FC = () => {
                         <ClickableTeamName
                           teamName={standing.team.name}
                           teamId={standing.team.id}
-                          className="font-medium hover:text-blue-400 text-white"
+                          className="font-medium hover:text-blue-400"
                         />
                       </div>
-                    </TableCell>
-                    <TableCell className="text-center text-white">{standing.playedGames}</TableCell>
-                    <TableCell className="text-center text-green-400 font-medium">{standing.won}</TableCell>
-                    <TableCell className="text-center text-yellow-400">{standing.draw}</TableCell>
-                    <TableCell className="text-center text-red-400">{standing.lost}</TableCell>
-                    <TableCell className="text-center text-white">{standing.goalsFor}</TableCell>
-                    <TableCell className="text-center text-white">{standing.goalsAgainst}</TableCell>
-                    <TableCell className="text-center font-mono text-white">
+                    </td>
+                    <td className="px-3 text-center">{standing.playedGames}</td>
+                    <td className="px-3 text-center text-green-400 font-medium">{standing.won}</td>
+                    <td className="px-3 text-center text-yellow-400">{standing.draw}</td>
+                    <td className="px-3 text-center text-red-400">{standing.lost}</td>
+                    <td className="px-3 text-center">{standing.goalsFor}</td>
+                    <td className="px-3 text-center">{standing.goalsAgainst}</td>
+                    <td className="px-3 text-center font-mono">
                       {formatGoalDifference(standing.goalDifference)}
-                    </TableCell>
-                    <TableCell className="text-center font-bold text-lg text-white">{standing.points}</TableCell>
-                    <TableCell className="text-white">
+                    </td>
+                    <td className="px-3 text-center font-bold text-lg">{standing.points}</td>
+                    <td className="px-3">
                       {getPositionBadge(standing.position)}
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 ))}
-              </TableBody>
-            </Table>
+              </tbody>
+            </table>
           </div>
         </CardContent>
       </Card>

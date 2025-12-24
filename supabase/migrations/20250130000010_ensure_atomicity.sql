@@ -232,3 +232,4 @@ COMMENT ON FUNCTION public.process_match_result_atomic IS
   'Atomic match result processing. Uses FOR UPDATE locks on teams. Idempotent - checks for existing entries.';
 
 
+

@@ -48,8 +48,8 @@ A React-based trading platform for Premier League football clubs, built with Typ
 
 4. **Set up the database**
    - Go to your Supabase dashboard
-   - Run `src/config/database/consolidated_migration.sql`
-   - Run `src/config/database/simplify_transfers_ledger.sql`
+   - Run migrations from `supabase/migrations/` directory in chronological order
+   - See `src/config/database/README.md` for detailed setup instructions
 
 5. **Start the development server**
    ```bash

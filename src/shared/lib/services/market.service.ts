@@ -1,8 +1,17 @@
 /**
  * Market Service - Market cap and share price calculations
+ * 
+ * NOTE: This service now uses centralized calculation utilities for consistency.
+ * All calculations are rounded to 2 decimal places to prevent floating-point issues.
  */
 
 import { logger } from '../logger';
+import {
+  calculateSharePrice as calcSharePrice,
+  calculatePercentChange as calcPercentChange,
+  calculateProfitLoss as calcProfitLoss,
+  calculateTotalValue as calcTotalValue
+} from '../utils/calculations';
 
 export interface MarketData {
   marketCap: number;
@@ -61,18 +70,12 @@ export const marketService = {
 
   /**
    * Calculate total value of shares
+   * @deprecated Use calculateTotalValue from @/shared/lib/utils/calculations directly
    */
   calculateTotalValue(sharePrice: number, quantity: number): number {
-    return sharePrice * quantity;
+    return calcTotalValue(sharePrice, quantity);
   },
 
-  /**
-   * Calculate average cost basis
-   */
-  calculateAverageCost(totalInvested: number, quantity: number): number {
-    if (quantity <= 0) return 0;
-    return totalInvested / quantity;
-  },
 
   /**
    * Validate share purchase

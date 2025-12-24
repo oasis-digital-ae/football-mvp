@@ -8,6 +8,10 @@ import { useAuth } from '@/features/auth/contexts/AuthContext';
 import { realtimeService } from '@/shared/lib/services/realtime.service';
 import { useToast } from '@/shared/hooks/use-toast';
 import { Button } from '@/shared/components/ui/button';
+import {
+  calculatePercentChange,
+  calculatePortfolioPercentage
+} from '@/shared/lib/utils/calculations';
 
 const PortfolioPage: React.FC = () => {
   const { portfolio, getTransactionsByClub, sellClub, clubs } = useContext(AppContext);
@@ -84,8 +88,8 @@ const PortfolioPage: React.FC = () => {
 
   // Memoized portfolio table rows
   const memoizedPortfolioRows = useMemo(() => portfolio.map((item) => {
-    const percentChange = ((item.currentPrice - item.purchasePrice) / item.purchasePrice) * 100;
-    const portfolioPercent = totalMarketValue > 0 ? (item.totalValue / totalMarketValue) * 100 : 0;
+    const percentChange = calculatePercentChange(item.currentPrice, item.purchasePrice);
+    const portfolioPercent = calculatePortfolioPercentage(item.totalValue, totalMarketValue);
     
     return (
       <tr 
@@ -93,21 +97,21 @@ const PortfolioPage: React.FC = () => {
         className="border-b border-gray-700/30 hover:bg-gray-700/30 cursor-pointer transition-colors duration-200 group"
         onClick={() => handleClubClick(item.clubId, item.clubName)}
       >
-        <td className="p-4 font-medium group-hover:text-trading-primary transition-colors duration-200">
+        <td className="px-3 font-medium group-hover:text-trading-primary transition-colors duration-200">
           {item.clubName}
         </td>
-        <td className="p-4 text-right font-mono">{formatNumber(item.units)}</td>
-        <td className="p-4 text-right font-mono">{formatCurrency(item.purchasePrice)}</td>
-        <td className="p-4 text-right font-mono">{formatCurrency(item.currentPrice)}</td>
-        <td className={`p-4 text-right font-semibold ${percentChange === 0 ? 'text-gray-400' : percentChange > 0 ? 'price-positive' : 'price-negative'}`}>
+        <td className="px-3 text-right font-mono">{formatNumber(item.units)}</td>
+        <td className="px-3 text-right font-mono">{formatCurrency(item.purchasePrice)}</td>
+        <td className="px-3 text-right font-mono">{formatCurrency(item.currentPrice)}</td>
+        <td className={`px-3 text-right font-semibold ${percentChange === 0 ? 'text-gray-400' : percentChange > 0 ? 'price-positive' : 'price-negative'}`}>
           {percentChange > 0 ? '+' : ''}{percentChange.toFixed(2)}%
         </td>
-        <td className="p-4 text-right font-mono">{formatCurrency(item.totalValue)}</td>
-        <td className="p-4 text-right font-semibold text-trading-primary">{portfolioPercent.toFixed(2)}%</td>
-        <td className={`p-4 text-right font-semibold ${item.profitLoss === 0 ? 'text-gray-400' : item.profitLoss > 0 ? 'price-positive' : 'price-negative'}`}>
+        <td className="px-3 text-right font-mono">{formatCurrency(item.totalValue)}</td>
+        <td className="px-3 text-right font-semibold text-trading-primary">{portfolioPercent.toFixed(2)}%</td>
+        <td className={`px-3 text-right font-semibold ${item.profitLoss === 0 ? 'text-gray-400' : item.profitLoss > 0 ? 'price-positive' : 'price-negative'}`}>
           {item.profitLoss > 0 ? '+' : ''}{formatCurrency(item.profitLoss)}
         </td>
-        <td className="p-4 text-center" onClick={(e) => handleSellClick(e, item)}>
+        <td className="px-3 text-center" onClick={(e) => handleSellClick(e, item)}>
           <Button
             size="sm"
             variant="outline"
@@ -197,7 +201,7 @@ const PortfolioPage: React.FC = () => {
                   {formatCurrency(totalProfitLoss)}
                 </p>
                 <p className={`text-sm font-medium ${totalProfitLoss === 0 ? 'text-gray-400' : totalProfitLoss > 0 ? 'price-positive' : 'price-negative'}`}>
-                  {totalInvested > 0 ? `${((totalProfitLoss / totalInvested) * 100).toFixed(2)}%` : '0.00%'}
+                  {totalInvested > 0 ? `${calculatePercentChange(totalProfitLoss + totalInvested, totalInvested).toFixed(2)}%` : '0.00%'}
                 </p>
               </div>
               <div className={`w-12 h-12 rounded-full flex items-center justify-center group-hover:animate-bounce-gentle ${
@@ -245,18 +249,18 @@ const PortfolioPage: React.FC = () => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-white">
+              <table className="trading-table">
                 <thead>
-                  <tr className="border-b border-gray-700/50">
-                    <th className="text-left p-4 font-semibold text-gray-300">Club</th>
-                    <th className="text-right p-4 font-semibold text-gray-300">Units</th>
-                    <th className="text-right p-4 font-semibold text-gray-300">Avg Price</th>
-                    <th className="text-right p-4 font-semibold text-gray-300">Current Price</th>
-                    <th className="text-right p-4 font-semibold text-gray-300">% Change</th>
-                    <th className="text-right p-4 font-semibold text-gray-300">Total Value</th>
-                    <th className="text-right p-4 font-semibold text-gray-300">% Portfolio</th>
-                    <th className="text-right p-4 font-semibold text-gray-300">P&L</th>
-                    <th className="text-center p-4 font-semibold text-gray-300">Action</th>
+                  <tr>
+                    <th className="text-left px-3">Club</th>
+                    <th className="text-right px-3">Units</th>
+                    <th className="text-right px-3">Avg Price</th>
+                    <th className="text-right px-3">Current Price</th>
+                    <th className="text-right px-3">% Change</th>
+                    <th className="text-right px-3">Total Value</th>
+                    <th className="text-right px-3">% Portfolio</th>
+                    <th className="text-right px-3">P&L</th>
+                    <th className="text-center px-3">Action</th>
                   </tr>
                 </thead>
                 <tbody>
