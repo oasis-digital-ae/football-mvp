@@ -106,17 +106,17 @@ const StandingsPage: React.FC = () => {
             <table className="trading-table">
               <thead>
                 <tr>
-                  <th className="w-12 px-3 text-left">Pos</th>
-                  <th className="min-w-[200px] px-3 text-left">Team</th>
-                  <th className="w-16 text-center px-3">P</th>
-                  <th className="w-16 text-center px-3">W</th>
-                  <th className="w-16 text-center px-3">D</th>
-                  <th className="w-16 text-center px-3">L</th>
-                  <th className="w-16 text-center px-3">GF</th>
-                  <th className="w-16 text-center px-3">GA</th>
-                  <th className="w-16 text-center px-3">GD</th>
-                  <th className="w-16 text-center px-3">Pts</th>
-                  <th className="w-32 text-center px-3">Status</th>
+                  <th className="w-12 px-3" style={{ textAlign: 'left' }}>Pos</th>
+                  <th className="min-w-[200px] px-3" style={{ textAlign: 'left' }}>Team</th>
+                  <th className="w-16 px-3" style={{ textAlign: 'center' }}>P</th>
+                  <th className="w-16 px-3" style={{ textAlign: 'center' }}>W</th>
+                  <th className="w-16 px-3" style={{ textAlign: 'center' }}>D</th>
+                  <th className="w-16 px-3" style={{ textAlign: 'center' }}>L</th>
+                  <th className="w-16 px-3" style={{ textAlign: 'center' }}>GF</th>
+                  <th className="w-16 px-3" style={{ textAlign: 'center' }}>GA</th>
+                  <th className="w-16 px-3" style={{ textAlign: 'center' }}>GD</th>
+                  <th className="w-16 px-3" style={{ textAlign: 'center' }}>Pts</th>
+                  <th className="w-32 px-3" style={{ textAlign: 'center' }}>Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -128,13 +128,13 @@ const StandingsPage: React.FC = () => {
                       standing.position >= 18 ? 'bg-red-900/20' : ''
                     }`}
                   >
-                    <td className="px-3 text-xs font-medium" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                    <td className="px-3 text-xs font-medium" style={{ color: 'hsl(var(--muted-foreground))', textAlign: 'left' }}>
                       <div className="flex items-center gap-2">
                         {getPositionIcon(standing.position)}
                         {standing.position}
                       </div>
                     </td>
-                    <td className="px-3">
+                    <td className="px-3" style={{ textAlign: 'left' }}>
                       <div className="flex items-center gap-2">
                         <img 
                           src={standing.team.crest} 
@@ -151,17 +151,17 @@ const StandingsPage: React.FC = () => {
                         />
                       </div>
                     </td>
-                    <td className="px-3 text-center text-xs">{standing.playedGames}</td>
-                    <td className="px-3 text-center text-xs text-green-400 font-medium">{standing.won}</td>
-                    <td className="px-3 text-center text-xs text-yellow-400">{standing.draw}</td>
-                    <td className="px-3 text-center text-xs text-red-400">{standing.lost}</td>
-                    <td className="px-3 text-center text-xs">{standing.goalsFor}</td>
-                    <td className="px-3 text-center text-xs">{standing.goalsAgainst}</td>
-                    <td className="px-3 text-center text-xs font-mono">
+                    <td className="px-3 text-xs" style={{ textAlign: 'center' }}>{standing.playedGames}</td>
+                    <td className="px-3 text-xs text-green-400 font-medium" style={{ textAlign: 'center' }}>{standing.won}</td>
+                    <td className="px-3 text-xs text-yellow-400" style={{ textAlign: 'center' }}>{standing.draw}</td>
+                    <td className="px-3 text-xs text-red-400" style={{ textAlign: 'center' }}>{standing.lost}</td>
+                    <td className="px-3 text-xs" style={{ textAlign: 'center' }}>{standing.goalsFor}</td>
+                    <td className="px-3 text-xs" style={{ textAlign: 'center' }}>{standing.goalsAgainst}</td>
+                    <td className="px-3 text-xs font-mono" style={{ textAlign: 'center' }}>
                       {formatGoalDifference(standing.goalDifference)}
                     </td>
-                    <td className="px-3 text-center text-xs font-semibold">{standing.points}</td>
-                    <td className="px-3 text-center">
+                    <td className="px-3 text-xs font-semibold" style={{ textAlign: 'center' }}>{standing.points}</td>
+                    <td className="px-3" style={{ textAlign: 'center' }}>
                       {getPositionBadge(standing.position)}
                     </td>
                   </tr>
