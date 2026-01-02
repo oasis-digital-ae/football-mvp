@@ -6,6 +6,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/shared/components/ui/tooltip';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/shared/components/ui/alert-dialog';
 import { useAuth } from '@/features/auth/contexts/AuthContext';
 import { DepositModal } from '@/features/trading/components/DepositModal';
 import { formatCurrency } from '@/shared/lib/formatters';
@@ -34,6 +44,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
   const { signOut, profile, walletBalance, refreshWalletBalance, isAdmin } = useAuth();
   const [depositModalOpen, setDepositModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   
   const allPages = [
     { id: 'marketplace', label: 'Marketplace', icon: TrendingUp },
@@ -52,8 +63,14 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
     return true;
   });
 
-  const handleSignOut = async () => {
+  const handleSignOutClick = () => {
+    setLogoutDialogOpen(true);
+    setMobileMenuOpen(false); // Close mobile menu if open
+  };
+
+  const handleConfirmSignOut = async () => {
     try {
+      setLogoutDialogOpen(false);
       await signOut();
     } catch (error) {
       console.error('Error signing out:', error);
@@ -150,7 +167,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
             )}
             <Button 
               variant="ghost" 
-              onClick={handleSignOut} 
+              onClick={handleSignOutClick} 
               className="text-gray-300 hover:text-white hover:bg-white/10 p-1.5 lg:p-2 flex-shrink-0"
               title="Sign Out"
             >
@@ -212,7 +229,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
                   </div>
                   <Button
                     variant="ghost"
-                    onClick={handleSignOut}
+                    onClick={handleSignOutClick}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 justify-start"
                   >
                     <LogOut className="w-5 h-5" />
@@ -236,6 +253,35 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
           }, 1500); // Give webhook time to process
         }}
       />
+
+      {/* Logout Confirmation Dialog */}
+      <AlertDialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
+        <AlertDialogContent className="bg-gray-800 border-gray-700 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-lg sm:text-xl font-bold flex items-center gap-2">
+              <LogOut className="w-5 h-5 text-red-400" />
+              Sign Out
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm sm:text-base text-gray-300 pt-2">
+              Are you sure you want to sign out? You'll need to sign in again to access your account.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-3 pt-4">
+            <AlertDialogCancel 
+              onClick={() => setLogoutDialogOpen(false)}
+              className="w-full sm:w-auto bg-gray-700 hover:bg-gray-600 text-white border-gray-600 order-2 sm:order-1 touch-manipulation min-h-[44px]"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmSignOut}
+              className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white order-1 sm:order-2 touch-manipulation min-h-[44px]"
+            >
+              Sign Out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </nav>
 
     {/* Bottom Navigation Bar - Mobile Only */}
