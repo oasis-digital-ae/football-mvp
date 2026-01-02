@@ -161,14 +161,18 @@ BEGIN
   v_loser_price_before := CASE WHEN v_total_shares > 0 THEN ROUND(v_loser_before_cap / v_total_shares, 2) ELSE 20.00 END;
 
   -- Calculate after values based on snapshot + transfer (rounded)
+  -- Use the same transfer amount that will be used for actual updates
+  -- This ensures displayed values match actual values
   v_winner_after_cap := ROUND(v_winner_before_cap + v_transfer_amount, 2);
   v_loser_after_cap := ROUND(v_loser_before_cap - v_transfer_amount, 2);
 
-  -- Ensure loser doesn't go below minimum ($10)
+  -- Ensure loser doesn't go below minimum ($10) - adjust transfer amount if needed
   IF v_loser_after_cap < 10 THEN
+    -- Recalculate transfer amount to only take what's available above $10 minimum
+    v_transfer_amount := ROUND(v_loser_before_cap - 10.00, 2);
     v_loser_after_cap := 10.00;
-    -- Adjust winner's gain to maintain total conservation
-    v_winner_after_cap := ROUND(v_winner_before_cap + (v_loser_before_cap - 10.00), 2);
+    -- Recalculate winner's gain with adjusted transfer amount
+    v_winner_after_cap := ROUND(v_winner_before_cap + v_transfer_amount, 2);
   END IF;
 
   -- Calculate new prices using total_shares (fixed denominator)
@@ -201,22 +205,32 @@ BEGIN
   
   -- Calculate the actual transfer amount based on current caps (to maintain consistency)
   -- This ensures we're working with the actual current state, not snapshots
-  -- Calculate transfer from current caps (not snapshots) to maintain consistency
+  -- Use the SAME transfer amount for both winner and loser to ensure they match exactly
   IF v_fixture.result = 'home_win' THEN
     v_actual_transfer := ROUND(v_loser_current_cap * 0.10, 2);
   ELSE
     v_actual_transfer := ROUND(v_winner_current_cap * 0.10, 2);
   END IF;
 
+  -- Ensure loser doesn't go below minimum ($10) BEFORE calculating final caps
+  -- This ensures the transfer amount is adjusted if needed, and both teams use the same adjusted amount
+  IF (v_loser_current_cap - v_actual_transfer) < 10 THEN
+    -- Adjust transfer to only take what's available above $10 minimum
+    v_actual_transfer := ROUND(v_loser_current_cap - 10.00, 2);
+    -- Update v_transfer_amount to match for logging consistency (so displayed amounts match actual amounts)
+    v_transfer_amount := v_actual_transfer;
+    -- Also update the snapshot-based after_cap values to match
+    v_loser_after_cap := 10.00;
+    v_winner_after_cap := ROUND(v_winner_before_cap + v_transfer_amount, 2);
+  END IF;
+
+  -- Calculate final caps using the same transfer amount for both teams
   v_winner_new_cap := ROUND(v_winner_current_cap + v_actual_transfer, 2);
   v_loser_new_cap := ROUND(v_loser_current_cap - v_actual_transfer, 2);
-
-  -- Ensure loser doesn't go below minimum ($10)
+  
+  -- Ensure loser is exactly at minimum if it was adjusted
   IF v_loser_new_cap < 10 THEN
     v_loser_new_cap := 10.00;
-    -- Adjust winner's gain to maintain total conservation
-    v_actual_transfer := ROUND(v_loser_current_cap - 10.00, 2);
-    v_winner_new_cap := ROUND(v_winner_current_cap + v_actual_transfer, 2);
   END IF;
 
   -- Update teams atomically (only if entries don't exist)

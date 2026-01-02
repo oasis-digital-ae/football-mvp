@@ -88,6 +88,8 @@ const PortfolioPage: React.FC = () => {
 
   // Memoized portfolio table rows
   const memoizedPortfolioRows = useMemo(() => portfolio.map((item) => {
+    // Since total_invested = ROUND(price, 2) * quantity, purchasePrice should equal currentPrice exactly
+    // when prices haven't changed, so percentChange should be exactly 0
     const percentChange = calculatePercentChange(item.currentPrice, item.purchasePrice);
     const portfolioPercent = calculatePortfolioPercentage(item.totalValue, totalMarketValue);
     

@@ -8,8 +8,12 @@ import type { Club, PortfolioItem } from '@/shared/constants/clubs';
 import {
   calculateSharePrice,
   calculateProfitLoss,
-  calculateLifetimePercentChange
+  calculatePercentChange,
+  calculateAverageCost,
+  calculateTotalValue,
+  roundToTwoDecimals
 } from './utils/calculations';
+import { fromCents } from './utils/decimal';
 
 // Import types from services
 import type { DatabaseTeam } from './services/teams.service';
@@ -116,25 +120,34 @@ export const teamDetailsService = {
 
 // Type conversion utilities
 // Fixed shares model: Price = market_cap / total_shares (1000)
+// Database stores values as BIGINT (cents), convert to dollars using fromCents()
 export const convertTeamToClub = (team: DatabaseTeam): Club => {
   // Use total_shares (fixed at 1000) instead of shares_outstanding
   const totalShares = team.total_shares || 1000;
-  const launchPrice = team.launch_price;
   
-  // Use centralized calculation functions for consistency
-  const currentNAV = calculateSharePrice(team.market_cap, totalShares, launchPrice);
-  const profitLoss = calculateProfitLoss(currentNAV, launchPrice);
-  const percentChange = calculateLifetimePercentChange(currentNAV, launchPrice);
+  // Convert cents to dollars: database stores as BIGINT (cents)
+  const marketCapDollars = fromCents(team.market_cap).toNumber();
+  const launchPriceDollars = fromCents(team.launch_price).toNumber();
+  
+  // Use centralized calculation functions (now use Decimal internally)
+  const currentNAV = calculateSharePrice(marketCapDollars, totalShares, launchPriceDollars);
+  const profitLoss = calculateProfitLoss(currentNAV, launchPriceDollars);
+  
+  // Calculate percent change directly from market cap to avoid rounding errors
+  // Since price = marketCap / totalShares, price % change = marketCap % change
+  // Calculate initial market cap from launch price for comparison
+  const initialMarketCap = launchPriceDollars * totalShares;
+  const percentChange = calculatePercentChange(marketCapDollars, initialMarketCap);
   
   return {
     id: team.id.toString(),
     name: team.name,
     externalId: team.external_id?.toString(),
-    launchValue: launchPrice,
-    currentValue: currentNAV,
-    profitLoss: profitLoss,
-    percentChange: percentChange,
-    marketCap: team.market_cap,
+    launchValue: launchPriceDollars,
+    currentValue: currentNAV, // Already rounded to 2 decimals by calculateSharePrice
+    profitLoss: profitLoss, // Already rounded to 2 decimals by calculateProfitLoss
+    percentChange: percentChange, // Already rounded to 2 decimals by calculatePercentChange
+    marketCap: marketCapDollars,
     sharesOutstanding: team.available_shares || 1000 // Show available_shares instead
   };
 };
@@ -142,18 +155,30 @@ export const convertTeamToClub = (team: DatabaseTeam): Club => {
 export const convertPositionToPortfolioItem = (position: DatabasePositionWithTeam): PortfolioItem => {
   // Use total_shares (fixed at 1000) instead of shares_outstanding
   const totalShares = position.team.total_shares || 1000;
+  
+  // Convert cents to dollars: database stores as BIGINT (cents)
+  const marketCapDollars = fromCents(position.team.market_cap).toNumber();
+  const totalInvestedDollars = fromCents(position.total_invested).toNumber();
+  
+  // Use centralized calculation functions (now use Decimal internally)
   const currentPrice = totalShares > 0 ? 
-    position.team.market_cap / totalShares : 20.00;
-  const avgCost = position.quantity > 0 ? position.total_invested / position.quantity : 0;
+    calculateSharePrice(marketCapDollars, totalShares, 20.00) : 20.00;
+  const avgCost = position.quantity > 0 ? 
+    calculateAverageCost(totalInvestedDollars, position.quantity) : 0;
+  
+  // Calculate P&L using Decimal-based calculations
+  // All values are already rounded to 2 decimals by calculation functions
+  const profitLoss = calculateProfitLoss(currentPrice, avgCost) * position.quantity;
+  const totalValue = calculateTotalValue(currentPrice, position.quantity);
   
   return {
     clubId: position.team_id.toString(),
     clubName: position.team.name,
     units: position.quantity,
-    purchasePrice: avgCost,
-    currentPrice: currentPrice,
-    totalValue: position.quantity * currentPrice,
-    profitLoss: (currentPrice - avgCost) * position.quantity
+    purchasePrice: avgCost, // Already rounded to 2 decimals by calculateAverageCost
+    currentPrice: currentPrice, // Already rounded to 2 decimals by calculateSharePrice
+    totalValue: totalValue, // Already rounded to 2 decimals by calculateTotalValue
+    profitLoss: roundToTwoDecimals(profitLoss) // Round final P&L to ensure 2 decimals
   };
 };
 

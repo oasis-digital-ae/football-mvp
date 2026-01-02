@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { OrderWithImpact, TeamOrdersData } from '@/shared/lib/services/types';
 import { TeamOrdersService } from '@/shared/lib/services/team-orders.service';
 import { supabase } from '@/shared/lib/supabase';
+import { fromCents } from '@/shared/lib/utils/decimal';
 
 interface TeamOrdersModalProps {
   teamId: number;
@@ -120,7 +121,7 @@ export const TeamOrdersModal: React.FC<TeamOrdersModalProps> = ({
                 <div className="bg-purple-50 p-4 rounded-lg">
                   <h3 className="text-sm font-medium text-purple-900">Current Market Cap</h3>
                   <p className="text-2xl font-bold text-purple-700">
-                    ${teamData.team.market_cap.toLocaleString()}
+                    ${fromCents(teamData.team.market_cap).toNumber().toLocaleString()}
                   </p>
                   <p className="text-sm text-purple-600">total value</p>
                 </div>

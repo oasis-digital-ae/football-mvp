@@ -2,7 +2,7 @@
  * Market Service - Market cap and share price calculations
  * 
  * NOTE: This service now uses centralized calculation utilities for consistency.
- * All calculations are rounded to 2 decimal places to prevent floating-point issues.
+ * All calculations use Decimal internally and are rounded to 2 decimal places for display.
  */
 
 import { logger } from '../logger';
@@ -12,6 +12,7 @@ import {
   calculateProfitLoss as calcProfitLoss,
   calculateTotalValue as calcTotalValue
 } from '../utils/calculations';
+import { roundForDisplay, toDecimal, type Decimal as DecimalType } from '../utils/decimal';
 
 export interface MarketData {
   marketCap: number;
@@ -106,18 +107,25 @@ export const marketService = {
 
   /**
    * Format share price for display
+   * Accepts number, string, or Decimal and rounds to 2 decimals
    */
-  formatSharePrice(price: number): string {
-    return `$${price.toFixed(2)}`;
+  formatSharePrice(price: number | string | DecimalType): string {
+    const roundedPrice = roundForDisplay(toDecimal(price));
+    return `$${roundedPrice.toFixed(2)}`;
   },
 
   /**
    * Format market cap for display
+   * Accepts number, string, or Decimal and rounds to 2 decimals
    */
-  formatMarketCap(marketCap: number): string {
-    if (marketCap >= 1_000_000) {
-      return `$${(marketCap / 1_000_000).toFixed(2)}M`;
+  formatMarketCap(marketCap: number | string | DecimalType): string {
+    const cap = toDecimal(marketCap);
+    const roundedCap = roundForDisplay(cap);
+    
+    if (roundedCap >= 1_000_000) {
+      const millions = roundForDisplay(cap.dividedBy(1_000_000));
+      return `$${millions.toFixed(2)}M`;
     }
-    return `$${marketCap.toLocaleString()}`;
+    return `$${roundedCap.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   },
 };

@@ -95,9 +95,11 @@ export const teamsAdminService = {
       });
 
       // Build team metrics
+      // Convert cents to dollars: market_cap is now BIGINT (cents)
       const teamsWithMetrics: TeamWithMetrics[] = (teams || []).map(team => {
         const totalShares = team.total_shares || 1000;
-        const sharePrice = totalShares > 0 ? team.market_cap / totalShares : 0;
+        const marketCapDollars = Number(team.market_cap || 0) / 100;
+        const sharePrice = totalShares > 0 ? marketCapDollars / totalShares : 0;
         const totalInvested = teamInvestments.get(team.id) || 0;
         
         const priceChange = teamPriceChanges.get(team.id);
@@ -105,8 +107,9 @@ export const teamsAdminService = {
         let priceChangePercent24h = 0;
         
         if (priceChange) {
-          const beforePrice = priceChange.before / totalShares;
-          const afterPrice = priceChange.after / totalShares;
+          // Convert cents to dollars: market_cap values are now BIGINT (cents)
+          const beforePrice = (Number(priceChange.before || 0) / 100) / totalShares;
+          const afterPrice = (Number(priceChange.after || 0) / 100) / totalShares;
           priceChange24h = afterPrice - beforePrice;
           priceChangePercent24h = beforePrice > 0 ? (priceChange24h / beforePrice) * 100 : 0;
         }
@@ -117,7 +120,7 @@ export const teamsAdminService = {
           short_name: team.short_name,
           external_id: team.external_id,
           logo_url: team.logo_url,
-          market_cap: Number(team.market_cap),
+          market_cap: marketCapDollars,
           share_price: sharePrice,
           available_shares: team.available_shares || 1000,
           total_shares: totalShares,
@@ -251,12 +254,14 @@ export const teamsAdminService = {
       if (positionsError) throw positionsError;
 
       // Build market cap history
+      // Convert cents to dollars: market_cap values are now BIGINT (cents)
       const marketCapHistory = (ledgerData || []).map(entry => {
         const totalShares = 1000; // Fixed shares
-        const sharePrice = totalShares > 0 ? Number(entry.market_cap_after) / totalShares : 0;
+        const marketCapDollars = Number(entry.market_cap_after || 0) / 100;
+        const sharePrice = totalShares > 0 ? marketCapDollars / totalShares : 0;
         return {
           date: entry.event_date,
-          market_cap: Number(entry.market_cap_after),
+          market_cap: marketCapDollars,
           share_price: sharePrice
         };
       });
@@ -274,8 +279,9 @@ export const teamsAdminService = {
           e.trigger_event_type === 'fixture'
         );
 
-        const marketCapBefore = ledgerEntry ? Number(ledgerEntry.market_cap_before) : 0;
-        const marketCapAfter = ledgerEntry ? Number(ledgerEntry.market_cap_after) : 0;
+        // Convert cents to dollars: market_cap values are now BIGINT (cents)
+        const marketCapBefore = ledgerEntry ? Number(ledgerEntry.market_cap_before || 0) / 100 : 0;
+        const marketCapAfter = ledgerEntry ? Number(ledgerEntry.market_cap_after || 0) / 100 : 0;
         const change = marketCapAfter - marketCapBefore;
         const changePercent = marketCapBefore > 0 ? (change / marketCapBefore) * 100 : 0;
 
@@ -326,6 +332,8 @@ export const teamsAdminService = {
     }
   }
 };
+
+
 
 
 

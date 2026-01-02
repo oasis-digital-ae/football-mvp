@@ -73,3 +73,4 @@ GRANT EXECUTE ON FUNCTION trigger_match_update_checks() TO anon;
 COMMENT ON FUNCTION update_match_data_from_api() IS 'Stub function for server-side match updates. Implement the API fetch in a separate scheduled job.';
 COMMENT ON FUNCTION trigger_match_update_checks() IS 'Helper function to check if fixtures need updates';
 
+

@@ -2,15 +2,22 @@
  * Centralized Calculation Utilities
  * 
  * All financial calculations should use these functions to ensure consistency
- * across the entire application. All values are rounded to 2 decimal places
- * to prevent floating-point precision issues.
+ * across the entire application. All calculations use Decimal internally for
+ * precision, then round to 2 decimal places for display.
+ * 
+ * Pattern:
+ * - Internal: Use Decimal with 4 decimal precision
+ * - Display: Round to 2 decimal places
  */
+
+import { Decimal, toDecimal, roundForDisplay } from './decimal';
 
 /**
  * Round a number to 2 decimal places
+ * Uses Decimal internally for precision, returns number for compatibility
  */
-export const roundToTwoDecimals = (value: number): number => {
-  return Math.round(value * 100) / 100;
+export const roundToTwoDecimals = (value: number | string | Decimal): number => {
+  return roundForDisplay(toDecimal(value));
 };
 
 /**
@@ -23,14 +30,17 @@ export const roundToTwoDecimals = (value: number): number => {
  * @returns Share price rounded to 2 decimal places
  */
 export const calculateSharePrice = (
-  marketCap: number,
-  totalShares: number,
-  defaultValue: number = 20.00
+  marketCap: number | string | Decimal,
+  totalShares: number | string | Decimal,
+  defaultValue: number | string | Decimal = 20.00
 ): number => {
-  if (totalShares <= 0) {
-    return roundToTwoDecimals(defaultValue);
+  const shares = toDecimal(totalShares);
+  if (shares.lte(0)) {
+    return roundForDisplay(toDecimal(defaultValue));
   }
-  return roundToTwoDecimals(marketCap / totalShares);
+  const cap = toDecimal(marketCap);
+  const price = cap.dividedBy(shares);
+  return roundForDisplay(price);
 };
 
 /**
@@ -41,14 +51,16 @@ export const calculateSharePrice = (
  * @returns Percent change rounded to 2 decimal places
  */
 export const calculatePercentChange = (
-  currentValue: number,
-  previousValue: number
+  currentValue: number | string | Decimal,
+  previousValue: number | string | Decimal
 ): number => {
-  if (previousValue <= 0) {
+  const prev = toDecimal(previousValue);
+  if (prev.lte(0)) {
     return 0;
   }
-  const change = ((currentValue - previousValue) / previousValue) * 100;
-  return roundToTwoDecimals(change);
+  const current = toDecimal(currentValue);
+  const change = current.minus(prev).dividedBy(prev).times(100);
+  return roundForDisplay(change);
 };
 
 /**
@@ -59,10 +71,13 @@ export const calculatePercentChange = (
  * @returns Profit/loss rounded to 2 decimal places
  */
 export const calculateProfitLoss = (
-  currentValue: number,
-  previousValue: number
+  currentValue: number | string | Decimal,
+  previousValue: number | string | Decimal
 ): number => {
-  return roundToTwoDecimals(currentValue - previousValue);
+  const current = toDecimal(currentValue);
+  const previous = toDecimal(previousValue);
+  const difference = current.minus(previous);
+  return roundForDisplay(difference);
 };
 
 /**
@@ -73,10 +88,13 @@ export const calculateProfitLoss = (
  * @returns Total value rounded to 2 decimal places
  */
 export const calculateTotalValue = (
-  pricePerUnit: number,
-  quantity: number
+  pricePerUnit: number | string | Decimal,
+  quantity: number | string | Decimal
 ): number => {
-  return roundToTwoDecimals(pricePerUnit * quantity);
+  const price = toDecimal(pricePerUnit);
+  const qty = toDecimal(quantity);
+  const total = price.times(qty);
+  return roundForDisplay(total);
 };
 
 /**
@@ -87,13 +105,16 @@ export const calculateTotalValue = (
  * @returns Average cost per share rounded to 2 decimal places
  */
 export const calculateAverageCost = (
-  totalInvested: number,
-  quantity: number
+  totalInvested: number | string | Decimal,
+  quantity: number | string | Decimal
 ): number => {
-  if (quantity <= 0) {
+  const qty = toDecimal(quantity);
+  if (qty.lte(0)) {
     return 0;
   }
-  return roundToTwoDecimals(totalInvested / quantity);
+  const invested = toDecimal(totalInvested);
+  const avgCost = invested.dividedBy(qty);
+  return roundForDisplay(avgCost);
 };
 
 /**
@@ -104,13 +125,16 @@ export const calculateAverageCost = (
  * @returns Percentage rounded to 2 decimal places
  */
 export const calculatePortfolioPercentage = (
-  itemValue: number,
-  totalValue: number
+  itemValue: number | string | Decimal,
+  totalValue: number | string | Decimal
 ): number => {
-  if (totalValue <= 0) {
+  const total = toDecimal(totalValue);
+  if (total.lte(0)) {
     return 0;
   }
-  return roundToTwoDecimals((itemValue / totalValue) * 100);
+  const item = toDecimal(itemValue);
+  const percentage = item.dividedBy(total).times(100);
+  return roundForDisplay(percentage);
 };
 
 /**
@@ -168,12 +192,14 @@ export const calculatePriceImpactPercent = (
  * @returns Share price change rounded to 2 decimal places
  */
 export const calculateSharePriceImpact = (
-  marketCapAfter: number,
-  marketCapBefore: number,
-  totalShares: number = 1000
+  marketCapAfter: number | string | Decimal,
+  marketCapBefore: number | string | Decimal,
+  totalShares: number | string | Decimal = 1000
 ): number => {
-  const priceAfter = calculateSharePrice(marketCapAfter, totalShares);
-  const priceBefore = calculateSharePrice(marketCapBefore, totalShares);
-  return calculateProfitLoss(priceAfter, priceBefore);
+  const priceAfter = toDecimal(marketCapAfter).dividedBy(toDecimal(totalShares));
+  const priceBefore = toDecimal(marketCapBefore).dividedBy(toDecimal(totalShares));
+  const impact = priceAfter.minus(priceBefore);
+  return roundForDisplay(impact);
 };
+
 

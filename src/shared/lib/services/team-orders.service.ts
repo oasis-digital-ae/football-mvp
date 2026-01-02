@@ -1,5 +1,6 @@
 import { supabase } from '@/shared/lib/supabase';
 import { Order, Team, OrderWithImpact } from './types';
+import { fromCents } from '../utils/decimal';
 
 export class TeamOrdersService {
   /**
@@ -35,17 +36,22 @@ export class TeamOrdersService {
         }, 0);
 
         // Current state represents market cap AFTER all orders
-        const marketCapBeforeAllOrders = team.market_cap - cumulativeMarketCapImpact - order.total_amount;
-        const marketCapAfterThisOrder = marketCapBeforeAllOrders + order.total_amount;
+        // All values are in cents (BIGINT), calculate in cents first
+        const marketCapBeforeAllOrdersCents = team.market_cap - cumulativeMarketCapImpact - order.total_amount;
+        const marketCapAfterThisOrderCents = marketCapBeforeAllOrdersCents + order.total_amount;
 
+        // Convert to dollars for return values
         return {
           ...order,
-          market_cap_impact: order.total_amount,
-          market_cap_before: Math.max(marketCapBeforeAllOrders, 0.01),
-          market_cap_after: marketCapAfterThisOrder,
-          share_price_before: marketCapBeforeAllOrders / (team.shares_outstanding - order.quantity),
-          share_price_after: marketCapAfterThisOrder / team.shares_outstanding,
-          cash_added_to_market_cap: order.total_amount,
+          // Convert from cents to dollars
+          price_per_share: fromCents(order.price_per_share).toNumber(),
+          total_amount: fromCents(order.total_amount).toNumber(),
+          market_cap_impact: fromCents(order.total_amount).toNumber(),
+          market_cap_before: Math.max(fromCents(marketCapBeforeAllOrdersCents).toNumber(), 0.01),
+          market_cap_after: fromCents(marketCapAfterThisOrderCents).toNumber(),
+          share_price_before: fromCents(marketCapBeforeAllOrdersCents).dividedBy(team.shares_outstanding - order.quantity).toNumber(),
+          share_price_after: fromCents(marketCapAfterThisOrderCents).dividedBy(team.shares_outstanding).toNumber(),
+          cash_added_to_market_cap: fromCents(order.total_amount).toNumber(),
           order_sequence: orders.length - index // Show chronologically
         };
       });
@@ -103,18 +109,25 @@ export class TeamOrdersService {
         const teamData = teamOrdersMap.get(teamId)!;
         
         // Add order with impact calculation
+        // All values are in cents (BIGINT), calculate in cents first
+        const marketCapBeforeCents = order.team.market_cap - order.total_amount;
+        const marketCapAfterCents = order.team.market_cap;
+        
         teamData.orders.push({
           ...order,
-          market_cap_impact: order.total_amount,
-          market_cap_before: order.team.market_cap - order.total_amount,
-          market_cap_after: order.team.market_cap,
-          share_price_before: (order.team.market_cap - order.total_amount) / (order.team.shares_outstanding - order.quantity),
-          share_price_after: order.team.market_cap / order.team.shares_outstanding,
-          cash_added_to_market_cap: order.total_amount,
+          // Convert from cents to dollars
+          price_per_share: fromCents(order.price_per_share).toNumber(),
+          total_amount: fromCents(order.total_amount).toNumber(),
+          market_cap_impact: fromCents(order.total_amount).toNumber(),
+          market_cap_before: fromCents(marketCapBeforeCents).toNumber(),
+          market_cap_after: fromCents(marketCapAfterCents).toNumber(),
+          share_price_before: fromCents(marketCapBeforeCents).dividedBy(order.team.shares_outstanding - order.quantity).toNumber(),
+          share_price_after: fromCents(marketCapAfterCents).dividedBy(order.team.shares_outstanding).toNumber(),
+          cash_added_to_market_cap: fromCents(order.total_amount).toNumber(),
           order_sequence: 1 // Will be recalculated per team
         });
 
-        teamData.total_cash_added += order.total_amount;
+        teamData.total_cash_added += fromCents(order.total_amount).toNumber();
         teamData.total_shares_traded += order.quantity;
       });
 
@@ -152,12 +165,14 @@ export class TeamOrdersService {
         .single();
 
       if (team) {
+        // Convert from cents to dollars
+        const initialMarketCapDollars = fromCents(team.initial_market_cap || 10000).toNumber(); // Default $100.00 in cents
         timeline.push({
           date: team.created_at || new Date().toISOString(),
           type: 'initial' as const,
           description: 'Initial State',
-          market_cap_before: team.initial_market_cap || 100,
-          market_cap_after: team.initial_market_cap || 100
+          market_cap_before: initialMarketCapDollars,
+          market_cap_after: initialMarketCapDollars
         });
       }
 

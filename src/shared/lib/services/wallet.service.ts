@@ -1,4 +1,5 @@
 import { supabase } from '@/shared/lib/supabase';
+import { fromCents } from '@/shared/lib/utils/decimal';
 
 export interface WalletBalance {
   balance: number;
@@ -8,6 +9,7 @@ export interface WalletBalance {
 export const walletService = {
   async getBalance(userId: string): Promise<number> {
     // Check profiles table first (common pattern)
+    // Database stores wallet_balance as BIGINT (cents), convert to dollars
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('wallet_balance')
@@ -15,7 +17,7 @@ export const walletService = {
       .maybeSingle();
 
     if (!profileError && profile?.wallet_balance !== null && profile?.wallet_balance !== undefined) {
-      return Number(profile.wallet_balance) || 0;
+      return fromCents(profile.wallet_balance).toNumber();
     }
 
     // Fallback to users table if profiles doesn't have wallet_balance

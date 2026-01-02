@@ -114,8 +114,8 @@ export const matchService = {
       await supabase
         .from('fixtures')
         .update({
-          snapshot_home_cap: homeTeam?.market_cap || 100,
-          snapshot_away_cap: awayTeam?.market_cap || 100,
+          snapshot_home_cap: homeTeam?.market_cap || 500000, // $5000.00 in cents (default if missing)
+          snapshot_away_cap: awayTeam?.market_cap || 500000, // $5000.00 in cents (default if missing)
         })
         .eq('id', fixtureId);
 

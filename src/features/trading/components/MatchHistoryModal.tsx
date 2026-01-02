@@ -6,6 +6,7 @@ import { formatCurrency } from '@/shared/lib/formatters';
 import { fixturesService, teamsService } from '@/shared/lib/database';
 import type { DatabaseFixture, DatabaseTeam } from '@/shared/lib/database';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { fromCents } from '@/shared/lib/utils/decimal';
 
 interface MatchHistoryModalProps {
   isOpen: boolean;
@@ -71,12 +72,13 @@ export const MatchHistoryModal: React.FC<MatchHistoryModalProps> = ({
 
         // Get current team data to calculate current market cap
         const currentTeam = teamsData.find(t => t.id === clubId);
-        const currentMarketCap = currentTeam?.market_cap || 0;
+        const currentMarketCap = fromCents(currentTeam?.market_cap || 0).toNumber();
 
-        // Calculate pre-match market cap from snapshot
-        const preMatchCap = isHome ? 
+        // Calculate pre-match market cap from snapshot (convert from cents to dollars)
+        const preMatchCap = fromCents(isHome ? 
           (fixture.snapshot_home_cap || 0) : 
-          (fixture.snapshot_away_cap || 0);
+          (fixture.snapshot_away_cap || 0)
+        ).toNumber();
 
         // Calculate post-match market cap based on result
         let postMatchCap = preMatchCap;
@@ -88,7 +90,7 @@ export const MatchHistoryModal: React.FC<MatchHistoryModalProps> = ({
           if (isHome) {
             result = 'win';
             // Winner gets 10% of loser's market cap
-            const loserCap = fixture.snapshot_away_cap || 0;
+            const loserCap = fromCents(fixture.snapshot_away_cap || 0).toNumber();
             priceImpact = loserCap * 0.10;
             postMatchCap = preMatchCap + priceImpact;
           } else {
@@ -106,7 +108,7 @@ export const MatchHistoryModal: React.FC<MatchHistoryModalProps> = ({
           } else {
             result = 'win';
             // Winner gets 10% of loser's market cap
-            const loserCap = fixture.snapshot_home_cap || 0;
+            const loserCap = fromCents(fixture.snapshot_home_cap || 0).toNumber();
             priceImpact = loserCap * 0.10;
             postMatchCap = preMatchCap + priceImpact;
           }

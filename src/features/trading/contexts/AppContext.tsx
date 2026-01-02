@@ -14,6 +14,8 @@ import { teamStateSnapshotService } from '@/shared/lib/team-state-snapshots';
 import { buyWindowService } from '@/shared/lib/buy-window.service';
 import { realtimeService } from '@/shared/lib/services/realtime.service';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { calculateSharePrice, calculateTotalValue, calculateProfitLoss } from '@/shared/lib/utils/calculations';
+import { toCents, fromCents } from '@/shared/lib/utils/decimal';
 
 interface AppContextType {
   sidebarOpen: boolean;
@@ -115,8 +117,9 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
         logger.debug('Sample team data:', dbTeams[0]);
         dbTeams.slice(0, 3).forEach(team => {
           const totalShares = team.total_shares || 1000;
-          const nav = totalShares > 0 ? team.market_cap / totalShares : 20.00;
-          logger.debug(`Team ${team.name}: Market Cap=$${team.market_cap}, Total Shares=${totalShares}, Available=${team.available_shares || 1000}, NAV=$${nav.toFixed(2)}`);
+          const marketCapDollars = fromCents(team.market_cap).toNumber();
+          const nav = totalShares > 0 ? marketCapDollars / totalShares : 20.00;
+          logger.debug(`Team ${team.name}: Market Cap=$${marketCapDollars}, Total Shares=${totalShares}, Available=${team.available_shares || 1000}, NAV=$${nav.toFixed(2)}`);
         });
       }
       
@@ -141,11 +144,13 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
         const team = clubMap.get(teamId); // O(1) lookup instead of O(n) find
         
         // Calculate average cost from total_invested and quantity
-        const avgCost = position.quantity > 0 ? position.total_invested / position.quantity : 0;
+        // Database stores total_invested as BIGINT (cents), convert to dollars first
+        const totalInvestedDollars = fromCents(position.total_invested).toNumber();
+        const avgCost = position.quantity > 0 ? totalInvestedDollars / position.quantity : 0;
         
         logger.debug('Portfolio calculation', {
           teamName,
-          position: { quantity: position.quantity, totalInvested: position.total_invested, avgCost },
+          position: { quantity: position.quantity, totalInvested: totalInvestedDollars, avgCost },
           team: team ? { id: team.id, currentValue: team.currentValue } : 'NOT FOUND',
           teamId
         });
@@ -195,8 +200,8 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
             clubId: order.team_id.toString(),
             clubName: order.team?.name || 'Unknown',
             units: order.quantity,
-            pricePerUnit: order.price_per_share,
-            totalValue: order.total_amount,
+            pricePerUnit: fromCents(order.price_per_share).toNumber(), // Convert cents to dollars
+            totalValue: fromCents(order.total_amount).toNumber(), // Convert cents to dollars
             date: new Date(order.executed_at || order.created_at).toLocaleDateString(),
             orderType: order.order_type as 'BUY' | 'SELL'
           });
@@ -243,17 +248,17 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
           isRealtimeActive = true;
           
           // Update clubs with new market cap (Fixed Shares Model: price = market_cap / total_shares)
+          // Database stores market_cap as BIGINT (cents), convert to dollars first
           setClubs(prevClubs => {
             const updatedClubs = prevClubs.map(club => {
               if (club.id === updatedTeam.id.toString()) {
                 const totalShares = updatedTeam.total_shares || 1000;
-                const newPrice = totalShares > 0 
-                  ? updatedTeam.market_cap / totalShares 
-                  : club.currentValue;
+                const marketCapDollars = fromCents(updatedTeam.market_cap).toNumber();
+                const newPrice = calculateSharePrice(marketCapDollars, totalShares, club.currentValue);
                 return {
                   ...club,
                   currentValue: newPrice,
-                  marketCap: updatedTeam.market_cap
+                  marketCap: marketCapDollars
                 };
               }
               return club;
@@ -262,18 +267,20 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
           });
 
           // Update portfolio with new prices (Fixed Shares Model: price = market_cap / total_shares)
+          // Database stores market_cap as BIGINT (cents), convert to dollars first
           setPortfolio(prevPortfolio => {
             return prevPortfolio.map(item => {
               if (item.clubId === updatedTeam.id.toString()) {
                 const totalShares = updatedTeam.total_shares || 1000;
-                const newPrice = totalShares > 0 
-                  ? updatedTeam.market_cap / totalShares 
-                  : item.currentPrice;
+                const marketCapDollars = fromCents(updatedTeam.market_cap).toNumber();
+                const newPrice = calculateSharePrice(marketCapDollars, totalShares, item.currentPrice);
+                const totalValue = calculateTotalValue(newPrice, item.units);
+                const profitLoss = calculateProfitLoss(newPrice, item.purchasePrice) * item.units;
                 return {
                   ...item,
                   currentPrice: newPrice,
-                  totalValue: item.units * newPrice,
-                  profitLoss: (newPrice - item.purchasePrice) * item.units
+                  totalValue: totalValue,
+                  profitLoss: profitLoss
                 };
               }
               return item;
@@ -423,14 +430,12 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
       }
 
       // Calculate proper NAV using total_shares (fixed at 1000) - Fixed Shares Model
+      // Database stores market_cap as BIGINT (cents), convert to dollars first
       const totalShares = team.total_shares || 1000;
-      const currentNAV = totalShares > 0 ? 
-        team.market_cap / totalShares : 
-        20.00; // Use $20 as default when no total_shares
-      
-      const nav = currentNAV;
-      // Round to 2 decimal places to avoid floating point precision issues
-      const totalCost = Math.round((nav * units) * 100) / 100;
+      const marketCapDollars = fromCents(team.market_cap).toNumber();
+      const nav = calculateSharePrice(marketCapDollars, totalShares, 20.00);
+      // Calculate total cost using Decimal-based calculation
+      const totalCost = calculateTotalValue(nav, units);
 
       // Validate purchase amount
       if (totalCost <= 0) {
@@ -484,6 +489,7 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
         throw new BusinessLogicError(error.message || 'Trading window is closed');
       }
       
+      // Function accepts NUMERIC (dollars) and converts to cents internally
       const { data: result, error: atomicError } = await supabase.rpc(
         'process_share_purchase_atomic',
         {
@@ -593,14 +599,12 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
       }
 
       // Calculate proper NAV using total_shares (fixed at 1000) - Fixed Shares Model
+      // Database stores market_cap as BIGINT (cents), convert to dollars first
       const totalShares = team.total_shares || 1000;
-      const currentNAV = totalShares > 0 ? 
-        team.market_cap / totalShares : 
-        20.00; // Use $20 as default when no total_shares
-      
-      const nav = currentNAV;
-      // Round to 2 decimal places to avoid floating point precision issues
-      const totalProceeds = Math.round((nav * units) * 100) / 100;
+      const marketCapDollars = fromCents(team.market_cap).toNumber();
+      const nav = calculateSharePrice(marketCapDollars, totalShares, 20.00);
+      // Calculate total proceeds using Decimal-based calculation
+      const totalProceeds = calculateTotalValue(nav, units);
 
       // Validate sale amount
       if (totalProceeds <= 0) {
@@ -655,6 +659,7 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
       // CRITICAL: Use atomic transaction for sale
       logger.debug(`Processing atomic sale: User ${profileId}, Team ${teamIdInt}, Units ${units}, Price ${nav}`);
       
+      // Function accepts NUMERIC (dollars) and converts to cents internally
       const { data: result, error: atomicError } = await supabase.rpc(
         'process_share_sale_atomic',
         {

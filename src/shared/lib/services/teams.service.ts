@@ -43,10 +43,12 @@ export const teamsService = {
   },
 
   async updateMarketCap(id: number, newMarketCap: number): Promise<void> {
+    // Convert dollars to cents: market_cap is now BIGINT (cents)
+    const marketCapCents = Math.round(newMarketCap * 100);
     const { error } = await supabase
       .from('teams')
       .update({ 
-        market_cap: newMarketCap,
+        market_cap: marketCapCents,
         updated_at: new Date().toISOString()
       })
       .eq('id', id);
@@ -212,14 +214,16 @@ export const teamsService = {
     for (const team of teams) {
       const investments = teamInvestments.get(team.id);
       
-      const marketCap = 100 + (investments?.totalInvestment || 0);
+      // Convert dollars to cents: market_cap is now BIGINT (cents)
+      // $100 = 10000 cents, investments are in dollars so convert to cents
+      const marketCapCents = 10000 + Math.round((investments?.totalInvestment || 0) * 100);
       const sharesOutstanding = 5 + (investments?.totalShares || 0);
       
       const { error } = await supabase
-        .from('teams')
-        .update({ 
-          initial_market_cap: 100,
-          market_cap: marketCap,
+      .from('teams')
+      .update({ 
+        initial_market_cap: 10000, // $100.00 in cents
+        market_cap: marketCapCents,
           shares_outstanding: sharesOutstanding,
           updated_at: new Date().toISOString()
         })
@@ -255,13 +259,13 @@ export const teamsService = {
       return; 
     }
 
-    // Reset ALL teams to exactly $100 market cap and 5 shares
+    // Reset ALL teams to exactly $5000 market cap ($5000.00 = 500000 cents) and 5 shares
     for (const team of teams) {
       const { error } = await supabase
-        .from('teams')
-        .update({ 
-          initial_market_cap: 100,
-          market_cap: 100,
+      .from('teams')
+      .update({ 
+        initial_market_cap: 500000, // $5000.00 in cents
+        market_cap: 500000, // $5000.00 in cents
           shares_outstanding: 5,
           updated_at: new Date().toISOString()
         })
@@ -306,15 +310,15 @@ export const teamsService = {
       const { error } = await supabase
         .from('teams')
         .update({ 
-          market_cap: 100,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', team.id);
+        market_cap: 500000, // $5000.00 in cents (initial market cap)
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', team.id);
       
       if (error) throw error;
     }
 
-    logger.info(`Reset market caps for ${teams.length} teams to $100 (fixtures preserved)`);
+    logger.info(`Reset market caps for ${teams.length} teams to $5000.00 (fixtures preserved)`);
   },
 
   async processMatchResult(fixtureId: number): Promise<void> {
@@ -410,8 +414,8 @@ export const teamsService = {
             .insert({
               name: team.name,
               external_id: team.id,
-              initial_market_cap: 100,
-              market_cap: 100,
+              initial_market_cap: 500000, // $5000.00 in cents
+              market_cap: 500000, // $5000.00 in cents
               shares_outstanding: 5,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()

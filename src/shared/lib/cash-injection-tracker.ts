@@ -3,6 +3,7 @@
 
 import { supabase } from './supabase';
 import { logger } from './logger';
+import { fromCents } from './utils/decimal';
 
 export interface CashInjection {
   id: number;
@@ -154,14 +155,15 @@ export const cashInjectionTracker = {
           id: injection.id,
           team_id: injection.team_id,
           user_id: injection.user_id,
-          amount: injection.total_amount,
+          // Convert from cents (BIGINT) to dollars
+          amount: fromCents(injection.total_amount).toNumber(),
           shares_purchased: injection.quantity,
-          price_per_share: injection.price_per_share,
+          price_per_share: fromCents(injection.price_per_share).toNumber(),
           created_at: injection.created_at,
           team_name: injection.team?.name || 'Unknown Team',
           user_email: injection.profile?.username || 'Unknown User',
-          market_cap_before: marketCapData.before,
-          market_cap_after: marketCapData.after
+          market_cap_before: fromCents(marketCapData.before).toNumber(),
+          market_cap_after: fromCents(marketCapData.after).toNumber()
         };
 
       // Find fixture context using binary search for O(log n) instead of O(n)

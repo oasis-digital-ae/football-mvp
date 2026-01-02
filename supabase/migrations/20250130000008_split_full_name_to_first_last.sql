@@ -41,3 +41,4 @@ COMMENT ON COLUMN public.profiles.last_name IS 'User last name';
 
 
 
+

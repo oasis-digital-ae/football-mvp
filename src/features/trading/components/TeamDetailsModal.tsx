@@ -13,6 +13,7 @@ import type { DatabasePositionWithTeam } from '@/shared/types/database.types';
 import { formatCurrency, formatNumber } from '@/shared/lib/formatters';
 import { Loader2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import TeamLogo from '@/shared/components/TeamLogo';
+import { toDecimal, roundForDisplay, fromCents } from '@/shared/lib/utils/decimal';
 
 interface TeamDetailsModalProps {
   isOpen: boolean;
@@ -190,9 +191,13 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
       console.log('Loading match history from total_ledger for teamId:', teamId);
       
       // Query total_ledger for match history instead of fixtures
+      // Only get matches that have actually been played (kickoff_at <= NOW())
       const { data: ledgerData, error: ledgerError } = await supabase
         .from('total_ledger')
-        .select('*')
+        .select(`
+          *,
+          fixture:fixtures!total_ledger_trigger_event_id_fkey(kickoff_at)
+        `)
         .eq('team_id', teamId)
         .in('ledger_type', ['match_win', 'match_loss', 'match_draw'])
         .order('event_date', { ascending: false })
@@ -248,6 +253,14 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
       // Use deduplicated match events
       const deduplicatedLedgerData = Array.from(matchEventsMap.values());
       
+      // Filter out future matches - only show matches that have actually been played
+      // event_date should match the fixture's kickoff_at, so we can filter by event_date
+      const now = new Date();
+      const pastMatchesOnly = deduplicatedLedgerData.filter(event => {
+        if (!event.event_date) return false;
+        return new Date(event.event_date) <= now;
+      });
+      
       // OPTIMIZED: Create team lookup map for O(1) access
       const teamMap = new Map(teamsData.map(team => [team.id, team]));
       
@@ -255,7 +268,7 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
       const fixtures = fixturesData;
       const fixturesMap = new Map(fixtures.map(f => [f.id, f]));
 
-      const matchHistoryData = deduplicatedLedgerData
+      const matchHistoryData = pastMatchesOnly
         .map(ledgerEntry => {
           try {
             // Get fixture details
@@ -289,21 +302,23 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
               : 'draw' as 'win' | 'loss' | 'draw';
             
             const isHome = ledgerEntry.is_home_match;
-            const preMatchCap = parseFloat(ledgerEntry.market_cap_before?.toString() || '0');
-            const postMatchCap = parseFloat(ledgerEntry.market_cap_after?.toString() || '0');
-            const priceImpact = parseFloat(ledgerEntry.price_impact?.toString() || '0');
-            const priceImpactPercent = preMatchCap > 0 ? (priceImpact / preMatchCap) * 100 : 0;
+            // Use Decimal utilities for monetary conversions
+            // Convert from cents (BIGINT) to dollars
+            const preMatchCap = roundForDisplay(fromCents(ledgerEntry.market_cap_before || 0));
+            const postMatchCap = roundForDisplay(fromCents(ledgerEntry.market_cap_after || 0));
+            const priceImpact = roundForDisplay(fromCents(ledgerEntry.price_impact || 0));
+            const priceImpactPercent = preMatchCap > 0 ? roundForDisplay(toDecimal(priceImpact).dividedBy(toDecimal(preMatchCap)).times(100)) : 0;
             
-            const preMatchSharePrice = parseFloat(ledgerEntry.share_price_before?.toString() || '0');
-            const postMatchSharePrice = parseFloat(ledgerEntry.share_price_after?.toString() || '0');
+            const preMatchSharePrice = roundForDisplay(fromCents(ledgerEntry.share_price_before || 0));
+            const postMatchSharePrice = roundForDisplay(fromCents(ledgerEntry.share_price_after || 0));
 
-            // Calculate user P/L if user has position
+            // Calculate user P/L if user has position (use Decimal for precision)
             const userPos = currentUserPosition || userPosition;
             let userPL = 0;
             if (userPos && userPos.quantity > 0) {
-              const preMatchValue = userPos.quantity * preMatchSharePrice;
-              const postMatchValue = userPos.quantity * postMatchSharePrice;
-              userPL = postMatchValue - preMatchValue;
+              const preMatchValue = roundForDisplay(toDecimal(preMatchSharePrice).times(userPos.quantity));
+              const postMatchValue = roundForDisplay(toDecimal(postMatchSharePrice).times(userPos.quantity));
+              userPL = roundForDisplay(toDecimal(postMatchValue).minus(preMatchValue));
             }
 
             const score = ledgerEntry.match_score || '0-0';

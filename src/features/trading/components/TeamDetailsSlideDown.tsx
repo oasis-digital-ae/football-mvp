@@ -12,6 +12,7 @@ import {
   calculateLifetimePercentChange,
   calculatePriceImpactPercent
 } from '@/shared/lib/utils/calculations';
+import { toDecimal, roundForDisplay, fromCents } from '@/shared/lib/utils/decimal';
 
 interface TeamDetailsSlideDownProps {
   isOpen: boolean;
@@ -42,7 +43,7 @@ const processChartData = (events: any[]): ChartDataPoint[] => {
   
   // Add initial state first
   initialStates.forEach((event: any) => {
-    const sharePrice = parseFloat(event.share_price_after || event.share_price_before || '0');
+    const sharePrice = roundForDisplay(fromCents(event.share_price_after || event.share_price_before || 0));
     if (sharePrice > 0) {
       chartPoints.push({ x: 0, y: sharePrice, label: 'Initial' });
     }
@@ -50,7 +51,7 @@ const processChartData = (events: any[]): ChartDataPoint[] => {
   
   // Add match events in chronological order
   sortedMatches.forEach((event: any) => {
-    const sharePrice = parseFloat(event.share_price_after || event.share_price_before || '0');
+    const sharePrice = roundForDisplay(fromCents(event.share_price_after || event.share_price_before || 0));
     if (sharePrice > 0) {
       const eventDate = new Date(event.event_date);
       chartPoints.push({
@@ -161,14 +162,23 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
       // Only process match events (no share purchases/sales)
       const deduplicatedLedgerData = Array.from(matchEventsMap.values());
 
-      const processedEvents = deduplicatedLedgerData.map(event => {
+      // Filter out future matches - only show matches that have actually been played
+      // event_date should match the fixture's kickoff_at, so we can filter by event_date
+      const now = new Date();
+      const pastMatchesOnly = deduplicatedLedgerData.filter(event => {
+        if (!event.event_date) return false;
+        return new Date(event.event_date) <= now;
+      });
+
+      const processedEvents = pastMatchesOnly.map(event => {
         // Process match events only
         const matchResult = event.ledger_type === 'match_win' ? 'win' : 
                            event.ledger_type === 'match_loss' ? 'loss' : 'draw';
         const description = event.event_description || 'Match Result';
-        const marketCapBefore = parseFloat(event.market_cap_before?.toString() || '0');
-        const marketCapAfter = parseFloat(event.market_cap_after?.toString() || '0');
-        const priceImpact = marketCapAfter - marketCapBefore;
+        // Convert from cents (BIGINT) to dollars
+        const marketCapBefore = roundForDisplay(fromCents(event.market_cap_before || 0));
+        const marketCapAfter = roundForDisplay(fromCents(event.market_cap_after || 0));
+        const priceImpact = roundForDisplay(toDecimal(marketCapAfter).minus(marketCapBefore));
         const priceImpactPercent = calculatePriceImpactPercent(marketCapAfter, marketCapBefore);
 
         return {
@@ -176,8 +186,8 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
           description,
           marketCapBefore,
           marketCapAfter,
-          sharePriceBefore: parseFloat(event.share_price_before?.toString() || '0'),
-          sharePriceAfter: parseFloat(event.share_price_after?.toString() || '0'),
+          sharePriceBefore: roundForDisplay(fromCents(event.share_price_before || 0)),
+          sharePriceAfter: roundForDisplay(fromCents(event.share_price_after || 0)),
           priceImpact,
           priceImpactPercent,
           matchResult,

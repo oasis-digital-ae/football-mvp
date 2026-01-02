@@ -123,14 +123,17 @@ export const usersService = {
         positionsCount: number;
       }>();
 
+      // Convert cents to dollars: market_cap and total_invested are now BIGINT (cents)
       (positions || []).forEach(position => {
         const team = teamsMap.get(position.team_id);
         if (!team) return;
 
         const totalShares = team.total_shares || 1000;
-        const sharePrice = totalShares > 0 ? team.market_cap / totalShares : 0;
+        const marketCapDollars = Number(team.market_cap || 0) / 100;
+        const sharePrice = totalShares > 0 ? marketCapDollars / totalShares : 0;
         const currentValue = Number(position.quantity) * sharePrice;
-        const profitLoss = currentValue - Number(position.total_invested);
+        const totalInvestedDollars = Number(position.total_invested || 0) / 100;
+        const profitLoss = currentValue - totalInvestedDollars;
 
         const existing = userMetrics.get(position.user_id) || {
           totalInvested: 0,
@@ -139,7 +142,7 @@ export const usersService = {
           positionsCount: 0
         };
 
-        existing.totalInvested += Number(position.total_invested);
+        existing.totalInvested += totalInvestedDollars;
         existing.portfolioValue += currentValue;
         existing.profitLoss += profitLoss;
         existing.positionsCount += 1;
@@ -162,7 +165,7 @@ export const usersService = {
           first_name: profile.first_name,
           last_name: profile.last_name,
           email: profile.email,
-          wallet_balance: Number(profile.wallet_balance) || 0,
+          wallet_balance: Number(profile.wallet_balance || 0) / 100, // Convert cents to dollars
           total_invested: metrics.totalInvested,
           portfolio_value: metrics.portfolioValue,
           profit_loss: metrics.profitLoss,
@@ -233,14 +236,17 @@ export const usersService = {
       let portfolioValue = 0;
       let profitLoss = 0;
 
+      // Convert cents to dollars: market_cap, total_invested, price_per_share, total_amount, wallet_balance are now BIGINT (cents)
       const positionsList = (positions || []).map(pos => {
         const team = pos.teams as any;
         const totalShares = team.total_shares || 1000;
-        const sharePrice = totalShares > 0 ? team.market_cap / totalShares : 0;
+        const marketCapDollars = Number(team.market_cap || 0) / 100;
+        const sharePrice = totalShares > 0 ? marketCapDollars / totalShares : 0;
         const currentValue = Number(pos.quantity) * sharePrice;
-        const pl = currentValue - Number(pos.total_invested);
+        const totalInvestedDollars = Number(pos.total_invested || 0) / 100;
+        const pl = currentValue - totalInvestedDollars;
 
-        totalInvested += Number(pos.total_invested);
+        totalInvested += totalInvestedDollars;
         portfolioValue += currentValue;
         profitLoss += pl;
 
@@ -248,7 +254,7 @@ export const usersService = {
           team_id: pos.team_id,
           team_name: team.name,
           quantity: Number(pos.quantity),
-          total_invested: Number(pos.total_invested),
+          total_invested: totalInvestedDollars,
           current_value: currentValue,
           profit_loss: pl
         };
@@ -259,8 +265,8 @@ export const usersService = {
         team_name: (order.teams as any)?.name || 'Unknown',
         order_type: order.order_type as 'BUY' | 'SELL',
         quantity: order.quantity,
-        price_per_share: Number(order.price_per_share),
-        total_amount: Number(order.total_amount),
+        price_per_share: Number(order.price_per_share || 0) / 100, // Convert cents to dollars
+        total_amount: Number(order.total_amount || 0) / 100, // Convert cents to dollars
         executed_at: order.executed_at || order.created_at,
         status: order.status
       }));
@@ -274,7 +280,7 @@ export const usersService = {
         birthday: profile.birthday,
         country: profile.country,
         phone: profile.phone,
-        wallet_balance: Number(profile.wallet_balance) || 0,
+        wallet_balance: Number(profile.wallet_balance || 0) / 100, // Convert cents to dollars
         total_invested: totalInvested,
         portfolio_value: portfolioValue,
         profit_loss: profitLoss,
@@ -330,6 +336,8 @@ export const usersService = {
     }
   }
 };
+
+
 
 
 

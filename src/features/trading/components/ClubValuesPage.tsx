@@ -25,6 +25,7 @@ import {
   calculateLifetimePercentChange,
   calculateProfitLoss
 } from '@/shared/lib/utils/calculations';
+import { toDecimal, roundForDisplay } from '@/shared/lib/utils/decimal';
 
 export const ClubValuesPage: React.FC = () => {
   const { clubs, matches, purchaseClub, user, refreshData } = useAppContext();
@@ -129,8 +130,8 @@ export const ClubValuesPage: React.FC = () => {
         // Only add if we have both before and after prices
         if (entry.share_price_before && entry.share_price_after) {
           matches.push({
-            before: Number(entry.share_price_before),
-            after: Number(entry.share_price_after),
+            before: roundForDisplay(toDecimal(entry.share_price_before)),
+            after: roundForDisplay(toDecimal(entry.share_price_after)),
             date: entry.event_date
           });
         }
@@ -580,11 +581,11 @@ export const ClubValuesPage: React.FC = () => {
           <div className="lg:hidden space-y-3">
             {useMemo(() => clubs
               .map(club => {
-                const launchPrice = Number(club.launchValue) || 20;
-                const currentValue = Number(club.currentValue) || 20;
-                const profitLoss = currentValue - launchPrice;
+                const launchPrice = roundForDisplay(toDecimal(club.launchValue || 20));
+                const currentValue = roundForDisplay(toDecimal(club.currentValue || 20));
+                const profitLoss = roundForDisplay(toDecimal(currentValue).minus(launchPrice));
                 const percentChange = club.percentChange;
-                const marketCap = Number(club.marketCap) || 100;
+                const marketCap = roundForDisplay(toDecimal(club.marketCap || 100));
                 
                 return {
                   ...club,

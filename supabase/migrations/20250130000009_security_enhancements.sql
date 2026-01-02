@@ -178,3 +178,4 @@ GRANT EXECUTE ON FUNCTION public.log_security_event(text, uuid, jsonb) TO authen
 
 
 
+

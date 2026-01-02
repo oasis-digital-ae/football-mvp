@@ -46,11 +46,18 @@ export const ordersService = {
     if (teamError) throw teamError;
     
     // Calculate market cap states for immutable snapshots
-    const marketCapBefore = team.market_cap;
+    // Fixed Shares Model: Market cap does NOT change on purchases/sales
+    // Convert dollars to cents: order values are in dollars, database stores as BIGINT (cents)
+    const marketCapBefore = team.market_cap; // Already in cents
     const sharesOutstandingBefore = team.shares_outstanding;
     
-    const marketCapAfter = marketCapBefore + order.total_amount;
+    // Fixed Shares Model: market_cap does NOT change on trades
+    const marketCapAfter = marketCapBefore; // No change in fixed shares model
     const sharesOutstandingAfter = sharesOutstandingBefore + order.quantity;
+    
+    // Convert order values from dollars to cents for storage
+    const pricePerShareCents = Math.round(Math.max(0, order.price_per_share) * 100);
+    const totalAmountCents = Math.round(Math.max(0, order.total_amount) * 100);
     
     // Sanitize inputs and add immutable snapshots
     const sanitizedOrder = {
@@ -58,10 +65,10 @@ export const ordersService = {
       user_id: sanitizeInput(order.user_id, 'database'),
       order_type: order.order_type as 'BUY' | 'SELL',
       quantity: Math.max(1, Math.floor(order.quantity)),
-      price_per_share: Math.max(0, order.price_per_share),
-      total_amount: Math.max(0, order.total_amount),
+      price_per_share: pricePerShareCents, // Store as cents
+      total_amount: totalAmountCents, // Store as cents
       status: order.status as 'PENDING' | 'FILLED' | 'CANCELLED',
-      // CRITICAL: Store immutable market cap snapshots
+      // CRITICAL: Store immutable market cap snapshots (in cents)
       market_cap_before: marketCapBefore,
       market_cap_after: marketCapAfter,
       shares_outstanding_before: sharesOutstandingBefore,
