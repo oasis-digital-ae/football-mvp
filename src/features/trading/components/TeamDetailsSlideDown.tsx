@@ -283,11 +283,11 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
         <div className="slide-down-panel-content">
           <div className="border-t border-gray-800/30 bg-secondary/20">
             <div className="px-4 pt-2 pb-4">
-              {/* Tab Navigation - Clean Professional Style */}
-              <div className="flex items-center gap-1 mb-2 border-b border-gray-800/30">
+              {/* Tab Navigation - Mobile Optimized */}
+              <div className="flex items-center gap-1 mb-3 sm:mb-4 border-b border-gray-800/30">
                 <button
                   onClick={() => setActiveTab('matches')}
-                  className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                  className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition-colors border-b-2 touch-manipulation ${
                     activeTab === 'matches'
                       ? 'border-trading-primary text-foreground'
                       : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -297,7 +297,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                 </button>
                 <button
                   onClick={() => setActiveTab('chart')}
-                  className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                  className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition-colors border-b-2 touch-manipulation ${
                     activeTab === 'chart'
                       ? 'border-trading-primary text-foreground'
                       : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -318,70 +318,139 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
               ) : (
                 <>
                   {activeTab === 'matches' && (
-                    <div className="space-y-2">
+                    <div className="space-y-2 sm:space-y-3">
                       {matchHistory.length === 0 ? (
                         <div className="text-center py-8">
-                          <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>No match history available</p>
+                          <p className="text-xs sm:text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>No match history available</p>
                         </div>
                       ) : (
-                        <div className="overflow-x-auto">
-                          <table className="trading-table">
-                            <thead>
-                              <tr>
-                                <th className="px-3" style={{ textAlign: 'left' }}>Match</th>
-                                <th className="px-3" style={{ textAlign: 'center' }}>Date</th>
-                                <th className="px-3" style={{ textAlign: 'center' }}>Market Cap</th>
-                                <th className="px-3" style={{ textAlign: 'center' }}>Change (USD)</th>
-                                <th className="px-3" style={{ textAlign: 'center' }}>%</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {matchHistory.map((event, index) => (
-                                <tr key={index}>
-                                  <td className="px-3" style={{ textAlign: 'left' }}>
-                                    <div className="flex items-center gap-2">
-                                      <div className={`w-6 h-6 rounded flex items-center justify-center text-xs font-semibold flex-shrink-0 ${
-                                        event.matchResult === 'win' ? 'bg-[#10B981]/20 text-[#10B981]' :
-                                        event.matchResult === 'loss' ? 'bg-[#EF4444]/20 text-[#EF4444]' :
-                                        'bg-gray-500/20 text-gray-400'
+                        <>
+                          {/* Desktop Table View */}
+                          <div className="hidden md:block overflow-x-auto">
+                            <table className="trading-table w-full">
+                              <thead>
+                                <tr>
+                                  <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'left' }}>Match</th>
+                                  <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>Date</th>
+                                  <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>Market Cap</th>
+                                  <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>Change</th>
+                                  <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>%</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {matchHistory.map((event, index) => (
+                                  <tr key={index} className="border-b border-gray-800/30">
+                                    <td className="px-3 py-2.5" style={{ textAlign: 'left' }}>
+                                      <div className="flex items-center gap-2">
+                                        <div className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+                                          event.matchResult === 'win' ? 'bg-[#10B981]/20 text-[#10B981]' :
+                                          event.matchResult === 'loss' ? 'bg-[#EF4444]/20 text-[#EF4444]' :
+                                          'bg-gray-500/20 text-gray-400'
+                                        }`}>
+                                          {getResultBadge(event.matchResult)}
+                                        </div>
+                                        <span className="text-xs font-medium">{event.description}</span>
+                                      </div>
+                                    </td>
+                                    <td className="px-3 py-2.5 text-[10px] font-mono" style={{ color: 'hsl(var(--muted-foreground))', textAlign: 'center' }}>
+                                      {new Date(event.date).toLocaleDateString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric'
+                                      })}
+                                    </td>
+                                    <td className="px-3 py-2.5 text-[10px] font-mono" style={{ color: 'hsl(var(--muted-foreground))', textAlign: 'center' }}>
+                                      {formatCurrency(event.marketCapAfter)}
+                                    </td>
+                                    <td className={`px-3 py-2.5 text-[10px] font-mono ${
+                                      event.sharePriceAfter > event.sharePriceBefore ? 'price-positive' :
+                                      event.sharePriceAfter < event.sharePriceBefore ? 'price-negative' :
+                                      ''
+                                    }`} style={{ textAlign: 'center' }}>
+                                      {event.sharePriceAfter !== event.sharePriceBefore && (
+                                        <span>{event.sharePriceAfter > event.sharePriceBefore ? '+' : ''}${(event.sharePriceAfter - event.sharePriceBefore).toFixed(2)}</span>
+                                      )}
+                                    </td>
+                                    <td className={`px-3 py-2.5 text-xs font-semibold ${
+                                      event.priceImpactPercent >= 0 ? 'price-positive' : 'price-negative'
+                                    }`} style={{ textAlign: 'center' }}>
+                                      {event.priceImpactPercent >= 0 ? '+' : ''}{event.priceImpactPercent.toFixed(2)}%
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Mobile/Tablet Card View */}
+                          <div className="md:hidden space-y-2">
+                            {matchHistory.map((event, index) => {
+                              const isPositive = event.priceImpactPercent >= 0;
+                              const priceChange = event.sharePriceAfter - event.sharePriceBefore;
+                              const dateObj = new Date(event.date);
+                              const formattedDate = dateObj.toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric'
+                              });
+
+                              return (
+                                <div
+                                  key={index}
+                                  className="bg-gray-800/40 border border-gray-700/30 rounded-lg p-2.5 sm:p-3 touch-manipulation"
+                                >
+                                  {/* Header Row: Result Badge + Opponent + Date */}
+                                  <div className="flex items-start justify-between gap-2 mb-2">
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+                                        event.matchResult === 'win' ? 'bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30' :
+                                        event.matchResult === 'loss' ? 'bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/30' :
+                                        'bg-gray-500/20 text-gray-400 border border-gray-500/30'
                                       }`}>
                                         {getResultBadge(event.matchResult)}
                                       </div>
-                                      <span className="text-sm font-medium">{event.description}</span>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-[11px] sm:text-xs font-semibold text-white truncate">
+                                          {event.description.replace('Match vs ', '')}
+                                        </p>
+                                        <p className="text-[9px] sm:text-[10px] text-gray-400 mt-0.5">
+                                          {formattedDate}
+                                        </p>
+                                      </div>
                                     </div>
-                                  </td>
-                                  <td className="px-3 text-xs" style={{ color: 'hsl(var(--muted-foreground))', textAlign: 'center' }}>
-                                    {new Date(event.date).toLocaleDateString('en-US', {
-                                      month: 'short',
-                                      day: 'numeric',
-                                      year: 'numeric'
-                                    })}
-                                  </td>
-                                  <td className="px-3 text-xs font-mono" style={{ color: 'hsl(var(--muted-foreground))', textAlign: 'center' }}>
-                                    {formatCurrency(event.marketCapAfter)}
-                                  </td>
-                                  <td className={`px-3 text-xs font-mono ${
-                                    event.sharePriceAfter > event.sharePriceBefore ? 'price-positive' :
-                                    event.sharePriceAfter < event.sharePriceBefore ? 'price-negative' :
-                                    ''
-                                  }`} style={{ textAlign: 'center' }}>
-                                    ${event.sharePriceAfter.toFixed(2)}
-                                    {event.sharePriceAfter !== event.sharePriceBefore && (
-                                      <span className="ml-1">
-                                        ({event.sharePriceAfter > event.sharePriceBefore ? '+' : ''}${(event.sharePriceAfter - event.sharePriceBefore).toFixed(2)})
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td className={`px-3 text-sm font-semibold ${
-                                    event.priceImpactPercent >= 0 ? 'price-positive' : 'price-negative'
-                                  }`} style={{ textAlign: 'center' }}>
-                                    {event.priceImpactPercent >= 0 ? '+' : ''}{event.priceImpactPercent.toFixed(2)}%
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                                  </div>
+
+                                  {/* Stats Row: Market Cap + Change */}
+                                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-700/20">
+                                    <div>
+                                      <p className="text-[9px] sm:text-[10px] text-gray-400 mb-0.5">Market Cap</p>
+                                      <p className="text-[11px] sm:text-xs font-semibold font-mono text-white">
+                                        {formatCurrency(event.marketCapAfter)}
+                                      </p>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="text-[9px] sm:text-[10px] text-gray-400 mb-0.5">Change</p>
+                                      <div className="flex items-center justify-end gap-1">
+                                        {priceChange !== 0 && (
+                                          <p className={`text-[10px] sm:text-xs font-semibold font-mono ${
+                                            isPositive ? 'text-[#10B981]' : 'text-[#EF4444]'
+                                          }`}>
+                                            {priceChange > 0 ? '+' : ''}${priceChange.toFixed(2)}
+                                          </p>
+                                        )}
+                                        <p className={`text-[11px] sm:text-xs font-bold ${
+                                          isPositive ? 'text-[#10B981]' : 'text-[#EF4444]'
+                                        }`}>
+                                          {isPositive ? '+' : ''}{event.priceImpactPercent.toFixed(1)}%
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
                       )}
                     </div>
                   )}
@@ -394,7 +463,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                         </div>
                       ) : (
                         <>
-                          {/* Chart Summary - Compact */}
+                          {/* Chart Summary - Mobile Optimized */}
                           {(() => {
                             // Calculate change using launch price if provided, otherwise use chart initial price
                             const initialPrice = launchPrice ?? chartData.find(point => point.x === 0)?.y ?? chartData[0]?.y ?? 0;
@@ -403,25 +472,25 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                             const isPositive = Number(latestPrice) >= Number(initialPrice);
                             
                             return (
-                              <div className="grid grid-cols-3 gap-3 mb-4">
-                                <div className="p-3 rounded border border-gray-800/30">
-                                  <p className="text-xs mb-1" style={{ color: 'hsl(var(--muted-foreground))' }}>Initial</p>
-                                  <p className="text-base font-semibold font-mono">
+                              <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-3 sm:mb-4">
+                                <div className="p-2 sm:p-3 rounded border border-gray-800/30">
+                                  <p className="text-[9px] sm:text-xs mb-1" style={{ color: 'hsl(var(--muted-foreground))' }}>Initial</p>
+                                  <p className="text-xs sm:text-sm font-semibold font-mono">
                                     {formatCurrency(initialPrice)}
                                   </p>
                                 </div>
                                 
-                                <div className="p-3 rounded border border-gray-800/30">
-                                  <p className="text-xs mb-1" style={{ color: 'hsl(var(--muted-foreground))' }}>Current</p>
-                                  <p className="text-base font-semibold font-mono">
+                                <div className="p-2 sm:p-3 rounded border border-gray-800/30">
+                                  <p className="text-[9px] sm:text-xs mb-1" style={{ color: 'hsl(var(--muted-foreground))' }}>Current</p>
+                                  <p className="text-xs sm:text-sm font-semibold font-mono">
                                     {formatCurrency(latestPrice)}
                                   </p>
                                 </div>
                                 
-                                <div className="p-3 rounded border border-gray-800/30">
-                                  <p className="text-xs mb-1" style={{ color: 'hsl(var(--muted-foreground))' }}>Change</p>
-                                  <p className={`text-base font-semibold ${isPositive ? 'price-positive' : 'price-negative'}`}>
-                                    {`${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%`}
+                                <div className="p-2 sm:p-3 rounded border border-gray-800/30">
+                                  <p className="text-[9px] sm:text-xs mb-1" style={{ color: 'hsl(var(--muted-foreground))' }}>Change</p>
+                                  <p className={`text-xs sm:text-sm font-semibold ${isPositive ? 'price-positive' : 'price-negative'}`}>
+                                    {`${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(1)}%`}
                                   </p>
                                 </div>
                               </div>

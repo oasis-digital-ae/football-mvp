@@ -20,7 +20,9 @@ import {
   LogOut,
   User,
   Shield,
-  Wallet
+  Wallet,
+  Menu,
+  X
 } from 'lucide-react';
 
 interface NavigationProps {
@@ -31,6 +33,7 @@ interface NavigationProps {
 const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) => {
   const { signOut, profile, walletBalance, refreshWalletBalance, isAdmin } = useAuth();
   const [depositModalOpen, setDepositModalOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   const allPages = [
     { id: 'marketplace', label: 'Marketplace', icon: TrendingUp },
@@ -58,19 +61,30 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
   };
 
   return (
-    <nav className="bg-gradient-primary border-b border-trading-primary/20 backdrop-blur-md sticky top-0 z-50 w-full">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center h-16 gap-2 md:gap-3">
-          {/* Logo and Brand */}
-          <div className="flex items-center space-x-2 flex-shrink-0">
-            <div className="flex items-center justify-center w-9 h-9 lg:w-10 lg:h-10 bg-trading-primary rounded-full primary-glow flex-shrink-0">
-              <Trophy className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
+    <>
+      <nav className="bg-gradient-primary border-b border-trading-primary/20 backdrop-blur-md sticky top-0 z-50 w-full">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center h-16 gap-2 md:gap-3">
+            {/* Mobile Menu Button */}
+            <Button
+              variant="ghost"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden text-white hover:bg-white/10 p-2 flex-shrink-0"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </Button>
+
+            {/* Logo and Brand */}
+            <div className="flex items-center space-x-2 flex-shrink-0">
+              <div className="flex items-center justify-center w-9 h-9 lg:w-10 lg:h-10 bg-trading-primary rounded-full primary-glow flex-shrink-0">
+                <Trophy className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
+              </div>
+              <h1 className="text-base lg:text-lg xl:text-xl font-bold text-white whitespace-nowrap">
+                <span className="hidden lg:inline">Arena Club Exchange (ACE)</span>
+                <span className="lg:hidden">ACE</span>
+              </h1>
             </div>
-            <h1 className="text-base lg:text-lg xl:text-xl font-bold text-white whitespace-nowrap">
-              <span className="hidden lg:inline">Arena Club Exchange (ACE)</span>
-              <span className="lg:hidden">ACE</span>
-            </h1>
-          </div>
 
           {/* Desktop Navigation - Horizontal Scrollable */}
           <div className="hidden md:flex items-center flex-1 justify-center min-w-0 px-2">
@@ -108,8 +122,8 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
             </div>
           </div>
 
-          {/* User Menu */}
-          <div className="flex items-center space-x-1 lg:space-x-2 flex-shrink-0 ml-auto">
+          {/* User Menu - Desktop */}
+          <div className="hidden md:flex items-center space-x-1 lg:space-x-2 flex-shrink-0 ml-auto">
             {profile && (
               <>
                 <div className="hidden lg:flex items-center space-x-1.5 text-gray-300">
@@ -126,7 +140,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
                 </div>
                 <Button
                   onClick={() => setDepositModalOpen(true)}
-                  className="hidden sm:flex items-center space-x-1 bg-trading-primary hover:bg-trading-primary/80 text-white px-1.5 lg:px-2.5 py-1 flex-shrink-0"
+                  className="flex items-center space-x-1 bg-trading-primary hover:bg-trading-primary/80 text-white px-1.5 lg:px-2.5 py-1 flex-shrink-0"
                   size="sm"
                 >
                   <Wallet className="w-3 h-3 lg:w-3.5 lg:h-3.5 flex-shrink-0" />
@@ -143,35 +157,72 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
               <LogOut className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
             </Button>
           </div>
+
+          {/* Mobile Wallet & User Info */}
+          {profile && (
+            <div className="md:hidden flex items-center gap-2 ml-auto">
+              <Button
+                onClick={() => setDepositModalOpen(true)}
+                className="flex items-center gap-1 bg-trading-primary hover:bg-trading-primary/80 text-white px-2 py-1.5 text-xs"
+                size="sm"
+              >
+                <Wallet className="w-3.5 h-3.5" />
+                <span className="font-semibold">{formatCurrency(walletBalance)}</span>
+              </Button>
+            </div>
+          )}
         </div>
 
-        {/* Mobile Navigation */}
-        <div className="md:hidden pb-3">
-          <div className="grid grid-cols-2 gap-1">
-            {pages.map((page) => {
-              const Icon = page.icon;
-              const isActive = currentPage === page.id;
-              
-              return (
-                <Button
-                  key={page.id}
-                  variant="ghost"
-                  onClick={() => onPageChange(page.id)}
-                  className={`
-                    flex flex-col items-center space-y-1 p-2 rounded-md transition-all duration-200 min-h-[60px]
-                    ${isActive 
-                      ? 'bg-trading-primary text-white border border-trading-primary' 
-                      : 'text-gray-300 hover:text-white hover:bg-white/10'
-                    }
-                  `}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span className="text-xs font-medium leading-tight">{page.label}</span>
-                </Button>
-              );
-            })}
+        {/* Mobile Menu Dropdown */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-gray-700/50 py-3">
+            <div className="space-y-1">
+              {pages.map((page) => {
+                const Icon = page.icon;
+                const isActive = currentPage === page.id;
+                
+                return (
+                  <Button
+                    key={page.id}
+                    variant="ghost"
+                    onClick={() => {
+                      onPageChange(page.id);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`
+                      w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 justify-start
+                      ${isActive 
+                        ? 'bg-trading-primary text-white' 
+                        : 'text-gray-300 hover:text-white hover:bg-white/10'
+                      }
+                    `}
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span className="font-medium">{page.label}</span>
+                  </Button>
+                );
+              })}
+              {profile && (
+                <div className="pt-2 mt-2 border-t border-gray-700/50">
+                  <div className="px-4 py-2 flex items-center gap-2 text-gray-300">
+                    <User className="w-4 h-4" />
+                    <span className="text-sm">
+                      {profile.first_name || (profile.full_name ? profile.full_name.split(' ')[0] : 'User')}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    onClick={handleSignOut}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 justify-start"
+                  >
+                    <LogOut className="w-5 h-5" />
+                    <span className="font-medium">Sign Out</span>
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
       <DepositModal
         isOpen={depositModalOpen}
@@ -186,6 +237,35 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
         }}
       />
     </nav>
+
+    {/* Bottom Navigation Bar - Mobile Only */}
+    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-md border-t border-gray-700/50 z-40 safe-area-inset-bottom">
+      <div className="grid grid-cols-4 gap-1 px-2 py-2">
+        {pages.slice(0, 4).map((page) => {
+          const Icon = page.icon;
+          const isActive = currentPage === page.id;
+          
+          return (
+            <Button
+              key={page.id}
+              variant="ghost"
+              onClick={() => onPageChange(page.id)}
+              className={`
+                flex flex-col items-center gap-1 p-2 rounded-lg transition-all duration-200 min-h-[60px]
+                ${isActive 
+                  ? 'bg-trading-primary/20 text-trading-primary' 
+                  : 'text-gray-400 hover:text-white'
+                }
+              `}
+            >
+              <Icon className="w-5 h-5" />
+              <span className="text-[10px] font-medium leading-tight">{page.label}</span>
+            </Button>
+          );
+        })}
+      </div>
+    </div>
+    </>
   );
 };
 

@@ -149,23 +149,23 @@ const PortfolioPage: React.FC = () => {
     }, [user, toast]);
 
   return (
-    <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 w-full max-w-full overflow-x-hidden">
-      {/* Welcome Header */}
+    <div className="p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 lg:space-y-6 w-full max-w-full overflow-x-hidden">
+      {/* Welcome Header - Mobile Optimized */}
       {profile && (profile.first_name || profile.full_name) && (
-        <div className="mb-2">
-          <h1 className="text-2xl font-bold">Welcome, {profile.first_name || (profile.full_name ? profile.full_name.split(' ')[0] : 'User')}</h1>
+        <div className="mb-1 sm:mb-2">
+          <h1 className="text-lg sm:text-xl md:text-2xl font-bold">Welcome, {profile.first_name || (profile.full_name ? profile.full_name.split(' ')[0] : 'User')}</h1>
         </div>
       )}
       
-      {/* Portfolio Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+      {/* Portfolio Overview Cards - Mobile Optimized */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 lg:gap-4">
         {/* Total Invested */}
         <Card className="trading-card group">
-          <CardContent className="p-4 sm:p-6">
+          <CardContent className="p-3 sm:p-4 lg:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm font-medium mb-2">Total Invested</p>
-                <p className="text-2xl font-bold text-white">{formatCurrency(totalInvested)}</p>
+                <p className="text-gray-400 text-xs sm:text-sm font-medium mb-1 sm:mb-2">Total Invested</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-white">{formatCurrency(totalInvested)}</p>
               </div>
               <div className="w-12 h-12 bg-gradient-success rounded-full flex items-center justify-center group-hover:animate-bounce-gentle">
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -178,11 +178,11 @@ const PortfolioPage: React.FC = () => {
 
         {/* Market Value */}
         <Card className="trading-card group">
-          <CardContent className="p-4 sm:p-6">
+          <CardContent className="p-3 sm:p-4 lg:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm font-medium mb-2">Market Value</p>
-                <p className="text-2xl font-bold text-white">{formatCurrency(totalMarketValue)}</p>
+                <p className="text-gray-400 text-xs sm:text-sm font-medium mb-1 sm:mb-2">Market Value</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-white">{formatCurrency(totalMarketValue)}</p>
               </div>
               <div className="w-12 h-12 bg-gradient-primary rounded-full flex items-center justify-center group-hover:animate-bounce-gentle">
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -195,15 +195,15 @@ const PortfolioPage: React.FC = () => {
 
         {/* Total P&L */}
         <Card className="trading-card group">
-          <CardContent className="p-4 sm:p-6">
+          <CardContent className="p-3 sm:p-4 lg:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm font-medium mb-2">Total P&L</p>
-                <p className={`text-2xl font-bold ${totalProfitLoss === 0 ? 'text-gray-400' : totalProfitLoss > 0 ? 'price-positive' : 'price-negative'}`}>
+                <p className="text-gray-400 text-xs sm:text-sm font-medium mb-1 sm:mb-2">Total P&L</p>
+                <p className={`text-lg sm:text-xl lg:text-2xl font-bold ${totalProfitLoss === 0 ? 'text-gray-400' : totalProfitLoss > 0 ? 'price-positive' : 'price-negative'}`}>
                   {formatCurrency(totalProfitLoss)}
                 </p>
-                <p className={`text-sm font-medium ${totalProfitLoss === 0 ? 'text-gray-400' : totalProfitLoss > 0 ? 'price-positive' : 'price-negative'}`}>
-                  {totalInvested > 0 ? `${calculatePercentChange(totalProfitLoss + totalInvested, totalInvested).toFixed(2)}%` : '0.00%'}
+                <p className={`text-xs sm:text-sm font-medium ${totalProfitLoss === 0 ? 'text-gray-400' : totalProfitLoss > 0 ? 'price-positive' : 'price-negative'}`}>
+                  {totalInvested > 0 ? `${calculatePercentChange(totalProfitLoss + totalInvested, totalInvested).toFixed(1)}%` : '0.0%'}
                 </p>
               </div>
               <div className={`w-12 h-12 rounded-full flex items-center justify-center group-hover:animate-bounce-gentle ${
@@ -250,26 +250,93 @@ const PortfolioPage: React.FC = () => {
               <p className="text-gray-500 text-sm">Start building your portfolio by buying club shares!</p>
             </div>
           ) : (
-            <div className="overflow-x-auto w-full max-w-full">
-              <table className="trading-table w-full">
-                <thead>
-                  <tr>
-                    <th className="text-left px-3">Club</th>
-                    <th className="text-right px-3">Units</th>
-                    <th className="text-right px-3">Avg Price</th>
-                    <th className="text-right px-3">Current Price</th>
-                    <th className="text-right px-3">% Change</th>
-                    <th className="text-right px-3">Total Value</th>
-                    <th className="text-right px-3">% Portfolio</th>
-                    <th className="text-right px-3">P&L</th>
-                    <th className="text-center px-3">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {memoizedPortfolioRows}
-                </tbody>
-              </table>
-            </div>
+            <>
+              {/* Desktop Table */}
+              <div className="hidden md:block overflow-x-auto w-full max-w-full">
+                <table className="trading-table w-full">
+                  <thead>
+                    <tr>
+                      <th className="text-left px-3">Club</th>
+                      <th className="text-right px-3">Units</th>
+                      <th className="text-right px-3">Avg Price</th>
+                      <th className="text-right px-3">Current Price</th>
+                      <th className="text-right px-3">% Change</th>
+                      <th className="text-right px-3">Total Value</th>
+                      <th className="text-right px-3">% Portfolio</th>
+                      <th className="text-right px-3">P&L</th>
+                      <th className="text-center px-3">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {memoizedPortfolioRows}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card Layout - Optimized */}
+              <div className="md:hidden space-y-2.5">
+                {portfolio.map((item) => {
+                  const percentChange = calculatePercentChange(item.currentPrice, item.purchasePrice);
+                  const portfolioPercent = calculatePortfolioPercentage(item.totalValue, totalMarketValue);
+                  const profitLoss = item.totalValue - (item.purchasePrice * item.units);
+                  
+                  return (
+                    <div
+                      key={item.clubId}
+                      onClick={() => handleClubClick(item.clubId, item.clubName)}
+                      className="bg-gray-800/40 rounded-lg p-3 border border-gray-700/30 active:bg-gray-700/50 transition-colors touch-manipulation"
+                    >
+                      <div className="flex items-start justify-between mb-2.5">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-white font-semibold text-sm mb-1 truncate">{item.clubName}</h3>
+                          <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                            <span>{item.units} units</span>
+                            <span>•</span>
+                            <span>{portfolioPercent.toFixed(1)}%</span>
+                          </div>
+                        </div>
+                        <Button
+                          onClick={(e) => handleSellClick(e, item)}
+                          size="sm"
+                          className="bg-red-600 hover:bg-red-700 text-white text-[11px] px-3 py-2 min-h-[44px] touch-manipulation"
+                        >
+                          Sell
+                        </Button>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 mb-2.5">
+                        <div className="bg-gray-700/20 rounded p-2">
+                          <div className="text-[9px] text-gray-500 mb-0.5 uppercase tracking-wide">Avg Price</div>
+                          <div className="text-white font-mono font-semibold text-xs">{formatCurrency(item.purchasePrice)}</div>
+                        </div>
+                        <div className="bg-gray-700/20 rounded p-2">
+                          <div className="text-[9px] text-gray-500 mb-0.5 uppercase tracking-wide">Current</div>
+                          <div className="text-white font-mono font-semibold text-xs">{formatCurrency(item.currentPrice)}</div>
+                        </div>
+                      </div>
+                      
+                      <div className="pt-2.5 border-t border-gray-700/20">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-[9px] text-gray-500 mb-0.5 uppercase tracking-wide">Total Value</div>
+                            <div className="text-white font-bold text-base sm:text-lg">{formatCurrency(item.totalValue)}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-[9px] text-gray-500 mb-0.5 uppercase tracking-wide">P&L</div>
+                            <div className={`font-bold text-sm sm:text-base ${profitLoss === 0 ? 'text-gray-400' : profitLoss > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {profitLoss > 0 ? '+' : ''}{formatCurrency(profitLoss)}
+                            </div>
+                            <div className={`text-[10px] font-medium ${percentChange === 0 ? 'text-gray-500' : percentChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {percentChange > 0 ? '+' : ''}{percentChange.toFixed(1)}%
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

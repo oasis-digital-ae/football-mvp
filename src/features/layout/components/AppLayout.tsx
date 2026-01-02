@@ -46,7 +46,7 @@ const AppLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 w-full overflow-x-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 w-full overflow-x-hidden pb-20 md:pb-0">
       <Navigation currentPage={currentPage} onPageChange={setCurrentPage} />
       <main className="max-w-7xl mx-auto w-full px-4 lg:px-6 overflow-x-hidden">
         {renderCurrentPage()}

@@ -169,48 +169,132 @@ const StandingsPage: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Card Layout */}
+          <div className="md:hidden space-y-2 p-3">
+            {standings.map((standing, index) => {
+              const positionChange = getPositionChange(standing.position, standing.previousPosition);
+              
+              return (
+                <div
+                  key={standing.team.id}
+                  className={`bg-gray-800/40 rounded-lg p-3 border ${
+                    standing.position <= 4 ? 'border-yellow-500/30 bg-yellow-900/10' :
+                    standing.position >= 18 ? 'border-red-500/30 bg-red-900/10' : 
+                    'border-gray-700/30'
+                  } touch-manipulation`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {getPositionIcon(standing.position)}
+                        <span className="text-xs font-semibold text-gray-400 w-6">{standing.position}</span>
+                      </div>
+                      <img 
+                        src={standing.team.crest} 
+                        alt={standing.team.name}
+                        className="w-5 h-5 object-contain flex-shrink-0"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                      <ClickableTeamName
+                        teamName={standing.team.name}
+                        teamId={standing.team.id}
+                        className="font-medium text-sm text-white hover:text-trading-primary transition-colors truncate"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="text-right">
+                        <div className="text-base font-bold text-white">{standing.points}</div>
+                        <div className="text-[9px] text-gray-500">pts</div>
+                      </div>
+                      {getPositionBadge(standing.position)}
+                    </div>
+                  </div>
+                  
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-4 gap-2 pt-2 border-t border-gray-700/20">
+                    <div className="text-center">
+                      <div className="text-[9px] text-gray-500 mb-0.5">P</div>
+                      <div className="text-xs font-semibold text-white">{standing.playedGames}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-[9px] text-gray-500 mb-0.5">W</div>
+                      <div className="text-xs font-semibold text-green-400">{standing.won}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-[9px] text-gray-500 mb-0.5">D</div>
+                      <div className="text-xs font-semibold text-yellow-400">{standing.draw}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-[9px] text-gray-500 mb-0.5">L</div>
+                      <div className="text-xs font-semibold text-red-400">{standing.lost}</div>
+                    </div>
+                  </div>
+                  
+                  {/* Goals */}
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-700/20 mt-2">
+                    <div>
+                      <div className="text-[9px] text-gray-500 mb-0.5">Goals For</div>
+                      <div className="text-xs font-semibold text-white">{standing.goalsFor}</div>
+                    </div>
+                    <div>
+                      <div className="text-[9px] text-gray-500 mb-0.5">Goal Diff</div>
+                      <div className={`text-xs font-semibold font-mono ${
+                        standing.goalDifference > 0 ? 'text-green-400' : 
+                        standing.goalDifference < 0 ? 'text-red-400' : 'text-gray-400'
+                      }`}>
+                        {formatGoalDifference(standing.goalDifference)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </CardContent>
       </Card>
 
-      {/* League Information */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* League Information - Mobile Optimized */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 sm:gap-3 lg:gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-yellow-500" />
+          <CardHeader className="p-3 sm:p-4 lg:p-6">
+            <CardTitle className="text-sm sm:text-base lg:text-lg flex items-center gap-2">
+              <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
               Champions League
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-600">
+          <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
+            <p className="text-xs sm:text-sm text-gray-400">
               Positions 1-4 qualify for the UEFA Champions League
             </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-blue-500" />
+          <CardHeader className="p-3 sm:p-4 lg:p-6">
+            <CardTitle className="text-sm sm:text-base lg:text-lg flex items-center gap-2">
+              <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
               Europa League
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-600">
+          <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
+            <p className="text-xs sm:text-sm text-gray-400">
               Position 5 qualifies for the UEFA Europa League
             </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <TrendingDown className="h-5 w-5 text-red-500" />
+          <CardHeader className="p-3 sm:p-4 lg:p-6">
+            <CardTitle className="text-sm sm:text-base lg:text-lg flex items-center gap-2">
+              <TrendingDown className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
               Relegation
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-600">
+          <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
+            <p className="text-xs sm:text-sm text-gray-400">
               Positions 18-20 are relegated to the Championship
             </p>
           </CardContent>

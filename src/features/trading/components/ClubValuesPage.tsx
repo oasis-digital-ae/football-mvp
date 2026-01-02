@@ -352,13 +352,13 @@ export const ClubValuesPage: React.FC = () => {
   }, [confirmationData, purchaseClub, toast, isPurchasing, refreshWalletBalance, refreshData]);
 
   return (
-    <div className="p-4 lg:p-6 space-y-6 w-full max-w-full overflow-x-hidden">
-      {/* Header Section - Minimalist */}
+    <div className="p-3 sm:p-4 md:p-5 lg:p-6 space-y-3 sm:space-y-4 md:space-y-6 w-full max-w-full overflow-x-hidden">
+      {/* Header Section - Mobile Optimized */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">The Premier League</h1>
+          <h1 className="text-lg sm:text-xl md:text-2xl font-bold">The Premier League</h1>
         </div>
-        <div className="flex items-center gap-2 text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
+        <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
           <div className="w-1.5 h-1.5 bg-[#10B981] rounded-full animate-pulse"></div>
           <span>Live</span>
         </div>
@@ -367,8 +367,8 @@ export const ClubValuesPage: React.FC = () => {
       {/* Main Marketplace Table - Clean Professional Style */}
       <Card className="trading-card border-0">
         <CardContent className="p-0">
-          {/* Desktop Table */}
-          <div className="hidden lg:block overflow-x-auto w-full max-w-full">
+          {/* Desktop/Tablet Table */}
+          <div className="hidden md:block overflow-x-auto w-full max-w-full">
             <table className="trading-table w-full">
               <thead>
                 <tr>
@@ -577,8 +577,8 @@ export const ClubValuesPage: React.FC = () => {
             </table>
           </div>
 
-          {/* Mobile Card Layout */}
-          <div className="lg:hidden space-y-3">
+          {/* Mobile Card Layout - Optimized */}
+          <div className="md:hidden space-y-2.5">
             {useMemo(() => clubs
               .map(club => {
                 const launchPrice = roundForDisplay(toDecimal(club.launchValue || 20));
@@ -598,42 +598,41 @@ export const ClubValuesPage: React.FC = () => {
               })
               .sort((a, b) => b.percentChange - a.percentChange), [clubs])
               .map((club, index) => (
-                <div key={club.id} className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/30">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="team-logo-container">
+                <div key={club.id} className="bg-gray-800/40 rounded-lg p-3 border border-gray-700/30 active:bg-gray-700/50 transition-colors touch-manipulation">
+                  <div className="flex items-start justify-between mb-2.5">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <div className="team-logo-container flex-shrink-0">
                         <TeamLogo 
                           teamName={club.name} 
                           externalId={club.externalId ? parseInt(club.externalId) : undefined}
                           size="sm" 
                         />
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-400 text-sm font-medium">#{index + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="text-gray-500 text-[10px] font-medium flex-shrink-0">#{index + 1}</span>
                           <button
                             onClick={() => handleTeamClick(club.id)}
-                            className="hover:text-trading-primary transition-colors duration-200 cursor-pointer text-left flex items-center gap-1"
+                            className="hover:text-trading-primary transition-colors duration-200 cursor-pointer text-left flex items-center gap-1 min-w-0"
                           >
-                            <span className="font-semibold text-white text-sm">{club.name}</span>
+                            <span className="font-semibold text-white text-xs sm:text-sm truncate">{club.name}</span>
                             <ChevronDown 
-                              className={`h-3 w-3 transition-transform duration-280 ease-out ${
+                              className={`h-3 w-3 transition-transform duration-200 ease-out flex-shrink-0 ${
                                 selectedClub === club.id ? 'rotate-180' : ''
                               }`}
                             />
                           </button>
                         </div>
-                        <div className="text-xs text-gray-400">
-                          {getGamesPlayed(club.id)} games played
+                        <div className="text-[10px] text-gray-500 mb-0.5">
+                          {getGamesPlayed(club.id)} games
                         </div>
                         {(() => {
                           const status = buyWindowStatuses.get(club.id);
                           if (status?.nextCloseTime) {
                             const deadline = formatTradingDeadline(status.nextCloseTime);
                             return (
-                              <div className="text-xs mt-1 font-mono" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                <span>Until {deadline}</span>
-                                <span className="text-[10px] text-gray-500 ml-1">(UAE)</span>
+                              <div className="text-[9px] font-mono text-gray-500 truncate">
+                                Until {deadline}
                               </div>
                             );
                           }
@@ -641,43 +640,41 @@ export const ClubValuesPage: React.FC = () => {
                         })()}
                       </div>
                     </div>
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-1.5 flex-shrink-0 ml-2">
                       <Button
                         onClick={() => handlePurchaseClick(club.id)}
                         size="sm"
                         disabled={isPurchasing || (buyWindowStatuses.has(club.id) && !buyWindowStatuses.get(club.id)?.isOpen)}
-                        className="bg-gradient-success hover:bg-gradient-success/80 text-white font-semibold px-3 py-1 text-xs rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="bg-[#10B981] hover:bg-[#059669] text-white font-semibold px-3 py-2 text-[11px] rounded-md disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation min-h-[44px]"
                         title={(buyWindowStatuses.has(club.id) && !buyWindowStatuses.get(club.id)?.isOpen) ? 'Trading window is closed' : 'Buy shares'}
                       >
-                        {isPurchasing && purchasingClubId === club.id ? 'Processing...' : 
-                         (buyWindowStatuses.has(club.id) && !buyWindowStatuses.get(club.id)?.isOpen) ? '🔒 Closed' : 'Buy'}
+                        {isPurchasing && purchasingClubId === club.id ? '...' : 
+                         (buyWindowStatuses.has(club.id) && !buyWindowStatuses.get(club.id)?.isOpen) ? 'Closed' : 'Buy'}
                       </Button>
                       <BuyWindowIndicator teamId={parseInt(club.id)} compact={true} showCountdown={false} />
                     </div>
                   </div>
                   
-                  {/* Main Price Display - Large and Clear */}
-                  <div className="mb-3 p-3 rounded-lg bg-gray-700/30 border border-gray-600/30">
+                  {/* Main Price Display - Compact */}
+                  <div className="mb-2.5 p-2.5 rounded-lg bg-gray-700/20 border border-gray-600/20">
                     <div className="text-center">
-                      <div className="text-xs text-gray-400 mb-1">Current Share Price</div>
-                      <div className="text-2xl font-bold text-white mb-1">{formatCurrency(club.currentValue)}</div>
-                      <div className={`text-sm font-semibold ${club.percentChange === 0 ? 'text-gray-400' : club.percentChange > 0 ? 'price-positive' : 'price-negative'}`}>
-                        {club.percentChange > 0 ? '+' : ''}{formatPercent(club.percentChange)} from launch
+                      <div className="text-[9px] text-gray-500 mb-0.5 uppercase tracking-wide">Share Price</div>
+                      <div className="text-xl sm:text-2xl font-bold text-white mb-0.5">{formatCurrency(club.currentValue)}</div>
+                      <div className={`text-xs font-semibold ${club.percentChange === 0 ? 'text-gray-500' : club.percentChange > 0 ? 'price-positive' : 'price-negative'}`}>
+                        {club.percentChange > 0 ? '+' : ''}{formatPercent(club.percentChange)}
                       </div>
                     </div>
                   </div>
                   
-                  {/* Secondary Info - Grid Layout */}
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="bg-gray-700/20 rounded p-2">
-                      <div className="text-gray-400 text-[10px] uppercase tracking-wide mb-1">Launch Price</div>
-                      <div className="text-white font-mono font-semibold">{formatCurrency(club.launchValue)}</div>
+                  {/* Secondary Info - Compact Grid */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-gray-700/15 rounded p-2">
+                      <div className="text-gray-500 text-[9px] uppercase tracking-wide mb-0.5">Launch</div>
+                      <div className="text-white font-mono font-semibold text-xs">{formatCurrency(club.launchValue)}</div>
                     </div>
-                    <div className="bg-gray-700/20 rounded p-2">
-                      <div className="text-gray-400 text-[10px] uppercase tracking-wide mb-1">Profit/Loss</div>
-                      <div className={`font-semibold ${club.profitLoss === 0 ? 'text-gray-400' : club.profitLoss > 0 ? 'price-positive' : 'price-negative'}`}>
-                        {club.profitLoss > 0 ? '+' : ''}{formatCurrency(club.profitLoss)}
-                      </div>
+                    <div className="bg-gray-700/15 rounded p-2">
+                      <div className="text-gray-500 text-[9px] uppercase tracking-wide mb-0.5">Market Cap</div>
+                      <div className="text-white font-mono font-semibold text-xs">{formatCurrency(club.marketCap)}</div>
                     </div>
                   </div>
                   

@@ -112,50 +112,43 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-gray-800/95 backdrop-blur-md border border-trading-primary/30 text-white max-w-md rounded-lg">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-center gradient-text">
+      <DialogContent className="bg-gray-800/95 backdrop-blur-md border border-trading-primary/30 text-white">
+        <DialogHeader className="pb-3 sm:pb-4">
+          <DialogTitle className="text-base sm:text-lg md:text-xl font-bold text-center gradient-text">
             Purchase Shares
           </DialogTitle>
         </DialogHeader>
         
-        <div className="py-6 space-y-4">
-          {/* Team Logo and Name */}
-          <div className="text-center space-y-4">
+        <div className="py-2 sm:py-4 space-y-3 sm:space-y-4">
+          {/* Team Logo and Name - Financial App Style */}
+          <div className="text-center space-y-1.5 sm:space-y-2">
             <div className="flex justify-center">
-              <div className="team-logo-container">
-                <TeamLogo 
-                  teamName={clubName} 
-                  externalId={externalId}
-                  size="lg"
-                  className="mx-auto"
-                />
-              </div>
+              <TeamLogo 
+                teamName={clubName} 
+                externalId={externalId}
+                size="sm"
+                className="mx-auto"
+              />
             </div>
-            <h3 className="text-lg font-semibold text-trading-primary">
+            <h3 className="text-xs sm:text-sm font-semibold text-trading-primary">
               {clubName}
             </h3>
           </div>
           
-          {/* Buy Window Status */}
-          {buyWindowStatus && (
-            <div className="bg-gray-700/50 rounded-lg p-3 border border-gray-600">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium">Trading Status</span>
-                <BuyWindowIndicator teamId={clubId ? parseInt(clubId) : 0} compact={true} />
+          {/* Buy Window Status - Minimal */}
+          {buyWindowStatus && !buyWindowStatus.isOpen && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2 text-center">
+              <div className="text-red-400 text-[10px] sm:text-xs">
+                ⚠️ Trading closed
               </div>
-              {!buyWindowStatus.isOpen && (
-                <div className="text-red-400 text-xs">
-                  ⚠️ Trading closes 30 minutes before match kickoff
-                </div>
-              )}
             </div>
           )}
           
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="shares" className="text-gray-300">
-                Number of shares to purchase
+          <div className="space-y-3">
+            {/* Shares Input - Financial App Style */}
+            <div className="space-y-1">
+              <Label htmlFor="shares" className="text-[10px] sm:text-xs text-gray-400 font-medium uppercase tracking-wide">
+                Shares
               </Label>
               <Input
                 id="shares"
@@ -164,55 +157,56 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
                 max={maxShares}
                 value={shares}
                 onChange={(e) => handleSharesChange(e.target.value)}
-                className={`bg-gray-700 border-gray-600 text-white ${
+                className={`bg-gray-700/50 border-gray-600 text-white text-base sm:text-lg font-semibold h-12 sm:h-14 touch-manipulation text-center ${
                   !isValid ? 'border-red-500 focus:border-red-500' : 'focus:border-blue-500'
                 }`}
-                placeholder="Enter number of shares"
+                placeholder="0"
               />
               {validationErrors.units && (
-                <p className="text-red-400 text-sm">
+                <p className="text-red-400 text-[10px] sm:text-xs mt-0.5">
                   {validationErrors.units}
                 </p>
               )}
               {validationErrors.general && (
-                <p className="text-red-400 text-sm">
+                <p className="text-red-400 text-[10px] sm:text-xs mt-0.5">
                   {validationErrors.general}
                 </p>
               )}
             </div>
             
-            <div className="space-y-4 bg-gradient-card p-6 rounded-lg border border-trading-primary/20">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-300 font-medium">Price per share:</span>
-                <span className="font-semibold text-white">{formatCurrency(pricePerShare)}</span>
+            {/* Purchase Summary - Financial App Style (Compact) */}
+            <div className="bg-gray-700/20 rounded-lg p-2.5 sm:p-3 border border-gray-600/30 space-y-2">
+              <div className="flex justify-between items-center text-[10px] sm:text-xs">
+                <span className="text-gray-500">Price</span>
+                <span className="font-medium text-gray-300">{formatCurrency(pricePerShare)}</span>
               </div>
               
-              <div className="flex justify-between items-center">
-                <span className="text-gray-300 font-medium">Number of shares:</span>
-                <span className="font-semibold text-white">{shares.toLocaleString()}</span>
+              <div className="flex justify-between items-center text-[10px] sm:text-xs">
+                <span className="text-gray-500">Qty</span>
+                <span className="font-medium text-gray-300">{shares.toLocaleString()}</span>
               </div>
               
-              <div className="border-t border-trading-primary/30 pt-4 space-y-2">
-                <div className="flex justify-between items-center text-lg">
-                  <span className="font-semibold text-gray-300">Total purchase value:</span>
-                  <span className="font-bold text-trading-primary text-xl">{formatCurrency(totalValue)}</span>
+              <div className="border-t border-gray-600/30 pt-2 space-y-1.5">
+                <div className="flex justify-between items-baseline">
+                  <span className="text-[10px] sm:text-xs text-gray-400 uppercase tracking-wide">Total</span>
+                  <span className="text-lg sm:text-xl md:text-2xl font-bold text-trading-primary">{formatCurrency(totalValue)}</span>
                 </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-400">Your balance:</span>
-                  <span className={`font-semibold ${hasSufficientBalance ? 'text-green-400' : 'text-red-400'}`}>
+                <div className="flex justify-between items-center text-[10px] sm:text-xs">
+                  <span className="text-gray-500">Available</span>
+                  <span className={`font-medium ${hasSufficientBalance ? 'text-green-400' : 'text-red-400'}`}>
                     {formatCurrency(walletBalance)}
                   </span>
                 </div>
                 {!hasSufficientBalance && (
-                  <div className="text-red-400 text-xs flex items-center justify-between">
-                    <span>Insufficient balance</span>
+                  <div className="pt-1 flex items-center justify-between">
+                    <span className="text-red-400 text-[10px]">Insufficient funds</span>
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => setDepositModalOpen(true)}
-                      className="text-xs h-6 px-2"
+                      className="text-[10px] h-6 px-2 touch-manipulation border-gray-600 text-gray-300 hover:bg-gray-700"
                     >
-                      Deposit
+                      Add
                     </Button>
                   </div>
                 )}
@@ -221,18 +215,12 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
           </div>
         </div>
         
-        <DialogFooter className="flex gap-3">
-          <Button
-            onClick={onClose}
-            variant="outline"
-            className="flex-1 bg-gradient-danger hover:bg-gradient-danger/80 text-white border-danger hover:border-danger/80 font-semibold"
-          >
-            Cancel
-          </Button>
+        {/* Action Buttons - Financial App Style */}
+        <DialogFooter className="flex flex-col gap-2 pt-3 border-t border-gray-700/50">
           <Button
             onClick={handleConfirm}
             disabled={!isValid || shares <= 0 || isProcessing || !buyWindowStatus?.isOpen || !hasSufficientBalance}
-            className="flex-1 bg-gradient-success hover:bg-gradient-success/80 disabled:bg-gray-600 text-white font-semibold transition-all duration-200 disabled:hover:scale-100"
+            className="w-full bg-[#10B981] hover:bg-[#059669] disabled:bg-gray-600 disabled:opacity-50 text-white font-semibold transition-all duration-200 disabled:hover:scale-100 h-12 sm:h-14 touch-manipulation text-sm sm:text-base shadow-lg"
             title={
               !buyWindowStatus?.isOpen 
                 ? 'Trading window is closed' 
@@ -242,9 +230,16 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
             }
           >
             {isProcessing ? 'Processing...' : 
-             !buyWindowStatus?.isOpen ? '🔒 Trading Closed' : 
-             !hasSufficientBalance ? '💳 Insufficient Balance' :
-             'Confirm Purchase'}
+             !buyWindowStatus?.isOpen ? 'Trading Closed' : 
+             !hasSufficientBalance ? 'Insufficient Balance' :
+             'Purchase'}
+          </Button>
+          <Button
+            onClick={onClose}
+            variant="ghost"
+            className="w-full bg-transparent hover:bg-gray-700/30 text-gray-400 hover:text-gray-300 font-medium h-10 touch-manipulation text-xs sm:text-sm"
+          >
+            Cancel
           </Button>
         </DialogFooter>
       </DialogContent>

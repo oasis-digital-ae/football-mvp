@@ -238,14 +238,14 @@ const MatchResultsPage: React.FC = () => {
   }
 
   return (
-    <div className="p-4 lg:p-6 space-y-6 w-full max-w-full overflow-x-hidden">
+    <div className="p-3 sm:p-4 md:p-5 lg:p-6 space-y-4 sm:space-y-5 md:space-y-6 w-full max-w-full overflow-x-hidden">
       {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white">Fixtures</h1>
-          <p className="text-gray-400 mt-1 text-sm">All matches and results</p>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white">Fixtures</h1>
+          <p className="text-gray-400 mt-1 text-xs sm:text-sm">All matches and results</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <div className="flex items-center space-x-2 text-xs text-gray-400">
             <div className="w-2 h-2 bg-trading-primary rounded-full animate-pulse"></div>
             <span>Live</span>
@@ -254,7 +254,7 @@ const MatchResultsPage: React.FC = () => {
             onClick={loadFixtures} 
             variant="outline" 
             size="sm"
-            className="text-xs text-gray-300 hover:text-white hover:bg-white/10"
+            className="text-xs text-gray-300 hover:text-white hover:bg-white/10 touch-manipulation min-h-[44px] px-3"
           >
             Refresh
           </Button>
@@ -267,7 +267,7 @@ const MatchResultsPage: React.FC = () => {
           onClick={() => setFilter('all')} 
           variant={filter === 'all' ? 'default' : 'outline'}
           size="sm"
-          className={`text-xs ${
+          className={`text-xs touch-manipulation min-h-[44px] px-3 ${
             filter === 'all' 
               ? 'bg-trading-primary hover:bg-trading-primary/80 text-white' 
               : 'text-gray-300 hover:text-white hover:bg-white/10'
@@ -279,7 +279,7 @@ const MatchResultsPage: React.FC = () => {
           onClick={() => setFilter('finished')} 
           variant={filter === 'finished' ? 'default' : 'outline'}
           size="sm"
-          className={`text-xs ${
+          className={`text-xs touch-manipulation min-h-[44px] px-3 ${
             filter === 'finished' 
               ? 'bg-trading-primary hover:bg-trading-primary/80 text-white' 
               : 'text-gray-300 hover:text-white hover:bg-white/10'
@@ -291,7 +291,7 @@ const MatchResultsPage: React.FC = () => {
           onClick={() => setFilter('upcoming')} 
           variant={filter === 'upcoming' ? 'default' : 'outline'}
           size="sm"
-          className={`text-xs ${
+          className={`text-xs touch-manipulation min-h-[44px] px-3 ${
             filter === 'upcoming' 
               ? 'bg-trading-primary hover:bg-trading-primary/80 text-white' 
               : 'text-gray-300 hover:text-white hover:bg-white/10'
@@ -345,11 +345,128 @@ const MatchResultsPage: React.FC = () => {
                     {dateFixtures.map((fixture, idx) => (
                       <div 
                         key={fixture.id} 
-                        className={`p-4 hover:bg-gray-800/30 transition-colors ${
+                        className={`p-3 sm:p-4 hover:bg-gray-800/30 transition-colors ${
                           fixture.status === 'closed' ? 'bg-yellow-500/5 border-l-2 border-l-yellow-400' : ''
                         }`}
                       >
-                        <div className="flex items-center justify-between gap-4">
+                        {/* Mobile Layout */}
+                        <div className="md:hidden space-y-3">
+                          {/* Header: Matchday & Status */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="text-xs text-gray-500 font-mono">
+                                MD{fixture.matchday}
+                              </div>
+                              {getStatusBadge(fixture.status)}
+                            </div>
+                            {fixture.status === 'scheduled' && fixture.buy_close_at && (
+                              <div className="text-xs text-gray-500">
+                                Closes {formatTime(fixture.buy_close_at)}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Match Display */}
+                          <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-700/30">
+                            {/* Home Team Row */}
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <TeamLogo 
+                                  teamName={fixture.home_team?.name || 'Home Team'} 
+                                  externalId={fixture.home_team?.external_id ? parseInt(fixture.home_team.external_id) : undefined}
+                                  size="sm" 
+                                />
+                                <ClickableTeamName
+                                  teamName={fixture.home_team?.name || 'Home Team'}
+                                  teamId={fixture.home_team_id}
+                                  externalId={fixture.home_team?.external_id ? parseInt(fixture.home_team.external_id) : undefined}
+                                  className="text-sm font-semibold text-white hover:text-trading-primary transition-colors truncate"
+                                />
+                              </div>
+                              {fixture.status === 'applied' && fixture.home_score !== null ? (
+                                <span className={`text-lg font-bold ml-2 ${
+                                  fixture.result === 'home_win' ? 'text-green-400' : 
+                                  fixture.result === 'away_win' ? 'text-gray-400' : 'text-white'
+                                }`}>
+                                  {fixture.home_score}
+                                </span>
+                              ) : (
+                                fixture.home_team_id && (
+                                  <Button
+                                    onClick={() => handlePurchaseClick(
+                                      fixture.home_team_id,
+                                      fixture.home_team?.name || 'Home Team',
+                                      fixture.home_team?.external_id ? parseInt(fixture.home_team.external_id) : undefined
+                                    )}
+                                    size="sm"
+                                    disabled={isPurchasing || purchasingClubId === fixture.home_team_id.toString()}
+                                    className="bg-[#10B981] hover:bg-[#059669] text-white font-medium px-3 py-1.5 text-xs rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation min-h-[36px] ml-2 flex-shrink-0"
+                                    title="Buy shares"
+                                  >
+                                    {isPurchasing && purchasingClubId === fixture.home_team_id.toString() ? '...' : 'Buy'}
+                                  </Button>
+                                )
+                              )}
+                            </div>
+
+                            {/* Score/Time Divider */}
+                            {fixture.status === 'applied' && fixture.home_score !== null ? (
+                              <div className="flex items-center justify-center py-1 mb-2">
+                                <span className="text-gray-500 text-sm">vs</span>
+                              </div>
+                            ) : (
+                              <div className="text-center py-2 mb-2 border-y border-gray-700/30">
+                                <span className="text-sm text-gray-400 font-mono">
+                                  {formatTime(fixture.kickoff_at)}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Away Team Row */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <TeamLogo 
+                                  teamName={fixture.away_team?.name || 'Away Team'} 
+                                  externalId={fixture.away_team?.external_id ? parseInt(fixture.away_team.external_id) : undefined}
+                                  size="sm" 
+                                />
+                                <ClickableTeamName
+                                  teamName={fixture.away_team?.name || 'Away Team'}
+                                  teamId={fixture.away_team_id}
+                                  externalId={fixture.away_team?.external_id ? parseInt(fixture.away_team.external_id) : undefined}
+                                  className="text-sm font-semibold text-white hover:text-trading-primary transition-colors truncate"
+                                />
+                              </div>
+                              {fixture.status === 'applied' && fixture.away_score !== null ? (
+                                <span className={`text-lg font-bold ml-2 ${
+                                  fixture.result === 'away_win' ? 'text-green-400' : 
+                                  fixture.result === 'home_win' ? 'text-gray-400' : 'text-white'
+                                }`}>
+                                  {fixture.away_score}
+                                </span>
+                              ) : (
+                                fixture.away_team_id && (
+                                  <Button
+                                    onClick={() => handlePurchaseClick(
+                                      fixture.away_team_id,
+                                      fixture.away_team?.name || 'Away Team',
+                                      fixture.away_team?.external_id ? parseInt(fixture.away_team.external_id) : undefined
+                                    )}
+                                    size="sm"
+                                    disabled={isPurchasing || purchasingClubId === fixture.away_team_id.toString()}
+                                    className="bg-[#10B981] hover:bg-[#059669] text-white font-medium px-3 py-1.5 text-xs rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation min-h-[36px] ml-2 flex-shrink-0"
+                                    title="Buy shares"
+                                  >
+                                    {isPurchasing && purchasingClubId === fixture.away_team_id.toString() ? '...' : 'Buy'}
+                                  </Button>
+                                )
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Desktop/Tablet Layout */}
+                        <div className="hidden md:flex items-center justify-between gap-4">
                           {/* Left: Matchday & Status */}
                           <div className="flex items-center gap-3 min-w-[100px]">
                             <div className="text-xs text-gray-500 font-mono">
@@ -371,7 +488,7 @@ const MatchResultsPage: React.FC = () => {
                                   )}
                                   size="sm"
                                   disabled={isPurchasing || purchasingClubId === fixture.home_team_id.toString()}
-                                  className="bg-[#10B981] hover:bg-[#059669] text-white font-medium px-2 py-0.5 text-xs rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed h-6"
+                                  className="bg-[#10B981] hover:bg-[#059669] text-white font-medium px-2 py-1 text-xs rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed h-7 touch-manipulation"
                                   title="Buy shares"
                                 >
                                   {isPurchasing && purchasingClubId === fixture.home_team_id.toString() ? '...' : 'Buy'}
@@ -437,7 +554,7 @@ const MatchResultsPage: React.FC = () => {
                                   )}
                                   size="sm"
                                   disabled={isPurchasing || purchasingClubId === fixture.away_team_id.toString()}
-                                  className="bg-[#10B981] hover:bg-[#059669] text-white font-medium px-2 py-0.5 text-xs rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed h-6"
+                                  className="bg-[#10B981] hover:bg-[#059669] text-white font-medium px-2 py-1 text-xs rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed h-7 touch-manipulation"
                                   title="Buy shares"
                                 >
                                   {isPurchasing && purchasingClubId === fixture.away_team_id.toString() ? '...' : 'Buy'}
