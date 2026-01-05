@@ -17,7 +17,7 @@ const MatchResultsPage: React.FC = () => {
   const { refreshWalletBalance } = useAuth();
   const [fixtures, setFixtures] = useState<DatabaseFixtureWithTeams[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'finished' | 'upcoming'>('all');
+  const [filter, setFilter] = useState<'all' | 'finished' | 'upcoming'>('upcoming');
   const [confirmationData, setConfirmationData] = useState<{
     clubId: string;
     clubName: string;

@@ -21,9 +21,18 @@ const TransactionHistoryModal: React.FC<TransactionHistoryModalProps> = ({
   externalId,
   transactions
 }) => {
-  const totalUnits = transactions.reduce((sum, t) => sum + t.units, 0);
-  const totalValue = transactions.reduce((sum, t) => sum + t.totalValue, 0);
-  const avgPrice = totalUnits > 0 ? totalValue / totalUnits : 0;
+  // Calculate total units: add buys, subtract sells
+  const totalUnits = transactions.reduce((sum, t) => {
+    return t.orderType === 'BUY' ? sum + t.units : sum - t.units;
+  }, 0);
+  
+  // Calculate total invested: only sum buy transactions (sells reduce investment)
+  const totalInvested = transactions.reduce((sum, t) => {
+    return t.orderType === 'BUY' ? sum + t.totalValue : sum - t.totalValue;
+  }, 0);
+  
+  // Average price is based on net investment and net units
+  const avgPrice = totalUnits > 0 ? totalInvested / totalUnits : 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -48,7 +57,7 @@ const TransactionHistoryModal: React.FC<TransactionHistoryModalProps> = ({
             </div>
             <div className="text-center">
               <p className="text-gray-400 mb-1">Total Invested</p>
-              <p className="font-bold text-white">{formatCurrency(totalValue)}</p>
+              <p className="font-bold text-white">{formatCurrency(totalInvested)}</p>
             </div>
             <div className="text-center">
               <p className="text-gray-400 mb-1">Average Price</p>

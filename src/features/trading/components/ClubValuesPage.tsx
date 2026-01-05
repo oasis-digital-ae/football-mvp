@@ -388,10 +388,6 @@ export const ClubValuesPage: React.FC = () => {
         <div>
           <h1 className="text-lg sm:text-xl md:text-2xl font-bold">The Premier League</h1>
         </div>
-        <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
-          <div className="w-1.5 h-1.5 bg-[#10B981] rounded-full animate-pulse"></div>
-          <span>Live</span>
-        </div>
       </div>
 
       {/* Main Marketplace Table - Clean Professional Style */}
@@ -596,6 +592,9 @@ export const ClubValuesPage: React.FC = () => {
                             userId={user?.id}
                             fixtures={fixtures}
                             teams={memoizedTeams}
+                            launchPrice={club.launchValue}
+                            currentPrice={club.currentValue}
+                            currentPercentChange={club.percentChange}
                           />
                         </td>
                       </tr>
@@ -611,7 +610,7 @@ export const ClubValuesPage: React.FC = () => {
           <div className="md:hidden -mx-3 sm:-mx-4">
             {/* Mobile Table Header */}
             <div className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur-sm border-b border-gray-700/50">
-              <div className="grid grid-cols-[28px_minmax(0,1fr)_32px_65px_50px] gap-1.5 px-3 py-2 text-[10px] font-semibold text-gray-400 items-center">
+              <div className="grid grid-cols-[28px_minmax(0,1fr)_65px_50px_50px] gap-1.5 px-3 py-2 text-[10px] font-semibold text-gray-400 items-center">
                   <div className="text-center">#</div>
                   <button
                     onClick={() => {
@@ -631,7 +630,6 @@ export const ClubValuesPage: React.FC = () => {
                       <ArrowUpDown className="h-2.5 w-2.5 opacity-20" />
                     )}
                   </button>
-                  <div className="text-center">Pl</div>
                   <button
                     onClick={() => {
                       if (sortField === 'price') {
@@ -645,6 +643,24 @@ export const ClubValuesPage: React.FC = () => {
                   >
                     <span>Price</span>
                     {sortField === 'price' ? (
+                      sortDirection === 'asc' ? <ArrowUp className="h-2.5 w-2.5" /> : <ArrowDown className="h-2.5 w-2.5" />
+                    ) : (
+                      <ArrowUpDown className="h-2.5 w-2.5 opacity-20" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (sortField === 'change') {
+                        setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                      } else {
+                        setSortField('change');
+                        setSortDirection('desc');
+                      }
+                    }}
+                    className="flex items-center justify-center gap-1 hover:text-white transition-colors w-full"
+                  >
+                    <span>%</span>
+                    {sortField === 'change' ? (
                       sortDirection === 'asc' ? <ArrowUp className="h-2.5 w-2.5" /> : <ArrowDown className="h-2.5 w-2.5" />
                     ) : (
                       <ArrowUpDown className="h-2.5 w-2.5 opacity-20" />
@@ -693,7 +709,7 @@ export const ClubValuesPage: React.FC = () => {
                     return (
                       <React.Fragment key={club.id}>
                         <div className="border-b border-gray-700/30 last:border-b-0">
-                          <div className="grid grid-cols-[28px_minmax(0,1fr)_32px_65px_50px] gap-1.5 px-3 py-2 items-center active:bg-gray-700/30 transition-colors touch-manipulation">
+                          <div className="grid grid-cols-[28px_minmax(0,1fr)_65px_50px_50px] gap-1.5 px-3 py-2 items-center active:bg-gray-700/30 transition-colors touch-manipulation">
                             {/* Rank */}
                             <div className="text-center text-[11px] font-medium text-gray-400 flex-shrink-0">
                               {index + 1}
@@ -721,14 +737,14 @@ export const ClubValuesPage: React.FC = () => {
                               </button>
                             </div>
                             
-                            {/* Games Played */}
-                            <div className="text-center text-[11px] font-medium text-gray-400 flex-shrink-0">
-                              {getGamesPlayed(club.id)}
-                            </div>
-                            
                             {/* Price */}
                             <div className="text-center font-mono font-semibold text-[11px] text-white flex-shrink-0 whitespace-nowrap">
                               {formatCurrency(club.currentValue)}
+                            </div>
+                            
+                            {/* Percent Change */}
+                            <div className={`text-center font-semibold text-[11px] flex-shrink-0 ${club.percentChange === 0 ? 'text-gray-400' : club.percentChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {club.percentChange > 0 ? '+' : ''}{formatPercent(club.percentChange)}
                             </div>
                             
                             {/* Buy Button */}
@@ -753,18 +769,18 @@ export const ClubValuesPage: React.FC = () => {
                   {/* Mobile Summary Stats */}
                   <div className="md:hidden border-b border-gray-700/30 pb-3 mb-3">
                     <div className="grid grid-cols-3 gap-2 px-2">
-                      {/* Gain/Loss */}
+                      {/* Games Played */}
                       <div className="bg-gray-700/20 rounded p-2 text-center">
-                        <div className="text-[9px] text-gray-500 uppercase tracking-wide mb-0.5">Gain/Loss</div>
-                        <div className={`text-xs font-semibold ${club.percentChange === 0 ? 'text-gray-400' : club.percentChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {club.percentChange > 0 ? '+' : ''}{formatPercent(club.percentChange)}
+                        <div className="text-[9px] text-gray-500 uppercase tracking-wide mb-0.5">Games</div>
+                        <div className="text-xs font-semibold text-white">
+                          {getGamesPlayed(club.id)}
                         </div>
                       </div>
                       
                       {/* Market Cap */}
                       <div className="bg-gray-700/20 rounded p-2 text-center">
                         <div className="text-[9px] text-gray-500 uppercase tracking-wide mb-0.5">Market Cap</div>
-                        <div className="text-xs font-mono font-semibold text-white">
+                        <div className="text-xs font-mono font-semibold text-white truncate">
                           {formatCurrency(club.marketCap)}
                         </div>
                       </div>
@@ -794,6 +810,8 @@ export const ClubValuesPage: React.FC = () => {
                                 fixtures={fixtures}
                                 teams={memoizedTeams}
                                 launchPrice={club.launchValue}
+                                currentPrice={club.currentValue}
+                                currentPercentChange={club.percentChange}
                               />
                             </div>
                           </div>

@@ -22,6 +22,8 @@ interface TeamDetailsSlideDownProps {
   fixtures?: DatabaseFixture[];
   teams?: DatabaseTeam[];
   launchPrice?: number; // Launch price from club data for consistent Change calculation
+  currentPrice?: number; // Current price from club data for consistent Change calculation
+  currentPercentChange?: number; // Current percent change from club data for consistent display
 }
 
 // Utility functions
@@ -31,8 +33,7 @@ const extractOpponentName = (eventDescription?: string): string => {
   return match?.[1]?.trim() || '';
 };
 
-const processChartData = (events: any[]): ChartDataPoint[] => {
-  const initialStates = events.filter(e => e.ledger_type === 'initial_state');
+const processChartData = (events: any[], launchPrice?: number): ChartDataPoint[] => {
   const matchEvents = events.filter(e => e.ledger_type !== 'initial_state');
   
   const sortedMatches = [...matchEvents].sort((a, b) => 
@@ -41,13 +42,19 @@ const processChartData = (events: any[]): ChartDataPoint[] => {
   
   const chartPoints: ChartDataPoint[] = [];
   
-  // Add initial state first
-  initialStates.forEach((event: any) => {
-    const sharePrice = roundForDisplay(fromCents(event.share_price_after || event.share_price_before || 0));
-    if (sharePrice > 0) {
-      chartPoints.push({ x: 0, y: sharePrice, label: 'Initial' });
-    }
-  });
+  // Always use launch price for initial point if provided, otherwise fall back to initial_state
+  if (launchPrice && launchPrice > 0) {
+    chartPoints.push({ x: 0, y: roundForDisplay(launchPrice), label: 'Initial' });
+  } else {
+    // Fallback: use initial_state events if launch price not provided
+    const initialStates = events.filter(e => e.ledger_type === 'initial_state');
+    initialStates.forEach((event: any) => {
+      const sharePrice = roundForDisplay(fromCents(event.share_price_after || event.share_price_before || 0));
+      if (sharePrice > 0) {
+        chartPoints.push({ x: 0, y: sharePrice, label: 'Initial' });
+      }
+    });
+  }
   
   // Add match events in chronological order
   sortedMatches.forEach((event: any) => {
@@ -75,7 +82,9 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
   userId,
   fixtures: parentFixtures,
   teams: parentTeams,
-  launchPrice
+  launchPrice,
+  currentPrice,
+  currentPercentChange
 }) => {
   const [activeTab, setActiveTab] = useState<'matches' | 'chart'>('matches');
   const [matchHistory, setMatchHistory] = useState<any[]>([]);
@@ -102,7 +111,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
 
       if (error) throw error;
       
-      const chartPoints = data && data.length > 0 ? processChartData(data) : [];
+      const chartPoints = data && data.length > 0 ? processChartData(data, launchPrice) : [];
       setChartData(chartPoints);
     } catch (error) {
       if (process.env.NODE_ENV === 'development') console.error('Error loading chart data:', error);
@@ -110,7 +119,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
     } finally {
       setLoading(prev => ({ ...prev, chart: false }));
     }
-  }, [teamId]);
+  }, [teamId, launchPrice]);
 
   const loadMatchesData = useCallback(async () => {
     if (!isOpen || !teamId) return;
@@ -372,6 +381,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                       )}
                                     </td>
                                     <td className={`px-3 py-2.5 text-xs font-semibold ${
+                                      event.matchResult === 'draw' ? 'text-white' :
                                       event.priceImpactPercent >= 0 ? 'price-positive' : 'price-negative'
                                     }`} style={{ textAlign: 'center' }}>
                                       {event.priceImpactPercent >= 0 ? '+' : ''}{event.priceImpactPercent.toFixed(2)}%
@@ -439,6 +449,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                           </p>
                                         )}
                                         <p className={`text-[11px] sm:text-xs font-bold ${
+                                          event.matchResult === 'draw' ? 'text-white' :
                                           isPositive ? 'text-[#10B981]' : 'text-[#EF4444]'
                                         }`}>
                                           {isPositive ? '+' : ''}{event.priceImpactPercent.toFixed(1)}%
@@ -465,11 +476,16 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                         <>
                           {/* Chart Summary - Mobile Optimized */}
                           {(() => {
-                            // Calculate change using launch price if provided, otherwise use chart initial price
-                            const initialPrice = launchPrice ?? chartData.find(point => point.x === 0)?.y ?? chartData[0]?.y ?? 0;
-                            const latestPrice = chartData[chartData.length - 1]?.y ?? 0;
-                            const changePercent = calculateLifetimePercentChange(Number(latestPrice), Number(initialPrice));
-                            const isPositive = Number(latestPrice) >= Number(initialPrice);
+                            // Always use launch price for initial price if provided, otherwise fall back to chart data
+                            const chartInitialPrice = chartData.find(point => point.x === 0)?.y ?? chartData[0]?.y ?? 0;
+                            const initialPrice = launchPrice && launchPrice > 0 ? launchPrice : chartInitialPrice;
+                            
+                            // Use current price from props if available (matches marketplace table), otherwise use chart's last point
+                            const latestPrice = currentPrice && currentPrice > 0 ? currentPrice : (chartData[chartData.length - 1]?.y ?? 0);
+                            
+                            // Use current percent change from props if available (matches marketplace table), otherwise calculate from prices
+                            const changePercent = currentPercentChange !== undefined ? currentPercentChange : calculateLifetimePercentChange(Number(latestPrice), Number(initialPrice));
+                            const isPositive = changePercent >= 0;
                             
                             return (
                               <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-3 sm:mb-4">
@@ -490,7 +506,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                 <div className="p-2 sm:p-3 rounded border border-gray-800/30">
                                   <p className="text-[9px] sm:text-xs mb-1" style={{ color: 'hsl(var(--muted-foreground))' }}>Change</p>
                                   <p className={`text-xs sm:text-sm font-semibold ${isPositive ? 'price-positive' : 'price-negative'}`}>
-                                    {`${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(1)}%`}
+                                    {`${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%`}
                                   </p>
                                 </div>
                               </div>
