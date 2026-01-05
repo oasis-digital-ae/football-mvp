@@ -177,10 +177,19 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
 
           {/* Mobile Wallet & User Info */}
           {profile && (
-            <div className="md:hidden flex items-center gap-2 ml-auto">
+            <div className="md:hidden flex items-center gap-1.5 ml-auto">
+              {/* User Name */}
+              <div className="flex items-center gap-1 text-white px-2 py-1.5 text-xs">
+                <User className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="font-medium whitespace-nowrap truncate max-w-[60px] sm:max-w-[80px]">
+                  {profile.first_name || (profile.full_name ? profile.full_name.split(' ')[0] : 'User')}
+                </span>
+              </div>
+              
+              {/* Wallet Balance */}
               <Button
                 onClick={() => setDepositModalOpen(true)}
-                className="flex items-center gap-1 bg-trading-primary hover:bg-trading-primary/80 text-white px-2 py-1.5 text-xs"
+                className="flex items-center gap-1 bg-trading-primary hover:bg-trading-primary/80 text-white px-2 py-1.5 rounded-lg text-xs"
                 size="sm"
               >
                 <Wallet className="w-3.5 h-3.5" />
