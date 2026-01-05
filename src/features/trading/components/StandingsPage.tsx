@@ -94,7 +94,7 @@ const StandingsPage: React.FC = () => {
         <p className="text-gray-400 mt-1 text-sm md:text-base">Season 2025-26</p>
       </div>
 
-      <Card className="md:rounded-lg">
+      <Card className="md:rounded-lg overflow-hidden">
         <CardHeader className="hidden md:block">
           <CardTitle className="flex items-center gap-2">
             <Trophy className="h-5 w-5" />

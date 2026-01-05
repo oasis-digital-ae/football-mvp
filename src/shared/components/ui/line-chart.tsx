@@ -42,10 +42,16 @@ export const LineChart: React.FC<LineChartProps> = ({
   
   React.useEffect(() => {
     const updateSize = () => {
-      const container = document.querySelector('[data-chart-container]') || document.body;
-      const availableWidth = container.clientWidth - 64; // 32px padding on each side
-      const actualWidth = Math.min(width, availableWidth);
-      const actualHeight = Math.max(200, (actualWidth * height) / width);
+      if (!containerRef.current) return;
+      
+      const container = containerRef.current.parentElement;
+      if (!container) return;
+      
+      // Get available width from parent container, accounting for padding
+      const containerRect = container.getBoundingClientRect();
+      const availableWidth = containerRect.width - 32; // Account for padding
+      const actualWidth = Math.min(width, Math.max(300, availableWidth));
+      const actualHeight = Math.max(200, Math.min(height, (actualWidth * height) / width));
       
       setContainerWidth(actualWidth);
       setContainerHeight(actualHeight);
@@ -53,7 +59,20 @@ export const LineChart: React.FC<LineChartProps> = ({
     
     updateSize();
     window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
+    
+    // Use ResizeObserver for better responsiveness
+    let resizeObserver: ResizeObserver | null = null;
+    if (containerRef.current?.parentElement) {
+      resizeObserver = new ResizeObserver(updateSize);
+      resizeObserver.observe(containerRef.current.parentElement);
+    }
+    
+    return () => {
+      window.removeEventListener('resize', updateSize);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+    };
   }, [width, height]);
   if (data.length === 0) {
     return (
@@ -153,8 +172,14 @@ export const LineChart: React.FC<LineChartProps> = ({
   }
 
   return (
-    <div className="w-full p-1 relative" data-chart-container ref={containerRef}>
-      <svg width={containerWidth} height={containerHeight} viewBox={`0 0 ${containerWidth} ${containerHeight}`}>
+    <div className="w-full relative" data-chart-container ref={containerRef} style={{ minWidth: '100%' }}>
+      <svg 
+        width="100%" 
+        height={containerHeight} 
+        viewBox={`0 0 ${containerWidth} ${containerHeight}`}
+        preserveAspectRatio="xMidYMid meet"
+        className="overflow-visible"
+      >
         {/* Subtle area fill */}
         <defs>
           <linearGradient id="chartBg" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -178,7 +203,7 @@ export const LineChart: React.FC<LineChartProps> = ({
                 key={`h-${index}`}
                 x1={50}
                 y1={label.y}
-                x2={width - 30}
+                x2={containerWidth - 30}
                 y2={label.y}
                 stroke="rgb(75 85 99)"
                 strokeWidth="1"
@@ -188,7 +213,7 @@ export const LineChart: React.FC<LineChartProps> = ({
             
             {/* Vertical grid lines */}
             {Array.from({ length: Math.min(8, data.length) }).map((_, index) => {
-              const x = 50 + ((width - 80) * index) / (Math.min(8, data.length) - 1);
+              const x = 50 + ((containerWidth - 80) * index) / (Math.min(8, data.length) - 1);
               return (
                 <line
                   key={`v-${index}`}
@@ -215,7 +240,7 @@ export const LineChart: React.FC<LineChartProps> = ({
                 x={45}
                 y={label.y + 4}
                 textAnchor="end"
-                fontSize="11"
+                fontSize="10"
                 fill="rgb(107 114 128)"
                 className="font-medium"
               >
@@ -286,9 +311,9 @@ export const LineChart: React.FC<LineChartProps> = ({
               <text
                 key={index}
                 x={scaleX(point.x)}
-                y={height - 10}
+                y={containerHeight - 10}
                 textAnchor="middle"
-                fontSize="11"
+                fontSize="10"
                 fill="rgb(107 114 128)"
                 className="font-medium"
               >
@@ -321,8 +346,8 @@ export const LineChart: React.FC<LineChartProps> = ({
       )}
       
       {/* Minimal legend */}
-      <div className="flex justify-center mt-4">
-        <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
+      <div className="flex justify-center mt-2 sm:mt-4">
+        <div className="flex items-center text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
           <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
           <span className="mr-3">Gain</span>
           <div className="w-2 h-2 bg-red-500 rounded-full mr-1"></div>

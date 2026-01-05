@@ -497,16 +497,18 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                             );
                           })()}
 
-                          {/* Chart Container */}
-                          <div className="rounded border border-gray-800/30 p-4 bg-secondary/10">
-                            <LineChart 
-                              data={chartData.length > 50 ? chartData.slice(-50) : chartData}
-                              width={chartData.length > 20 ? 600 : 800}
-                              height={300}
-                              color="#10b981"
-                              showGrid={chartData.length <= 20}
-                              showAxes={true}
-                            />
+                          {/* Chart Container - Mobile Responsive */}
+                          <div className="rounded border border-gray-800/30 p-2 sm:p-4 bg-secondary/10 -mx-2 sm:mx-0">
+                            <div className="w-full overflow-x-auto">
+                              <LineChart 
+                                data={chartData.length > 50 ? chartData.slice(-50) : chartData}
+                                width={400}
+                                height={250}
+                                color="#10b981"
+                                showGrid={chartData.length <= 20}
+                                showAxes={true}
+                              />
+                            </div>
                           </div>
                         </>
                       )}
