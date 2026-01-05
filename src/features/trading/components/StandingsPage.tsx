@@ -89,7 +89,7 @@ const StandingsPage: React.FC = () => {
 
   return (
     <div className="md:p-4 lg:p-6 space-y-3 sm:space-y-4 md:space-y-6 w-full max-w-full overflow-x-hidden">
-      <div className="px-2 md:px-0">
+      <div className="px-3 md:px-0">
         <h1 className="text-lg sm:text-xl md:text-3xl font-bold text-white">Premier League Standings</h1>
         <p className="text-gray-400 mt-1 text-sm md:text-base">Season 2025-26</p>
       </div>
@@ -172,7 +172,7 @@ const StandingsPage: React.FC = () => {
           </div>
 
           {/* Mobile Table Layout - Compact Premier League Style */}
-          <div className="md:hidden -mx-3 sm:-mx-4">
+          <div className="md:hidden -mx-4 sm:-mx-4">
             {/* Mobile Table Header */}
             <div className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur-sm border-b border-gray-700/50">
               <div className="grid grid-cols-[35px_minmax(0,1fr)_28px_28px_28px_40px_32px] gap-1 px-2 py-2 text-[10px] font-semibold text-gray-400 items-center">
