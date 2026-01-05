@@ -1,12 +1,15 @@
 import React from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader } from '@/shared/components/ui/dialog';
 import { Transaction } from '@/shared/constants/clubs';
 import { formatCurrency, formatNumber } from '@/shared/lib/formatters';
+import TeamLogo from '@/shared/components/TeamLogo';
 
 interface TransactionHistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   clubName: string;
+  clubId?: string;
+  externalId?: number;
   transactions: Transaction[];
 }
 
@@ -14,6 +17,8 @@ const TransactionHistoryModal: React.FC<TransactionHistoryModalProps> = ({
   isOpen,
   onClose,
   clubName,
+  clubId,
+  externalId,
   transactions
 }) => {
   const totalUnits = transactions.reduce((sum, t) => sum + t.units, 0);
@@ -22,24 +27,32 @@ const TransactionHistoryModal: React.FC<TransactionHistoryModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-gray-800 border-gray-700 text-white max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="text-xl">{clubName} - Transaction History</DialogTitle>
+      <DialogContent className="bg-gray-800 border-gray-700 text-white max-w-2xl max-w-[calc(100vw-1rem)] max-h-[calc(100vh-1rem)] max-h-[calc(100dvh-1rem)] overflow-y-auto">
+        <DialogHeader className="pb-4 border-b border-gray-700/50 mb-4 pr-12">
+          <div className="flex items-center gap-3 pr-8">
+            <TeamLogo 
+              teamName={clubName} 
+              externalId={externalId}
+              size="md"
+              className="flex-shrink-0"
+            />
+            <h2 className="text-xl font-bold text-white">Transaction History</h2>
+          </div>
         </DialogHeader>
         
-        <div className="mb-4 p-4 bg-gray-700 rounded">
+        <div className="mb-4 p-4 bg-gray-700/50 rounded-lg">
           <div className="grid grid-cols-3 gap-4 text-sm">
-            <div>
-              <p className="text-gray-400">Total Units</p>
-              <p className="font-bold">{formatNumber(totalUnits)}</p>
+            <div className="text-center">
+              <p className="text-gray-400 mb-1">Total Units</p>
+              <p className="font-bold text-white">{formatNumber(totalUnits)}</p>
             </div>
-            <div>
-              <p className="text-gray-400">Total Invested</p>
-              <p className="font-bold">{formatCurrency(totalValue)}</p>
+            <div className="text-center">
+              <p className="text-gray-400 mb-1">Total Invested</p>
+              <p className="font-bold text-white">{formatCurrency(totalValue)}</p>
             </div>
-            <div>
-              <p className="text-gray-400">Average Price</p>
-              <p className="font-bold">{formatCurrency(avgPrice)}</p>
+            <div className="text-center">
+              <p className="text-gray-400 mb-1">Average Price</p>
+              <p className="font-bold text-white">{formatCurrency(avgPrice)}</p>
             </div>
           </div>
         </div>

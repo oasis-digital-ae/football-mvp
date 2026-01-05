@@ -750,41 +750,41 @@ export const ClubValuesPage: React.FC = () => {
                         <div className="slide-down-panel" data-open={selectedClub === club.id}>
                           <div className="slide-down-panel-inner">
                             <div className="slide-down-panel-content">
-                              {/* Mobile Summary Stats */}
-                              <div className="md:hidden border-b border-gray-700/30 pb-3 mb-3">
-                                <div className="grid grid-cols-3 gap-2 px-2">
-                                  {/* Gain/Loss */}
-                                  <div className="bg-gray-700/20 rounded p-2">
-                                    <div className="text-[9px] text-gray-500 uppercase tracking-wide mb-0.5">Gain/Loss</div>
-                                    <div className={`text-xs font-semibold ${club.percentChange === 0 ? 'text-gray-400' : club.percentChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                      {club.percentChange > 0 ? '+' : ''}{formatPercent(club.percentChange)}
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Market Cap */}
-                                  <div className="bg-gray-700/20 rounded p-2">
-                                    <div className="text-[9px] text-gray-500 uppercase tracking-wide mb-0.5">Market Cap</div>
-                                    <div className="text-xs font-mono font-semibold text-white truncate">
-                                      {formatCurrency(club.marketCap)}
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Closes Time */}
-                                  <div className="bg-gray-700/20 rounded p-2">
-                                    <div className="text-[9px] text-gray-500 uppercase tracking-wide mb-0.5">Closes</div>
-                                    <div className="text-[10px] font-mono text-gray-300 truncate">
-                                      {(() => {
-                                        const status = buyWindowStatuses.get(club.id);
-                                        if (!status?.nextCloseTime) {
-                                          return <span className="text-gray-500">—</span>;
-                                        }
-                                        const deadline = formatTradingDeadline(status.nextCloseTime);
-                                        return deadline ? deadline.split(', ')[1] : '—'; // Show only time part
-                                      })()}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
+                  {/* Mobile Summary Stats */}
+                  <div className="md:hidden border-b border-gray-700/30 pb-3 mb-3">
+                    <div className="grid grid-cols-3 gap-2 px-2">
+                      {/* Gain/Loss */}
+                      <div className="bg-gray-700/20 rounded p-2 text-center">
+                        <div className="text-[9px] text-gray-500 uppercase tracking-wide mb-0.5">Gain/Loss</div>
+                        <div className={`text-xs font-semibold ${club.percentChange === 0 ? 'text-gray-400' : club.percentChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {club.percentChange > 0 ? '+' : ''}{formatPercent(club.percentChange)}
+                        </div>
+                      </div>
+                      
+                      {/* Market Cap */}
+                      <div className="bg-gray-700/20 rounded p-2 text-center">
+                        <div className="text-[9px] text-gray-500 uppercase tracking-wide mb-0.5">Market Cap</div>
+                        <div className="text-xs font-mono font-semibold text-white">
+                          {formatCurrency(club.marketCap)}
+                        </div>
+                      </div>
+                      
+                      {/* Closes Time */}
+                      <div className="bg-gray-700/20 rounded p-2 text-center">
+                        <div className="text-[9px] text-gray-500 uppercase tracking-wide mb-0.5">Closes</div>
+                        <div className="text-[10px] font-mono text-gray-300">
+                          {(() => {
+                            const status = buyWindowStatuses.get(club.id);
+                            if (!status?.nextCloseTime) {
+                              return <span className="text-gray-500">—</span>;
+                            }
+                            const deadline = formatTradingDeadline(status.nextCloseTime);
+                            return deadline ? deadline.split(', ')[1] : '—'; // Show only time part
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                               
                               <TeamDetailsSlideDown
                                 isOpen={selectedClub === club.id}

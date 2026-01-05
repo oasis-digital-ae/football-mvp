@@ -17,7 +17,7 @@ import ClickableTeamName from '@/shared/components/ClickableTeamName';
 
 const PortfolioPage: React.FC = () => {
   const { portfolio, getTransactionsByClub, sellClub, clubs } = useContext(AppContext);
-  const [selectedClub, setSelectedClub] = useState<{ id: string; name: string } | null>(null);
+  const [selectedClub, setSelectedClub] = useState<{ id: string; name: string; externalId?: number } | null>(null);
   const [sellModalData, setSellModalData] = useState<{
     clubId: string;
     clubName: string;
@@ -43,8 +43,13 @@ const PortfolioPage: React.FC = () => {
   }, [portfolio]);
 
   const handleClubClick = useCallback((clubId: string, clubName: string) => {
-    setSelectedClub({ id: clubId, name: clubName });
-  }, []);
+    const club = clubs.find(c => c.id === clubId);
+    setSelectedClub({ 
+      id: clubId, 
+      name: clubName,
+      externalId: club?.externalId ? parseInt(club.externalId) : undefined
+    });
+  }, [clubs]);
 
   const handleCloseModal = useCallback(() => {
     setSelectedClub(null);
@@ -367,6 +372,8 @@ const PortfolioPage: React.FC = () => {
           isOpen={!!selectedClub}
           onClose={handleCloseModal}
           clubName={selectedClub.name}
+          clubId={selectedClub.id}
+          externalId={selectedClub.externalId}
           transactions={getTransactionsByClub(selectedClub.id)}
         />
       )}
