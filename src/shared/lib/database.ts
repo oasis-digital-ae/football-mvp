@@ -23,6 +23,9 @@ import type { DatabaseOrder } from './services/orders.service';
 import type { DatabaseTransferLedger } from './services/transfers.service';
 import type { DatabasePositionWithTeam, DatabaseOrderWithTeam } from '@/shared/types/database.types';
 
+// Re-export DatabaseFixtureWithTeams for use in other files
+export type { DatabaseFixtureWithTeams };
+
 // Import and re-export all services from services module
 export { 
   teamsService, 
@@ -42,7 +45,6 @@ export type {
 };
 
 export type {
-  DatabaseFixtureWithTeams,
   DatabasePositionWithTeam,
   DatabaseOrderWithTeam
 } from '@/shared/types/database.types';
@@ -171,6 +173,10 @@ export const convertPositionToPortfolioItem = (position: DatabasePositionWithTea
   const profitLoss = calculateProfitLoss(currentPrice, avgCost) * position.quantity;
   const totalValue = calculateTotalValue(currentPrice, position.quantity);
   
+  // Calculate purchase market cap (full precision, no rounding)
+  // This is the market cap at the time of purchase for accurate calculations
+  const purchaseMarketCapPrecise = marketCapDollars; // Use current market cap as approximation
+  
   return {
     clubId: position.team_id.toString(),
     clubName: position.team.name,
@@ -178,7 +184,8 @@ export const convertPositionToPortfolioItem = (position: DatabasePositionWithTea
     purchasePrice: avgCost, // Already rounded to 2 decimals by calculateAverageCost
     currentPrice: currentPrice, // Already rounded to 2 decimals by calculateSharePrice
     totalValue: totalValue, // Already rounded to 2 decimals by calculateTotalValue
-    profitLoss: roundToTwoDecimals(profitLoss) // Round final P&L to ensure 2 decimals
+    profitLoss: roundToTwoDecimals(profitLoss), // Round final P&L to ensure 2 decimals
+    purchaseMarketCapPrecise: purchaseMarketCapPrecise
   };
 };
 

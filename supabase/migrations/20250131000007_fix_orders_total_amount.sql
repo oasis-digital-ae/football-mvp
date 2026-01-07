@@ -10,3 +10,5 @@ COMMENT ON TABLE orders IS 'total_amount is calculated as ROUND(price_per_share,
 
 
 
+
+

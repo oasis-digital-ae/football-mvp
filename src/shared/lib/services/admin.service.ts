@@ -2,6 +2,7 @@
 import { supabase } from '../supabase';
 import { logger } from '../logger';
 import { auditService } from './audit.service';
+import { fromCents } from '../utils/decimal';
 import type { 
   SystemStats, 
   TeamMarketCapOverview, 
@@ -57,7 +58,7 @@ export const adminService = {
       if (cashError) throw cashError;
 
       // Convert cents to dollars: total_amount is now BIGINT (cents)
-      const totalCashInjected = (cashData || []).reduce((sum, order) => sum + (Number(order.total_amount || 0) / 100), 0);
+      const totalCashInjected = (cashData || []).reduce((sum, order) => sum + fromCents(order.total_amount || 0).toNumber(), 0);
 
       // Get total active users (users with positions > 0)
       const { data: usersData, error: usersError } = await supabase
@@ -80,7 +81,7 @@ export const adminService = {
       const totalTradesExecuted = tradesData?.length || 0;
       // Calculate average trade size from all trades (BUY and SELL)
       // Convert cents to dollars: total_amount is now BIGINT (cents)
-      const totalTradeVolume = (tradesData || []).reduce((sum, order) => sum + (Number(order.total_amount || 0) / 100), 0);
+      const totalTradeVolume = (tradesData || []).reduce((sum, order) => sum + fromCents(order.total_amount || 0).toNumber(), 0);
       const averageTradeSize = totalTradesExecuted > 0 ? totalTradeVolume / totalTradesExecuted : 0;
 
       // Get market cap overview by team (Fixed Shares Model)
@@ -109,7 +110,7 @@ export const adminService = {
       // Convert cents to dollars: total_invested is now BIGINT (cents)
       (investmentsData || []).forEach(investment => {
         const current = teamInvestments.get(investment.team_id) || 0;
-        teamInvestments.set(investment.team_id, current + (Number(investment.total_invested || 0) / 100));
+        teamInvestments.set(investment.team_id, current + fromCents(investment.total_invested || 0).toNumber());
       });
 
       const marketCapOverview: TeamMarketCapOverview[] = (teamsData || []).map(team => {
@@ -118,7 +119,7 @@ export const adminService = {
         // Market cap only changes on match results, not on purchases/sales
         const totalShares = team.total_shares || 1000;
         // Convert cents to dollars: market_cap is now BIGINT (cents)
-        const marketCapDollars = Number(team.market_cap || 0) / 100;
+        const marketCapDollars = fromCents(team.market_cap || 0).toNumber();
         const sharePrice = totalShares > 0 ? marketCapDollars / totalShares : 0;
 
         return {
@@ -186,11 +187,11 @@ export const adminService = {
         
         // Calculate current value from team data (Fixed Shares Model)
         // Convert cents to dollars: market_cap and monetary values are now BIGINT (cents)
-        const teamMarketCapDollars = Number(team.market_cap || 0) / 100;
+        const teamMarketCapDollars = fromCents(team.market_cap || 0).toNumber();
         const teamTotalShares = team.total_shares || 1000; // Fixed at 1000 shares
         const currentSharePrice = teamTotalShares > 0 ? teamMarketCapDollars / teamTotalShares : 0;
         const currentValue = order.quantity * currentSharePrice;
-        const orderTotalAmountDollars = Number(order.total_amount || 0) / 100;
+        const orderTotalAmountDollars = fromCents(order.total_amount || 0).toNumber();
         // For BUY: profitLoss = currentValue - cost
         // For SELL: profitLoss calculation would need cost basis (not calculated here)
         const profitLoss = order.order_type === 'BUY' 
@@ -219,11 +220,11 @@ export const adminService = {
           orderId: order.id,
           orderType: order.order_type,
           shares: order.quantity,
-          pricePerShare: Number(order.price_per_share || 0) / 100, // Convert cents to dollars
+          pricePerShare: fromCents(order.price_per_share || 0).toNumber(), // Convert cents to dollars
           teamName: team.name || 'Unknown',
           executedAt: order.executed_at,
-          marketCapBefore: Number(order.market_cap_before || 0) / 100, // Convert cents to dollars
-          marketCapAfter: Number(order.market_cap_after || 0) / 100, // Convert cents to dollars
+          marketCapBefore: fromCents(order.market_cap_before || 0).toNumber(), // Convert cents to dollars
+          marketCapAfter: fromCents(order.market_cap_after || 0).toNumber(), // Convert cents to dollars
           sharesOutstandingBefore: order.shares_outstanding_before, // This is total_shares (1000) in fixed model
           sharesOutstandingAfter: order.shares_outstanding_after, // This is total_shares (1000) in fixed model
           currentSharePrice: currentSharePrice
@@ -295,10 +296,10 @@ export const adminService = {
         username: order.profiles?.username || 'Unknown',
         teamName: order.teams?.name || 'Unknown',
         // Convert cents to dollars: total_amount, price_per_share, and market_cap fields are BIGINT (cents)
-        total_amount: Number(order.total_amount || 0) / 100,
-        price_per_share: Number(order.price_per_share || 0) / 100,
-        market_cap_before: order.market_cap_before ? Number(order.market_cap_before) / 100 : undefined,
-        market_cap_after: order.market_cap_after ? Number(order.market_cap_after) / 100 : undefined
+        total_amount: fromCents(order.total_amount || 0).toNumber(),
+        price_per_share: fromCents(order.price_per_share || 0).toNumber(),
+        market_cap_before: order.market_cap_before ? fromCents(order.market_cap_before).toNumber() : undefined,
+        market_cap_after: order.market_cap_after ? fromCents(order.market_cap_after).toNumber() : undefined
       }));
     } catch (error) {
       logger.error('Error fetching trade history:', error);
@@ -371,10 +372,10 @@ export const adminService = {
             teamName: team.name || 'Unknown',
             orderType: order.order_type as 'BUY' | 'SELL',
             quantity: order.quantity,
-            pricePerShare: Number(order.price_per_share || 0) / 100, // Convert cents to dollars
-            totalAmount: Number(order.total_amount || 0) / 100, // Convert cents to dollars
-            marketCapBefore: Number(order.market_cap_before || 0) / 100, // Convert cents to dollars
-            marketCapAfter: Number(order.market_cap_after || 0) / 100 // Convert cents to dollars
+            pricePerShare: fromCents(order.price_per_share || 0).toNumber(), // Convert cents to dollars
+            totalAmount: fromCents(order.total_amount || 0).toNumber(), // Convert cents to dollars
+            marketCapBefore: fromCents(order.market_cap_before || 0).toNumber(), // Convert cents to dollars
+            marketCapAfter: fromCents(order.market_cap_after || 0).toNumber() // Convert cents to dollars
           } as OrderEvent
         };
       });
@@ -384,7 +385,7 @@ export const adminService = {
         const isHomeTeam = fixture.home_team_id === teamId;
         // Convert cents to dollars: snapshot caps are now BIGINT (cents)
         const marketCapBeforeCents = isHomeTeam ? fixture.snapshot_home_cap : fixture.snapshot_away_cap;
-        const marketCapBefore = Number(marketCapBeforeCents || 0) / 100;
+        const marketCapBefore = fromCents(marketCapBeforeCents || 0).toNumber();
         const marketCapAfter = isHomeTeam ? 
           (fixture.result === 'home_win' ? marketCapBefore * 1.1 : 
            fixture.result === 'away_win' ? marketCapBefore * 0.9 : marketCapBefore) :
@@ -515,7 +516,7 @@ export const adminService = {
         throw new Error(`Failed to fetch teams: ${teamsError.message}`);
       }
       // Convert cents to dollars: market_cap is now BIGINT (cents)
-      const totalPlatformValue = (teams || []).reduce((sum, team) => sum + (Number(team.market_cap || 0) / 100), 0);
+      const totalPlatformValue = (teams || []).reduce((sum, team) => sum + fromCents(team.market_cap || 0).toNumber(), 0);
 
       // Get total user deposits (from wallet_transactions where type = 'deposit')
       const { data: deposits, error: depositsError } = await supabase
@@ -527,7 +528,7 @@ export const adminService = {
         logger.error('Error fetching deposits for financial overview:', depositsError);
         throw new Error(`Failed to fetch deposits: ${depositsError.message}`);
       }
-      const totalUserDeposits = (deposits || []).reduce((sum, tx) => sum + (Number(tx.amount_cents || 0) / 100), 0);
+      const totalUserDeposits = (deposits || []).reduce((sum, tx) => sum + fromCents(tx.amount_cents || 0).toNumber(), 0);
 
       // Get total user wallets (sum of all wallet balances)
       const { data: profiles, error: profilesError } = await supabase
@@ -539,7 +540,7 @@ export const adminService = {
         throw new Error(`Failed to fetch profiles: ${profilesError.message}`);
       }
       // Convert cents to dollars: wallet_balance is now BIGINT (cents)
-      const totalUserWallets = (profiles || []).reduce((sum, profile) => sum + (Number(profile.wallet_balance || 0) / 100), 0);
+      const totalUserWallets = (profiles || []).reduce((sum, profile) => sum + fromCents(profile.wallet_balance || 0).toNumber(), 0);
 
       // Get total invested (sum of all positions.total_invested)
       const { data: positions, error: positionsError } = await supabase
@@ -552,7 +553,7 @@ export const adminService = {
         throw new Error(`Failed to fetch positions: ${positionsError.message}`);
       }
       // Convert cents to dollars: total_invested is now BIGINT (cents)
-      const totalInvested = (positions || []).reduce((sum, pos) => sum + (Number(pos.total_invested || 0) / 100), 0);
+      const totalInvested = (positions || []).reduce((sum, pos) => sum + fromCents(pos.total_invested || 0).toNumber(), 0);
 
       // Platform revenue = total deposits - total wallets (money in system)
       const platformRevenue = totalUserDeposits - totalUserWallets;
@@ -666,7 +667,7 @@ export const adminService = {
           activities.push({
             type: 'trade',
             timestamp: trade.executed_at || trade.created_at,
-            description: `${profile.username || 'User'} ${trade.order_type === 'BUY' ? 'bought' : 'sold'} $${(Number(trade.total_amount || 0) / 100).toFixed(2)} worth of ${team.name || 'shares'}`,
+            description: `${profile.username || 'User'} ${trade.order_type === 'BUY' ? 'bought' : 'sold'} $${fromCents(trade.total_amount || 0).toNumber().toFixed(2)} worth of ${team.name || 'shares'}`,
             user_id: trade.user_id,
             username: profile.username
           });

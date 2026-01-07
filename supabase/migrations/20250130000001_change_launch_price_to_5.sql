@@ -72,3 +72,5 @@ COMMENT ON COLUMN teams.initial_market_cap IS 'Initial market cap: $5,000 ($5/sh
 
 
 
+
+

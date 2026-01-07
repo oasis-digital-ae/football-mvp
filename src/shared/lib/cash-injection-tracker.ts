@@ -160,8 +160,8 @@ export const cashInjectionTracker = {
           shares_purchased: injection.quantity,
           price_per_share: fromCents(injection.price_per_share).toNumber(),
           created_at: injection.created_at,
-          team_name: injection.team?.name || 'Unknown Team',
-          user_email: injection.profile?.username || 'Unknown User',
+          team_name: (injection.team as any)?.name || 'Unknown Team',
+          user_email: (injection.profile as any)?.username || 'Unknown User',
           market_cap_before: fromCents(marketCapData.before).toNumber(),
           market_cap_after: fromCents(marketCapData.after).toNumber()
         };
@@ -179,8 +179,8 @@ export const cashInjectionTracker = {
       if (completedFixtures.length > 0) {
         const fixtureBefore = completedFixtures[completedFixtures.length - 1];
         const opponent = fixtureBefore.home_team_id === teamId 
-          ? fixtureBefore.away_team?.name 
-          : fixtureBefore.home_team?.name;
+          ? (fixtureBefore.away_team as any)?.name 
+          : (fixtureBefore.home_team as any)?.name;
         
         details.fixture_before = {
           id: fixtureBefore.id,
@@ -199,8 +199,8 @@ export const cashInjectionTracker = {
       if (upcomingFixtures.length > 0) {
         const fixtureAfter = upcomingFixtures[0];
         const opponent = fixtureAfter.home_team_id === teamId 
-          ? fixtureAfter.away_team?.name 
-          : fixtureAfter.home_team?.name;
+          ? (fixtureAfter.away_team as any)?.name 
+          : (fixtureAfter.home_team as any)?.name;
         
         details.fixture_after = {
           id: fixtureAfter.id,
@@ -271,8 +271,8 @@ export const cashInjectionTracker = {
       shares_purchased: injection.quantity,
       price_per_share: injection.price_per_share,
       created_at: injection.created_at,
-      team_name: injection.team?.name || 'Unknown Team',
-      user_email: injection.profile?.username || 'Unknown User'
+      team_name: (injection.team as any)?.name || 'Unknown Team',
+      user_email: (injection.profile as any)?.username || 'Unknown User'
     }));
   },
 

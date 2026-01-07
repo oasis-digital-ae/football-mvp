@@ -213,44 +213,44 @@ export const TeamOrderTimeline: React.FC<TeamOrderTimelineProps> = ({
                   {event.type === 'fixture' ? (
                     <div className="space-y-2">
                       <p className="text-sm">
-                        <span className="font-medium">{event.data.homeTeam}</span>
+                        <span className="font-medium">{(event.data as any).homeTeam}</span>
                         {' vs '}
-                        <span className="font-medium">{event.data.awayTeam}</span>
+                        <span className="font-medium">{(event.data as any).awayTeam}</span>
                         {' - '}
                         <span className="font-semibold">
-                          {event.data.homeScore} - {event.data.awayScore}
+                          {(event.data as any).homeScore} - {(event.data as any).awayScore}
                         </span>
                       </p>
                       <div className="flex items-center space-x-2">
-                        {getMarketCapChangeIcon(event.data.marketCapChange)}
-                        <span className={`text-sm font-medium ${getMarketCapChangeColor(event.data.marketCapChange)}`}>
-                          Market Cap: {formatCurrency(event.data.marketCapBefore)} → {formatCurrency(event.data.marketCapAfter)}
+                        {getMarketCapChangeIcon((event.data as any).marketCapChange)}
+                        <span className={`text-sm font-medium ${getMarketCapChangeColor((event.data as any).marketCapChange)}`}>
+                          Market Cap: {formatCurrency((event.data as any).marketCapBefore)} → {formatCurrency((event.data as any).marketCapAfter)}
                           {' '}
-                          ({event.data.marketCapChangePercent > 0 ? '+' : ''}{event.data.marketCapChangePercent.toFixed(2)}%)
+                          ({(event.data as any).marketCapChangePercent > 0 ? '+' : ''}{(event.data as any).marketCapChangePercent.toFixed(2)}%)
                         </span>
                       </div>
                     </div>
                   ) : (
                     <div className="space-y-2">
                       <p className="text-sm">
-                        <span className="font-medium">{event.data.username}</span>
+                        <span className="font-medium">{(event.data as any).username}</span>
                         {' '}
-                        <Badge variant={event.data.orderType === 'BUY' ? 'default' : 'destructive'} className="text-xs">
-                          {event.data.orderType}
+                        <Badge variant={(event.data as any).orderType === 'BUY' ? 'default' : 'destructive'} className="text-xs">
+                          {(event.data as any).orderType}
                         </Badge>
                         {' '}
-                        <span className="font-semibold">{event.data.quantity}</span>
+                        <span className="font-semibold">{(event.data as any).quantity}</span>
                         {' shares of '}
-                        <span className="font-medium">{event.data.teamName}</span>
+                        <span className="font-medium">{(event.data as any).teamName}</span>
                         {' at '}
-                        <span className="font-semibold">{formatCurrency(event.data.pricePerShare)}</span>
+                        <span className="font-semibold">{formatCurrency((event.data as any).pricePerShare)}</span>
                         {' each'}
                       </p>
                       <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                        <span>Total: {formatCurrency(event.data.totalAmount)}</span>
-                        {event.data.marketCapBefore && event.data.marketCapAfter && (
+                        <span>Total: {formatCurrency((event.data as any).totalAmount)}</span>
+                        {(event.data as any).marketCapBefore && (event.data as any).marketCapAfter && (
                           <span>
-                            Market Cap: {formatCurrency(event.data.marketCapBefore)} → {formatCurrency(event.data.marketCapAfter)}
+                            Market Cap: {formatCurrency((event.data as any).marketCapBefore)} → {formatCurrency((event.data as any).marketCapAfter)}
                           </span>
                         )}
                       </div>

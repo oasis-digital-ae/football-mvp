@@ -46,32 +46,32 @@ export const TradeHistoryTable: React.FC = () => {
 
       switch (sortField) {
         case 'executed_at':
-          aValue = new Date(a.executed_at || a.created_at).getTime();
-          bValue = new Date(b.executed_at || b.created_at).getTime();
+          aValue = new Date((a as any).executed_at || (a as any).created_at).getTime();
+          bValue = new Date((b as any).executed_at || (b as any).created_at).getTime();
           break;
         case 'username':
-          aValue = a.username.toLowerCase();
-          bValue = b.username.toLowerCase();
+          aValue = (a as any).username.toLowerCase();
+          bValue = (b as any).username.toLowerCase();
           break;
         case 'teamName':
-          aValue = a.teamName.toLowerCase();
-          bValue = b.teamName.toLowerCase();
+          aValue = (a as any).teamName.toLowerCase();
+          bValue = (b as any).teamName.toLowerCase();
           break;
         case 'order_type':
-          aValue = a.order_type;
-          bValue = b.order_type;
+          aValue = (a as any).order_type;
+          bValue = (b as any).order_type;
           break;
         case 'quantity':
-          aValue = a.quantity;
-          bValue = b.quantity;
+          aValue = (a as any).quantity;
+          bValue = (b as any).quantity;
           break;
         case 'price_per_share':
-          aValue = a.price_per_share;
-          bValue = b.price_per_share;
+          aValue = (a as any).price_per_share;
+          bValue = (b as any).price_per_share;
           break;
         case 'total_amount':
-          aValue = a.total_amount;
-          bValue = b.total_amount;
+          aValue = (a as any).total_amount;
+          bValue = (b as any).total_amount;
           break;
         default:
           return 0;
@@ -100,22 +100,25 @@ export const TradeHistoryTable: React.FC = () => {
       'Market Cap Change'
     ];
 
-    const csvData = trades.map(trade => [
-      new Date(trade.executed_at || trade.created_at).toISOString(),
-      trade.username,
-      trade.teamName,
-      trade.order_type,
-      trade.quantity,
-      trade.price_per_share,
-      trade.total_amount,
-      trade.status,
-      trade.market_cap_before || '',
-      trade.market_cap_after || '',
-      (() => {
-        const change = (trade.market_cap_after || 0) - (trade.market_cap_before || 0);
-        return Math.abs(change) > 0.01 ? change.toFixed(2) : '0.00';
-      })()
-    ]);
+    const csvData = trades.map(trade => {
+      const t = trade as any;
+      return [
+        new Date(t.executed_at || t.created_at).toISOString(),
+        t.username,
+        t.teamName,
+        t.order_type,
+        t.quantity,
+        t.price_per_share,
+        t.total_amount,
+        t.status,
+        t.market_cap_before || '',
+        t.market_cap_after || '',
+        (() => {
+          const change = (t.market_cap_after || 0) - (t.market_cap_before || 0);
+          return Math.abs(change) > 0.01 ? change.toFixed(2) : '0.00';
+        })()
+      ];
+    });
 
     const csvContent = [
       headers.join(','),
@@ -334,61 +337,64 @@ export const TradeHistoryTable: React.FC = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedTrades.map((trade) => (
-                    <TableRow key={trade.id}>
-                      <TableCell>
-                        <div className="text-sm">
-                          {new Date(trade.executed_at || trade.created_at).toLocaleDateString()}
-                          <br />
-                          <span className="text-muted-foreground">
-                            {new Date(trade.executed_at || trade.created_at).toLocaleTimeString()}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <p className="font-medium">{trade.username}</p>
-                      </TableCell>
-                      <TableCell>
-                        <p className="font-medium">{trade.teamName}</p>
-                      </TableCell>
-                      <TableCell>
-                        {getOrderTypeBadge(trade.order_type)}
-                      </TableCell>
-                      <TableCell>
-                        <p className="font-medium">{trade.quantity}</p>
-                      </TableCell>
-                      <TableCell>
-                        <p className="font-medium">{formatCurrency(trade.price_per_share)}</p>
-                      </TableCell>
-                      <TableCell>
-                        <p className="font-semibold">{formatCurrency(trade.total_amount)}</p>
-                        {trade.market_cap_before !== undefined && trade.market_cap_after !== undefined && (
-                          (() => {
-                            // Fixed Shares Model: Market cap doesn't change on purchases/sales
-                            const marketCapChange = Math.abs((trade.market_cap_after || 0) - (trade.market_cap_before || 0));
-                            const hasMarketCapChange = marketCapChange > 0.01; // Only show if actually changed (> 1 cent)
-                            
-                            if (hasMarketCapChange) {
-                              return (
-                                <p className="text-xs text-muted-foreground">
-                                  MC: {formatCurrency(trade.market_cap_before || 0)} → {formatCurrency(trade.market_cap_after || 0)}
-                                </p>
-                              );
-                            } else {
-                              return (
-                                <p className="text-xs text-muted-foreground" title="Market cap only changes on match results, not trades">
-                                  MC: No change
-                                </p>
-                              );
-                            }
-                          })()
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(trade.status)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {sortedTrades.map((trade) => {
+                    const t = trade as any;
+                    return (
+                      <TableRow key={t.id}>
+                        <TableCell>
+                          <div className="text-sm">
+                            {new Date(t.executed_at || t.created_at).toLocaleDateString()}
+                            <br />
+                            <span className="text-muted-foreground">
+                              {new Date(t.executed_at || t.created_at).toLocaleTimeString()}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <p className="font-medium">{t.username}</p>
+                        </TableCell>
+                        <TableCell>
+                          <p className="font-medium">{t.teamName}</p>
+                        </TableCell>
+                        <TableCell>
+                          {getOrderTypeBadge(t.order_type)}
+                        </TableCell>
+                        <TableCell>
+                          <p className="font-medium">{t.quantity}</p>
+                        </TableCell>
+                        <TableCell>
+                          <p className="font-medium">{formatCurrency(t.price_per_share)}</p>
+                        </TableCell>
+                        <TableCell>
+                          <p className="font-semibold">{formatCurrency(t.total_amount)}</p>
+                          {t.market_cap_before !== undefined && t.market_cap_after !== undefined && (
+                            (() => {
+                              // Fixed Shares Model: Market cap doesn't change on purchases/sales
+                              const marketCapChange = Math.abs((t.market_cap_after || 0) - (t.market_cap_before || 0));
+                              const hasMarketCapChange = marketCapChange > 0.01; // Only show if actually changed (> 1 cent)
+                              
+                              if (hasMarketCapChange) {
+                                return (
+                                  <p className="text-xs text-muted-foreground">
+                                    MC: {formatCurrency(t.market_cap_before || 0)} → {formatCurrency(t.market_cap_after || 0)}
+                                  </p>
+                                );
+                              } else {
+                                return (
+                                  <p className="text-xs text-muted-foreground" title="Market cap only changes on match results, not trades">
+                                    MC: No change
+                                  </p>
+                                );
+                              }
+                            })()
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {getStatusBadge(t.status)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

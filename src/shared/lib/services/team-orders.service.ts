@@ -160,7 +160,7 @@ export class TeamOrdersService {
       // Add initial state (assuming initial market cap is stored in team or can be calculated)
       const { data: team } = await supabase
         .from('teams')
-        .select('initial_market_cap, market_cap')
+        .select('initial_market_cap, market_cap, created_at')
         .eq('id', teamId)
         .single();
 
@@ -168,7 +168,7 @@ export class TeamOrdersService {
         // Convert from cents to dollars
         const initialMarketCapDollars = fromCents(team.initial_market_cap || 10000).toNumber(); // Default $100.00 in cents
         timeline.push({
-          date: team.created_at || new Date().toISOString(),
+          date: (team as any).created_at || new Date().toISOString(),
           type: 'initial' as const,
           description: 'Initial State',
           market_cap_before: initialMarketCapDollars,

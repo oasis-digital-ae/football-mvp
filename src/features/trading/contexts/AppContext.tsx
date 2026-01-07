@@ -14,8 +14,8 @@ import { teamStateSnapshotService } from '@/shared/lib/team-state-snapshots';
 import { buyWindowService } from '@/shared/lib/buy-window.service';
 import { realtimeService } from '@/shared/lib/services/realtime.service';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { calculateSharePrice, calculateTotalValue, calculateProfitLoss } from '@/shared/lib/utils/calculations';
-import { toCents, fromCents } from '@/shared/lib/utils/decimal';
+import { calculateSharePrice, calculateTotalValue, calculateProfitLoss, calculateAverageCost } from '@/shared/lib/utils/calculations';
+import { toCents, fromCents, Decimal, roundForDisplay } from '@/shared/lib/utils/decimal';
 
 interface AppContextType {
   sidebarOpen: boolean;
@@ -136,45 +136,7 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
         logger.debug(`Position: Team ${pos.team_id} (${pos.team?.name}), Quantity: ${pos.quantity}, Total Invested: ${pos.total_invested}, Latest: ${pos.is_latest}`);
       });
 
-      // Convert positions to portfolio items - OPTIMIZED with Map lookup
-      const clubMap = new Map(convertedClubs.map(club => [club.id, club]));
-      const portfolio = dbPositions.map((position: DatabasePositionWithTeam) => {
-        const teamId = position.team_id.toString();
-        const teamName = position.team?.name || 'Unknown';
-        const team = clubMap.get(teamId); // O(1) lookup instead of O(n) find
-        
-        // Calculate average cost from total_invested and quantity
-        // Database stores total_invested as BIGINT (cents), convert to dollars first
-        const totalInvestedDollars = fromCents(position.total_invested).toNumber();
-        const avgCost = position.quantity > 0 ? totalInvestedDollars / position.quantity : 0;
-        
-        logger.debug('Portfolio calculation', {
-          teamName,
-          position: { quantity: position.quantity, totalInvested: totalInvestedDollars, avgCost },
-          team: team ? { id: team.id, currentValue: team.currentValue } : 'NOT FOUND',
-          teamId
-        });
-        
-        const currentPrice = team ? team.currentValue : 0;
-        
-        return {
-          clubId: teamId,
-          clubName: teamName,
-          units: position.quantity,
-          purchasePrice: avgCost,
-          currentPrice,
-          totalValue: position.quantity * currentPrice,
-          profitLoss: (currentPrice - avgCost) * position.quantity
-        };
-      });
-      
-      logger.db('Final portfolio calculated', { count: portfolio.length });
-      setPortfolio(portfolio);
-      
-      // Load user transactions from orders table
-      const convertedTransactions: Transaction[] = [];
-      
-      // Get individual transactions from orders table (not positions) - include both BUY and SELL
+      // Get orders first (needed for realized P&L calculation and transactions)
       const { data: userOrders, error: ordersError } = await supabase
         .from('orders')
         .select(`
@@ -184,12 +146,118 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
         .eq('user_id', user.id)
         .eq('status', 'FILLED')
         .in('order_type', ['BUY', 'SELL'])
-        .order('executed_at', { ascending: false });
+        .order('executed_at', { ascending: true }); // Oldest first for cost basis tracking
 
       if (ordersError) {
         logger.error('Error loading user orders:', ordersError);
         throw ordersError;
       }
+
+      // Convert positions to portfolio items - OPTIMIZED with Map lookup
+      // Calculate realized P&L per team from SELL orders (before processing positions)
+      // We need to process orders chronologically to track cost basis
+      const realizedPLByTeam = new Map<string, number>();
+      const teamCostBasis = new Map<string, { totalInvested: Decimal; totalQuantity: Decimal }>();
+      
+      // Process orders chronologically (already sorted oldest first) to track cost basis
+      const sortedOrders = userOrders || [];
+
+      sortedOrders.forEach(order => {
+        const teamId = order.team_id.toString();
+        const orderType = order.order_type;
+        const quantity = fromCents(order.quantity || 0).toNumber();
+        const totalAmount = fromCents(order.total_amount || 0);
+
+        if (orderType === 'BUY') {
+          // Add to cost basis
+          const current = teamCostBasis.get(teamId) || { totalInvested: new Decimal(0), totalQuantity: new Decimal(0) };
+          teamCostBasis.set(teamId, {
+            totalInvested: current.totalInvested.plus(totalAmount),
+            totalQuantity: current.totalQuantity.plus(quantity)
+          });
+        } else if (orderType === 'SELL') {
+          // Calculate realized P&L: (sell_price * quantity) - (cost_basis_for_those_shares)
+          const current = teamCostBasis.get(teamId) || { totalInvested: new Decimal(0), totalQuantity: new Decimal(0) };
+          
+          if (current.totalQuantity.gt(0)) {
+            // Calculate average cost basis at time of sale
+            const avgCostBasis = current.totalInvested.dividedBy(current.totalQuantity);
+            const costBasisForSoldShares = avgCostBasis.times(quantity);
+            const saleProceeds = totalAmount;
+            const realizedPL = saleProceeds.minus(costBasisForSoldShares);
+            
+            // Add to realized P&L for this team
+            const currentRealizedPL = realizedPLByTeam.get(teamId) || 0;
+            realizedPLByTeam.set(teamId, currentRealizedPL + roundForDisplay(realizedPL));
+            
+            // Reduce cost basis (proportional reduction)
+            teamCostBasis.set(teamId, {
+              totalInvested: current.totalInvested.minus(costBasisForSoldShares),
+              totalQuantity: current.totalQuantity.minus(quantity)
+            });
+          }
+        }
+      });
+
+      const clubMap = new Map(convertedClubs.map(club => [club.id, club]));
+      const portfolio = dbPositions.map((position: DatabasePositionWithTeam) => {
+        const teamId = position.team_id.toString();
+        const teamName = position.team?.name || 'Unknown';
+        const team = clubMap.get(teamId); // O(1) lookup instead of O(n) find
+        
+        // Calculate average cost from total_invested and quantity
+        // Database stores total_invested as BIGINT (cents) - use fixed-point arithmetic, no rounding
+        // For display: round to 2 decimals
+        // For calculations: keep full precision
+        const totalInvestedCents = Number(position.total_invested || 0);
+        const avgCostForDisplay = calculateAverageCost(fromCents(totalInvestedCents).toNumber(), position.quantity); // Rounded for display
+        const avgCostPrecise = fromCents(totalInvestedCents).dividedBy(position.quantity); // Full precision Decimal for calculations
+        
+        logger.debug('Portfolio calculation', {
+          teamName,
+          position: { quantity: position.quantity, totalInvested: totalInvestedCents, avgCost: avgCostForDisplay },
+          team: team ? { id: team.id, currentValue: team.currentValue } : 'NOT FOUND',
+          teamId
+        });
+        
+        const currentPrice = team ? team.currentValue : 0;
+        
+        // Use centralized calculation functions for consistency
+        const totalValue = calculateTotalValue(currentPrice, position.quantity);
+        
+        // Calculate unrealized P&L: current_value - total_invested (for current positions)
+        const unrealizedPL = calculateProfitLoss(currentPrice, avgCostForDisplay) * position.quantity;
+        
+        // Get realized P&L from SELL orders (already calculated above)
+        const realizedPL = realizedPLByTeam.get(teamId) || 0;
+        
+        // Total P&L = Unrealized P&L + Realized P&L
+        const profitLoss = unrealizedPL + realizedPL;
+        
+        // Calculate purchase market cap with full precision (no rounding)
+        // purchase_market_cap = (total_invested / quantity) * totalShares
+        // Since total_invested is in cents: purchase_market_cap = (total_invested * totalShares) / (quantity * 100)
+        const totalShares = position.team?.total_shares || 1000;
+        const purchaseMarketCapPrecise = avgCostPrecise.times(totalShares); // Full precision Decimal
+        
+        return {
+          clubId: teamId,
+          clubName: teamName,
+          units: position.quantity,
+          purchasePrice: avgCostForDisplay, // Display: user's actual purchase price (rounded to 2 decimals)
+          currentPrice,
+          totalValue,
+          profitLoss,
+          // Full precision purchase market cap for percentage calculation (no rounding)
+          purchaseMarketCapPrecise: purchaseMarketCapPrecise.toNumber()
+        };
+      });
+      
+      logger.db('Final portfolio calculated', { count: portfolio.length });
+      setPortfolio(portfolio);
+      
+      // Load user transactions from orders table (already fetched above, just convert)
+      const convertedTransactions: Transaction[] = [];
 
       // Convert orders to transactions
       if (userOrders) {

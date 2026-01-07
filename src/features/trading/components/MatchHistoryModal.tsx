@@ -55,8 +55,9 @@ export const MatchHistoryModal: React.FC<MatchHistoryModalProps> = ({
       setTeams(teamsData);
 
       // Filter fixtures for this club that have been completed
+      const clubIdNum = parseInt(clubId);
       const clubFixtures = fixturesData.filter(fixture => 
-        (fixture.home_team_id === clubId || fixture.away_team_id === clubId) &&
+        (fixture.home_team_id === clubIdNum || fixture.away_team_id === clubIdNum) &&
         fixture.status === 'applied' && 
         fixture.result !== 'pending' &&
         fixture.snapshot_home_cap !== null &&
@@ -65,13 +66,13 @@ export const MatchHistoryModal: React.FC<MatchHistoryModalProps> = ({
 
       // Process each fixture to calculate price impacts
       const matchesWithImpacts: MatchWithPriceImpact[] = clubFixtures.map(fixture => {
-        const isHome = fixture.home_team_id === clubId;
+        const isHome = fixture.home_team_id === clubIdNum;
         const opponent = isHome ? 
           teamsData.find(t => t.id === fixture.away_team_id)?.name || 'Unknown' :
           teamsData.find(t => t.id === fixture.home_team_id)?.name || 'Unknown';
 
         // Get current team data to calculate current market cap
-        const currentTeam = teamsData.find(t => t.id === clubId);
+        const currentTeam = teamsData.find(t => t.id === clubIdNum);
         const currentMarketCap = fromCents(currentTeam?.market_cap || 0).toNumber();
 
         // Calculate pre-match market cap from snapshot (convert from cents to dollars)

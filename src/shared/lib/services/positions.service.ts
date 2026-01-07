@@ -321,7 +321,11 @@ export const positionsService = {
     }
 
     const nextFixture = upcomingFixtures[0];
-    const buyCloseTime = new Date(nextFixture.buy_close_at);
+    // Ensure UTC parsing - if no timezone info, treat as UTC
+    const buyCloseTimeStr = nextFixture.buy_close_at;
+    const buyCloseTime = new Date(buyCloseTimeStr.includes('Z') || buyCloseTimeStr.match(/[+-]\d{2}:\d{2}$/) 
+      ? buyCloseTimeStr 
+      : buyCloseTimeStr + 'Z');
     
     if (now > buyCloseTime) {
       return { 

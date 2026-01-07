@@ -54,7 +54,7 @@ export const matchService = {
    */
   async updateFixtureFromAPI(fixtureId: number, externalId: string): Promise<boolean> {
     try {
-      const matchData = await footballApiService.getMatchById(externalId);
+      const matchData = await footballApiService.getMatchDetails(parseInt(externalId));
       
       if (!matchData) {
         logger.warn(`No match data found for external ID: ${externalId}`);
@@ -62,14 +62,14 @@ export const matchService = {
       }
 
       const updateData: any = {
-        home_score: matchData.score.home,
-        away_score: matchData.score.away,
+        home_score: matchData.score.fullTime?.home ?? 0,
+        away_score: matchData.score.fullTime?.away ?? 0,
       };
 
       // Update status based on match state
       if (matchData.status === 'FINISHED') {
         updateData.status = 'completed';
-        updateData.result = this.determineResult(matchData.score.home, matchData.score.away);
+        updateData.result = this.determineResult(matchData.score.fullTime?.home ?? 0, matchData.score.fullTime?.away ?? 0);
       } else if (matchData.status === 'LIVE') {
         updateData.status = 'live';
       }
@@ -195,7 +195,7 @@ export const matchService = {
       for (const fixture of fixturesNeedingSnapshot) {
         try {
           await teamsService.captureMarketCapSnapshot(fixture.id);
-          await fixturesService.markFixtureAsClosed(fixture.id);
+          await fixturesService.markFixtureAsClosed(fixture.id.toString());
           
           logger.info(`✅ Processed kickoff snapshot for ${fixture.home_team?.name} vs ${fixture.away_team?.name}`);
         } catch (error) {

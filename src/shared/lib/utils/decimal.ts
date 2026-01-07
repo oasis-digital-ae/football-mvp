@@ -137,9 +137,11 @@ export function equals(a: Decimal | number | string, b: Decimal | number | strin
  * @returns Sum as Decimal
  */
 export function sum(values: Array<Decimal | number | string | null | undefined>): Decimal {
-  return values.reduce((acc, val) => {
-    return acc.plus(toDecimal(val));
-  }, new Decimal(0));
+  let result = new Decimal(0);
+  for (const val of values) {
+    result = result.plus(toDecimal(val));
+  }
+  return result;
 }
 
 /**

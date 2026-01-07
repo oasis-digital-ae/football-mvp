@@ -21,3 +21,5 @@ COMMENT ON POLICY fixtures_admin_insert ON public.fixtures IS
 
 
 
+
+

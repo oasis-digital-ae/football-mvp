@@ -31,10 +31,11 @@ export interface PortfolioItem {
   clubId: string;
   clubName: string;
   units: number;
-  purchasePrice: number;
+  purchasePrice: number; // Display: user's actual purchase price from total_invested (rounded to 2 decimals)
   currentPrice: number;
   totalValue: number;
   profitLoss: number;
+  purchaseMarketCapPrecise: number; // Full precision purchase market cap for calculations (no rounding)
 }
 
 export interface Transaction {

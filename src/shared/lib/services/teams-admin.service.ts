@@ -2,6 +2,7 @@
 import { supabase } from '../supabase';
 import { logger } from '../logger';
 import { calculateSharePrice, calculateProfitLoss, calculatePercentChange } from '../utils/calculations';
+import { fromCents } from '../utils/decimal';
 
 export interface TeamWithMetrics {
   id: number;
@@ -71,15 +72,15 @@ export const teamsAdminService = {
       // Convert cents to dollars: total_invested is now BIGINT (cents)
       (positions || []).forEach(pos => {
         const current = teamInvestments.get(pos.team_id) || 0;
-        teamInvestments.set(pos.team_id, current + (Number(pos.total_invested || 0) / 100));
+        teamInvestments.set(pos.team_id, current + fromCents(pos.total_invested || 0).toNumber());
       });
 
       // Build team metrics
       // Convert cents to dollars: market_cap is now BIGINT (cents)
       const teamsWithMetrics: TeamWithMetrics[] = (teams || []).map(team => {
         const totalShares = team.total_shares || 1000;
-        const marketCapDollars = Number(team.market_cap || 0) / 100;
-        const launchPriceDollars = Number(team.launch_price || 0) / 100;
+        const marketCapDollars = fromCents(team.market_cap || 0).toNumber();
+        const launchPriceDollars = fromCents(team.launch_price || 0).toNumber();
         // Use centralized calculation function (same as Portfolio page) - rounds to 2 decimals
         const sharePrice = calculateSharePrice(marketCapDollars, totalShares, launchPriceDollars);
         const totalInvested = teamInvestments.get(team.id) || 0;
@@ -127,7 +128,7 @@ export const teamsAdminService = {
       if (!team) throw new Error('Team not found');
 
       // Convert cents to dollars: market_cap is stored as BIGINT (cents)
-      const oldMarketCapDollars = Number(team.market_cap || 0) / 100;
+      const oldMarketCapDollars = fromCents(team.market_cap || 0).toNumber();
 
       // Update market cap - convert dollars to cents (database stores as BIGINT cents)
       const newMarketCapCents = Math.round(newMarketCap * 100);
@@ -233,7 +234,7 @@ export const teamsAdminService = {
       // Convert cents to dollars: market_cap values are now BIGINT (cents)
       const marketCapHistory = (ledgerData || []).map(entry => {
         const totalShares = 1000; // Fixed shares
-        const marketCapDollars = Number(entry.market_cap_after || 0) / 100;
+        const marketCapDollars = fromCents(entry.market_cap_after || 0).toNumber();
         const sharePrice = totalShares > 0 ? marketCapDollars / totalShares : 0;
         return {
           date: entry.event_date,
@@ -256,8 +257,8 @@ export const teamsAdminService = {
         );
 
         // Convert cents to dollars: market_cap values are now BIGINT (cents)
-        const marketCapBefore = ledgerEntry ? Number(ledgerEntry.market_cap_before || 0) / 100 : 0;
-        const marketCapAfter = ledgerEntry ? Number(ledgerEntry.market_cap_after || 0) / 100 : 0;
+        const marketCapBefore = ledgerEntry ? fromCents(ledgerEntry.market_cap_before || 0).toNumber() : 0;
+        const marketCapAfter = ledgerEntry ? fromCents(ledgerEntry.market_cap_after || 0).toNumber() : 0;
         const change = marketCapAfter - marketCapBefore;
         const changePercent = marketCapBefore > 0 ? (change / marketCapBefore) * 100 : 0;
 
@@ -284,7 +285,7 @@ export const teamsAdminService = {
       const topHolders = (positions || []).map(pos => {
         const team = pos.teams as any;
         const totalShares = team.total_shares || 1000;
-        const marketCapDollars = Number(team.market_cap || 0) / 100;
+        const marketCapDollars = fromCents(team.market_cap || 0).toNumber();
         const sharePrice = totalShares > 0 ? marketCapDollars / totalShares : 0;
         const currentValue = Number(pos.quantity) * sharePrice;
 
@@ -292,7 +293,7 @@ export const teamsAdminService = {
           user_id: pos.user_id,
           username: (pos.profiles as any)?.username || 'Unknown',
           quantity: Number(pos.quantity),
-          total_invested: Number(pos.total_invested || 0) / 100, // Convert cents to dollars
+          total_invested: fromCents(pos.total_invested || 0).toNumber(), // Convert cents to dollars
           current_value: currentValue
         };
       });

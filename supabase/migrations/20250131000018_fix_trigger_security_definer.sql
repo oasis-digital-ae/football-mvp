@@ -193,3 +193,5 @@ COMMENT ON FUNCTION public.fixture_result_trigger() IS
 
 
 
+
+

@@ -71,3 +71,5 @@ COMMENT ON FUNCTION public.credit_wallet(uuid, bigint, text, text) IS
   'Credits user wallet atomically with row locking. Fixed-point arithmetic: wallet_balance is BIGINT (cents). p_amount_cents should be in cents (e.g., 100000 for $1000). Idempotent if ref is provided.';
 
 
+
+

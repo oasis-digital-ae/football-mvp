@@ -277,3 +277,5 @@ $$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION process_match_result_atomic IS 'CRITICAL: Winner gets exactly transfer_amount_2dec. If drift exists, adjust LOSER cap (not winner). Zero drift guaranteed without stealing from winner.';
 
 
+
+

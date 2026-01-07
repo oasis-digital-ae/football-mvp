@@ -14,6 +14,20 @@ export interface BuyWindowStatus {
 
 export const buyWindowService = {
   /**
+   * Ensure Date is created from UTC timestamp string
+   * If string doesn't have timezone info, treat it as UTC
+   */
+  parseUTCDate(dateString: string): Date {
+    if (!dateString) return new Date();
+    // If already has timezone info (Z or +HH:MM or -HH:MM), use as-is
+    if (dateString.includes('Z') || dateString.match(/[+-]\d{2}:\d{2}$/)) {
+      return new Date(dateString);
+    }
+    // Otherwise, append Z to force UTC interpretation
+    return new Date(dateString + 'Z');
+  },
+
+  /**
    * Calculate buy window status synchronously from fixtures data (instant, no DB call)
    * Trusts fixture status 'closed' which is updated from API and handles extra time correctly
    */
@@ -29,7 +43,7 @@ export const buyWindowService = {
       // But exclude matches with a result (home_win, away_win, draw) - those are finished
       const potentiallyLiveMatch = teamFixtures
         .filter(f => {
-          const kickoff = new Date(f.kickoff_at);
+          const kickoff = this.parseUTCDate(f.kickoff_at);
           const isPastKickoff = now >= kickoff;
           
           // Match is potentially live if:
@@ -42,10 +56,10 @@ export const buyWindowService = {
                  f.status !== 'applied' && 
                  f.status !== 'postponed';
         })
-        .sort((a, b) => new Date(b.kickoff_at).getTime() - new Date(a.kickoff_at).getTime())[0];
+        .sort((a, b) => this.parseUTCDate(b.kickoff_at).getTime() - this.parseUTCDate(a.kickoff_at).getTime())[0];
 
       if (potentiallyLiveMatch) {
-        const matchKickoff = new Date(potentiallyLiveMatch.kickoff_at);
+        const matchKickoff = this.parseUTCDate(potentiallyLiveMatch.kickoff_at);
         
         // If status is 'closed' and result is 'pending', match is definitely live (from API, handles extra time)
         if (potentiallyLiveMatch.status === 'closed' && (!potentiallyLiveMatch.result || potentiallyLiveMatch.result === 'pending')) {
@@ -72,7 +86,7 @@ export const buyWindowService = {
       // SECOND: Check for upcoming fixtures for this team (exclude matches currently in progress)
       const upcomingFixtures = fixtures
         .filter(f => {
-          const kickoff = new Date(f.kickoff_at);
+          const kickoff = this.parseUTCDate(f.kickoff_at);
           
           // Only include fixtures that are:
           // - For this team
@@ -82,7 +96,7 @@ export const buyWindowService = {
                  kickoff > now && // Future matches only
                  f.status === 'scheduled'; // Not live, not finished
         })
-        .sort((a, b) => new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime());
+        .sort((a, b) => this.parseUTCDate(a.kickoff_at).getTime() - this.parseUTCDate(b.kickoff_at).getTime());
 
       if (!upcomingFixtures || upcomingFixtures.length === 0) {
         return {
@@ -92,8 +106,8 @@ export const buyWindowService = {
       }
 
       const nextFixture = upcomingFixtures[0];
-      const buyCloseTime = new Date(nextFixture.buy_close_at);
-      const kickoffTime = new Date(nextFixture.kickoff_at);
+      const buyCloseTime = this.parseUTCDate(nextFixture.buy_close_at);
+      const kickoffTime = this.parseUTCDate(nextFixture.kickoff_at);
 
       if (now >= buyCloseTime) {
         return {
@@ -147,7 +161,7 @@ export const buyWindowService = {
       // If result is 'pending' or null, match is still in progress - trading should be CLOSED
       if (liveMatch && liveMatch.length > 0) {
         const match = liveMatch[0];
-        const matchKickoff = new Date(match.kickoff_at);
+        const matchKickoff = this.parseUTCDate(match.kickoff_at);
         
         // Check if match has a final result (not 'pending')
         const hasFinalResult = match.result && 
@@ -198,7 +212,7 @@ export const buyWindowService = {
               return {
                 isOpen: false,
                 nextCloseTime: undefined,
-                nextKickoffTime: new Date(potentialMatch.kickoff_at),
+                nextKickoffTime: this.parseUTCDate(potentialMatch.kickoff_at),
                 reason: `Trading closed. Match in progress.`
               };
             }
@@ -209,7 +223,7 @@ export const buyWindowService = {
             return {
               isOpen: false,
               nextCloseTime: undefined,
-              nextKickoffTime: new Date(potentialMatch.kickoff_at),
+              nextKickoffTime: this.parseUTCDate(potentialMatch.kickoff_at),
               reason: `Trading closed. Match in progress.`
             };
           }
@@ -218,7 +232,7 @@ export const buyWindowService = {
           return {
             isOpen: false,
             nextCloseTime: undefined,
-            nextKickoffTime: new Date(potentialMatch.kickoff_at),
+            nextKickoffTime: this.parseUTCDate(potentialMatch.kickoff_at),
             reason: `Trading closed. Match in progress.`
           };
         }
@@ -252,8 +266,8 @@ export const buyWindowService = {
       }
       
       const nextFixture = upcomingFixtures[0];
-      const buyCloseTime = new Date(nextFixture.buy_close_at);
-      const kickoffTime = new Date(nextFixture.kickoff_at);
+      const buyCloseTime = this.parseUTCDate(nextFixture.buy_close_at);
+      const kickoffTime = this.parseUTCDate(nextFixture.kickoff_at);
       
       if (now >= buyCloseTime) {
         return {

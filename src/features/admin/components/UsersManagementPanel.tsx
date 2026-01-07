@@ -567,8 +567,9 @@ export const UsersManagementPanel: React.FC = () => {
                             // Use price_per_share from service (calculated from market cap / total shares)
                             // This ensures consistency: quantity * price_per_share = current_value
                             const pricePerShare = pos.price_per_share || (pos.quantity > 0 ? pos.current_value / pos.quantity : 0);
-                            const investedPerShare = calculateAverageCost(pos.total_invested, pos.quantity);
-                            const percentChange = calculatePercentChange(pricePerShare, investedPerShare);
+                            // Use percent_change_from_purchase which is calculated using market cap directly
+                            // This ensures it matches latest match change when shares were bought before the match
+                            const percentChange = pos.percent_change_from_purchase;
                             
                             return (
                               <tr key={index} className="border-b transition-colors hover:bg-muted/50">

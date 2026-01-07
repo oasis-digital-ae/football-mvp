@@ -129,5 +129,40 @@ export const adminManagementService = {
       logger.error('Error during admin migration:', error);
       throw error;
     }
+  },
+
+  /**
+   * Reset a user's password directly (admin only)
+   * This bypasses the password reset email flow
+   */
+  async resetUserPassword(email: string, newPassword: string): Promise<void> {
+    try {
+      // First, find the user by email
+      const { data: users, error: listError } = await supabase.auth.admin.listUsers();
+      if (listError) {
+        logger.error('Failed to list users:', listError);
+        throw listError;
+      }
+
+      const user = users.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+      if (!user) {
+        throw new Error(`User with email ${email} not found`);
+      }
+
+      // Update the user's password directly
+      const { error: updateError } = await supabase.auth.admin.updateUserById(user.id, {
+        password: newPassword
+      });
+
+      if (updateError) {
+        logger.error('Failed to reset password:', updateError);
+        throw updateError;
+      }
+
+      logger.info('Password reset successfully for user:', email);
+    } catch (error) {
+      logger.error('Error resetting password:', error);
+      throw error;
+    }
   }
 };

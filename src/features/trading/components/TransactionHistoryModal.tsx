@@ -11,6 +11,7 @@ interface TransactionHistoryModalProps {
   clubId?: string;
   externalId?: number;
   transactions: Transaction[];
+  averagePrice?: number; // Average cost basis from positions table (total_invested / quantity)
 }
 
 const TransactionHistoryModal: React.FC<TransactionHistoryModalProps> = ({
@@ -19,19 +20,20 @@ const TransactionHistoryModal: React.FC<TransactionHistoryModalProps> = ({
   clubName,
   clubId,
   externalId,
-  transactions
+  transactions,
+  averagePrice
 }) => {
   // Calculate total units: add buys, subtract sells
   const totalUnits = transactions.reduce((sum, t) => {
     return t.orderType === 'BUY' ? sum + t.units : sum - t.units;
   }, 0);
   
-  // Calculate total invested: only sum buy transactions (sells reduce investment)
+  // Calculate net cash invested: total spent on buys - total received from sells
   const totalInvested = transactions.reduce((sum, t) => {
     return t.orderType === 'BUY' ? sum + t.totalValue : sum - t.totalValue;
   }, 0);
   
-  // Average price is based on net investment and net units
+  // Average price = net invested / total units (always calculate from transactions)
   const avgPrice = totalUnits > 0 ? totalInvested / totalUnits : 0;
 
   return (
@@ -56,7 +58,7 @@ const TransactionHistoryModal: React.FC<TransactionHistoryModalProps> = ({
               <p className="font-bold text-white">{formatNumber(totalUnits)}</p>
             </div>
             <div className="text-center">
-              <p className="text-gray-400 mb-1">Total Invested</p>
+              <p className="text-gray-400 mb-1">Net Invested</p>
               <p className="font-bold text-white">{formatCurrency(totalInvested)}</p>
             </div>
             <div className="text-center">

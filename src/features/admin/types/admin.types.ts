@@ -1,5 +1,6 @@
 // Admin panel type definitions
-import type { DatabaseOrder, DatabasePosition } from '@/shared/lib/services/types';
+import type { DatabaseOrder } from '@/shared/lib/services/orders.service';
+import type { DatabasePosition } from '@/shared/lib/services/positions.service';
 
 // System statistics for admin dashboard
 export interface SystemStats {

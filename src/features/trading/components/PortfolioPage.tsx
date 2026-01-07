@@ -33,7 +33,8 @@ const PortfolioPage: React.FC = () => {
   const { totalInvested, totalMarketValue, totalProfitLoss } = useMemo(() => {
     const invested = portfolio.reduce((sum, item) => sum + (item.purchasePrice * item.units), 0);
     const marketValue = portfolio.reduce((sum, item) => sum + item.totalValue, 0);
-    const profitLoss = marketValue - invested;
+    // Total P&L = sum of all item.profitLoss (which already includes realized + unrealized)
+    const profitLoss = portfolio.reduce((sum, item) => sum + item.profitLoss, 0);
     
     return {
       totalInvested: invested,
@@ -95,9 +96,25 @@ const PortfolioPage: React.FC = () => {
 
   // Memoized portfolio table rows
   const memoizedPortfolioRows = useMemo(() => portfolio.map((item) => {
-    // Since total_invested = ROUND(price, 2) * quantity, purchasePrice should equal currentPrice exactly
-    // when prices haven't changed, so percentChange should be exactly 0
-    const percentChange = calculatePercentChange(item.currentPrice, item.purchasePrice);
+    // Calculate average price from transactions: net invested / total units
+    const transactions = getTransactionsByClub(item.clubId);
+    const netInvested = transactions.reduce((sum, t) => {
+      return t.orderType === 'BUY' ? sum + t.totalValue : sum - t.totalValue;
+    }, 0);
+    const totalUnitsFromTransactions = transactions.reduce((sum, t) => {
+      return t.orderType === 'BUY' ? sum + t.units : sum - t.units;
+    }, 0);
+    const avgPrice = totalUnitsFromTransactions > 0 ? netInvested / totalUnitsFromTransactions : 0;
+    
+    // Calculate percentage change from average price
+    // Use avgPrice and currentPrice directly (simpler and avoids market cap rounding issues)
+    // This matches what users see: price change from their net invested average price
+    let percentChange = calculatePercentChange(item.currentPrice, avgPrice);
+    // Round very small changes to 0.00% to avoid showing "+0.03%" when it should be "0.00%"
+    // This handles floating point precision issues where prices are effectively the same
+    if (Math.abs(percentChange) < 0.01) {
+      percentChange = 0;
+    }
     const portfolioPercent = calculatePortfolioPercentage(item.totalValue, totalMarketValue);
     
     return (
@@ -110,7 +127,7 @@ const PortfolioPage: React.FC = () => {
           {item.clubName}
         </td>
         <td className="px-3 text-right font-mono">{formatNumber(item.units)}</td>
-        <td className="px-3 text-right font-mono">{formatCurrency(item.purchasePrice)}</td>
+        <td className="px-3 text-right font-mono">{formatCurrency(avgPrice)}</td>
         <td className="px-3 text-right font-mono">{formatCurrency(item.currentPrice)}</td>
         <td className={`px-3 text-right font-semibold ${percentChange === 0 ? 'text-gray-400' : percentChange > 0 ? 'price-positive' : 'price-negative'}`}>
           {percentChange > 0 ? '+' : ''}{percentChange.toFixed(2)}%
@@ -132,7 +149,7 @@ const PortfolioPage: React.FC = () => {
         </td>
       </tr>
     );
-  }), [portfolio, totalMarketValue, handleClubClick, handleSellClick]);
+  }), [portfolio, clubs, totalMarketValue, handleClubClick, handleSellClick, getTransactionsByClub]);
 
   // Realtime portfolio updates
   useEffect(() => {
@@ -297,9 +314,29 @@ const PortfolioPage: React.FC = () => {
                 {/* Mobile Table Rows */}
                 <div className="space-y-0">
                   {portfolio.map((item) => {
-                    const percentChange = calculatePercentChange(item.currentPrice, item.purchasePrice);
-                    const profitLoss = item.totalValue - (item.purchasePrice * item.units);
+                    // Find club to get external_id
                     const club = clubs.find(c => c.id === item.clubId);
+                    
+                    // Calculate average price from transactions: net invested / total units
+                    const transactions = getTransactionsByClub(item.clubId);
+                    const netInvested = transactions.reduce((sum, t) => {
+                      return t.orderType === 'BUY' ? sum + t.totalValue : sum - t.totalValue;
+                    }, 0);
+                    const totalUnitsFromTransactions = transactions.reduce((sum, t) => {
+                      return t.orderType === 'BUY' ? sum + t.units : sum - t.units;
+                    }, 0);
+                    const avgPrice = totalUnitsFromTransactions > 0 ? netInvested / totalUnitsFromTransactions : 0;
+                    
+                    // Calculate percentage change from average price
+                    // Use avgPrice and currentPrice directly (simpler and avoids market cap rounding issues)
+                    let percentChange = calculatePercentChange(item.currentPrice, avgPrice);
+                    // Round very small changes to 0.00% to avoid showing "+0.03%" when it should be "0.00%"
+                    // This handles floating point precision issues where prices are effectively the same
+                    if (Math.abs(percentChange) < 0.01) {
+                      percentChange = 0;
+                    }
+                    // Use item.profitLoss which already includes realized + unrealized P&L
+                    const profitLoss = item.profitLoss;
                     
                     return (
                       <div
@@ -367,16 +404,20 @@ const PortfolioPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {selectedClub && (
-        <TransactionHistoryModal
-          isOpen={!!selectedClub}
-          onClose={handleCloseModal}
-          clubName={selectedClub.name}
-          clubId={selectedClub.id}
-          externalId={selectedClub.externalId}
-          transactions={getTransactionsByClub(selectedClub.id)}
-        />
-      )}
+      {selectedClub && (() => {
+        const portfolioItem = portfolio.find(p => p.clubId === selectedClub.id);
+        return (
+          <TransactionHistoryModal
+            isOpen={!!selectedClub}
+            onClose={handleCloseModal}
+            clubName={selectedClub.name}
+            clubId={selectedClub.id}
+            externalId={selectedClub.externalId}
+            transactions={getTransactionsByClub(selectedClub.id)}
+            averagePrice={portfolioItem?.purchasePrice}
+          />
+        );
+      })()}
 
       {sellModalData && (
         <SellConfirmationModal
