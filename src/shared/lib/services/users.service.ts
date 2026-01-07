@@ -1,8 +1,8 @@
 // Users service for admin user management
 import { supabase } from '../supabase';
 import { logger } from '../logger';
-import { calculateSharePrice, calculateTotalValue, calculateProfitLoss, calculateAverageCost, calculatePercentChange } from '../utils/calculations';
-import { fromCents, roundForDisplay, Decimal } from '../utils/decimal';
+import { calculateSharePrice, calculateTotalValue, calculateProfitLoss, calculateAverageCost, calculatePercentChange, calculatePriceImpactPercent } from '../utils/calculations';
+import { fromCents, roundForDisplay, Decimal, toDecimal } from '../utils/decimal';
 
 export interface UserListItem {
   id: string;
@@ -420,6 +420,40 @@ export const usersService = {
         }))
       });
 
+      // Load latest match result percentages for each team
+      const teamIds = (positions || []).map(pos => pos.team_id);
+      const matchdayChanges = new Map<number, number>();
+      
+      if (teamIds.length > 0) {
+        try {
+          const { data: ledgerData } = await supabase
+            .from('total_ledger')
+            .select('team_id, market_cap_before, market_cap_after, event_date')
+            .in('team_id', teamIds)
+            .in('ledger_type', ['match_win', 'match_loss', 'match_draw'])
+            .order('event_date', { ascending: false });
+
+          const latestMatches = new Map<number, { marketCapBefore: number; marketCapAfter: number }>();
+          
+          (ledgerData || []).forEach(entry => {
+            const teamId = entry.team_id;
+            if (!latestMatches.has(teamId) && entry.market_cap_before && entry.market_cap_after) {
+              latestMatches.set(teamId, {
+                marketCapBefore: roundForDisplay(fromCents(entry.market_cap_before || 0)),
+                marketCapAfter: roundForDisplay(fromCents(entry.market_cap_after || 0))
+              });
+            }
+          });
+
+          latestMatches.forEach((match, teamId) => {
+            const percentChange = calculatePriceImpactPercent(match.marketCapAfter, match.marketCapBefore);
+            matchdayChanges.set(teamId, percentChange);
+          });
+        } catch (error) {
+          logger.error('Error loading matchday changes for admin:', error);
+        }
+      }
+
       // Calculate portfolio metrics
       let totalInvested = 0;
       let portfolioValue = 0;
@@ -442,9 +476,12 @@ export const usersService = {
         // This includes both unrealized and realized P&L
         const pl = fromCents(pos.total_pnl || 0).toNumber();
 
-        // Calculate percentage change from purchase price: (current_share_price - purchase_price) / purchase_price * 100
-        // Portfolio uses purchase price vs current share price, NOT market cap change
-        const percentChangeFromPurchase = calculatePercentChange(sharePrice, avgCost);
+        // Calculate percentage change - prefer match result percentage if available, otherwise use calculated
+        // Match result percentage is the actual percentage from the latest match (e.g., +8.58%, -10%)
+        const matchResultPercent = matchdayChanges.get(pos.team_id);
+        const percentChangeFromPurchase = matchResultPercent !== undefined && matchResultPercent !== null
+          ? matchResultPercent
+          : calculatePercentChange(sharePrice, avgCost);
 
         totalInvested += totalInvestedDollars;
         portfolioValue += currentValue;
