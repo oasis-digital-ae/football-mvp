@@ -185,15 +185,9 @@ const PortfolioPage: React.FC = () => {
     const currentValueDecimal = toDecimal(item.totalValue);
     const profitLoss = roundForDisplay(currentValueDecimal.minus(netInvested));
     
-    // Calculate percentage change - prefer match result percentage if available, otherwise use calculated
-    // Match result percentage is the actual percentage from the latest match (e.g., +8.58%, -10%)
-    const matchResultPercent = matchdayChanges.get(item.clubId);
-    let percentChange;
-    if (matchResultPercent !== undefined && matchResultPercent !== null) {
-      percentChange = matchResultPercent;
-    } else {
-      percentChange = calculatePercentChange(item.currentPrice, avgPrice);
-    }
+    // Calculate percentage change: (Current Price - Avg Price) / Avg Price * 100
+    // This shows the change from the user's average purchase price to the current price
+    let percentChange = calculatePercentChange(item.currentPrice, avgPrice);
     // Round very small changes to 0.00% to avoid showing "+0.03%" when it should be "0.00%"
     // This handles floating point precision issues where prices are effectively the same
     if (Math.abs(percentChange) < 0.01) {
@@ -423,15 +417,9 @@ const PortfolioPage: React.FC = () => {
                     const currentValueDecimal = toDecimal(item.totalValue);
                     const profitLoss = roundForDisplay(currentValueDecimal.minus(netInvested));
                     
-                    // Calculate percentage change - prefer match result percentage if available, otherwise use calculated
-                    // Match result percentage is the actual percentage from the latest match (e.g., +8.58%, -10%)
-                    const matchResultPercent = matchdayChanges.get(item.clubId);
-                    let percentChange;
-                    if (matchResultPercent !== undefined && matchResultPercent !== null) {
-                      percentChange = matchResultPercent;
-                    } else {
-                      percentChange = calculatePercentChange(item.currentPrice, avgPrice);
-                    }
+                    // Calculate percentage change: (Current Price - Avg Price) / Avg Price * 100
+                    // This shows the change from the user's average purchase price to the current price
+                    let percentChange = calculatePercentChange(item.currentPrice, avgPrice);
                     // Round very small changes to 0.00% to avoid showing "+0.03%" when it should be "0.00%"
                     // This handles floating point precision issues where prices are effectively the same
                     if (Math.abs(percentChange) < 0.01) {

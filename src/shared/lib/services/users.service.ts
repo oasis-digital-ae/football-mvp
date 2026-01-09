@@ -476,12 +476,9 @@ export const usersService = {
         // This includes both unrealized and realized P&L
         const pl = fromCents(pos.total_pnl || 0).toNumber();
 
-        // Calculate percentage change - prefer match result percentage if available, otherwise use calculated
-        // Match result percentage is the actual percentage from the latest match (e.g., +8.58%, -10%)
-        const matchResultPercent = matchdayChanges.get(pos.team_id);
-        const percentChangeFromPurchase = matchResultPercent !== undefined && matchResultPercent !== null
-          ? matchResultPercent
-          : calculatePercentChange(sharePrice, avgCost);
+        // Calculate percentage change: (Current Price - Avg Price) / Avg Price * 100
+        // This shows the change from the user's average purchase price to the current price
+        const percentChangeFromPurchase = calculatePercentChange(sharePrice, avgCost);
 
         totalInvested += totalInvestedDollars;
         portfolioValue += currentValue;
