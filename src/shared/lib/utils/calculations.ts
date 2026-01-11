@@ -6,8 +6,8 @@
  * precision, then round to 2 decimal places for display.
  * 
  * Pattern:
- * - Internal: Use Decimal with 4 decimal precision
- * - Display: Round to 2 decimal places
+ * - Internal: Use Decimal with full precision for accuracy
+ * - Display: Round to 2 decimal places (matching backend)
  */
 
 import { Decimal, toDecimal, roundForDisplay } from './decimal';

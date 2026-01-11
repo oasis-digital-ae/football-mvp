@@ -13,7 +13,7 @@
 import Decimal from 'decimal.js';
 
 // Configure Decimal defaults for monetary calculations
-// Use 4 decimal places internally for precision
+// Use high precision internally, round to 2 decimal places for display (matching backend)
 Decimal.set({
   precision: 28, // High precision for calculations
   rounding: Decimal.ROUND_HALF_UP, // Standard rounding (0.5 rounds up)

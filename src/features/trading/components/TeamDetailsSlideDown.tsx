@@ -262,6 +262,42 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
     }
   }, [isOpen, teamId, userId, loadMatchesData]);
 
+  // Expose refresh function for external components to call
+  useEffect(() => {
+    if (teamId) {
+      const refreshKey = `refreshTeamDetails_${teamId}`;
+      (window as any)[refreshKey] = async () => {
+        if (isOpen) {
+          await loadMatchesData();
+          await loadChartData();
+        }
+      };
+      return () => {
+        delete (window as any)[refreshKey];
+      };
+    }
+  }, [teamId, isOpen, loadMatchesData, loadChartData]);
+
+  // Listen for global refresh signal
+  useEffect(() => {
+    const handleRefresh = async () => {
+      if (isOpen && teamId && userId) {
+        // Small delay to ensure database triggers have completed
+        await new Promise(resolve => setTimeout(resolve, 300));
+        await loadMatchesData();
+        if (activeTab === 'chart') {
+          await loadChartData();
+        }
+      }
+    };
+
+    // Listen for custom refresh event
+    window.addEventListener('refreshTeamDetails', handleRefresh);
+    return () => {
+      window.removeEventListener('refreshTeamDetails', handleRefresh);
+    };
+  }, [isOpen, teamId, userId, activeTab, loadMatchesData, loadChartData]);
+
 
   // Load chart data when switching to chart tab
   useEffect(() => {

@@ -246,7 +246,9 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
           totalValue,
           profitLoss,
           // Full precision purchase market cap for percentage calculation (no rounding)
-          purchaseMarketCapPrecise: purchaseMarketCapPrecise.toNumber()
+          purchaseMarketCapPrecise: purchaseMarketCapPrecise.toNumber(),
+          // Total invested in cents (from database) - for full precision average price calculation
+          totalInvestedCents: totalInvestedCents
         };
       });
       
@@ -271,7 +273,8 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
             totalValue: fromCents(order.total_amount).toNumber(), // Convert cents to dollars
             date: dateObj.toLocaleDateString(),
             timestamp: timestamp, // Store full ISO timestamp for proper sorting by date and time
-            orderType: order.order_type as 'BUY' | 'SELL'
+            orderType: order.order_type as 'BUY' | 'SELL',
+            marketCapBefore: order.market_cap_before || undefined // Market cap in cents at purchase time
           });
         });
         logger.db('Converted orders to transactions', { count: convertedTransactions.length });
@@ -822,6 +825,9 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
       // Match results are processed automatically by database triggers
       // when fixture results are updated, so we just need to refresh the data
       await loadData();
+      
+      // Trigger refresh event for TeamDetailsSlideDown components
+      window.dispatchEvent(new CustomEvent('refreshTeamDetails'));
       
       toast({
         title: "Match Simulation Complete",

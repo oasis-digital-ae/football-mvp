@@ -1,14 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
 import { formatCurrency } from '@/shared/lib/formatters';
 import { useAuth } from '@/features/auth/contexts/AuthContext';
-import { supabase } from '@/shared/lib/supabase';
-import { Wallet, Loader2 } from 'lucide-react';
+import { Wallet, Loader2, AlertCircle } from 'lucide-react';
 import { useToast } from '@/shared/hooks/use-toast';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { walletService } from '@/shared/lib/services/wallet.service';
 
-// STRIPE DISABLED FOR TESTING - Using direct credit instead
-const STRIPE_DISABLED = true;
+// Stripe is enabled
+const STRIPE_DISABLED = false;
+
+// Platform fee: 5%
+const PLATFORM_FEE_PERCENT = 0.05;
+
+// Minimum deposit: $10.00
+const MIN_DEPOSIT_CENTS = 1000;
+
+// Get Netlify function base URL
+// Vite proxy will handle forwarding to Netlify dev server (port 8888) if running
+// Otherwise, use relative path for production
+const getNetlifyFunctionUrl = (functionName: string): string => {
+  return `/.netlify/functions/${functionName}`;
+};
+
+// Initialize Stripe - Detect environment and use appropriate keys
+// In production, use live keys; in development, use test keys
+const isProduction = typeof window !== 'undefined' && (
+  window.location.hostname.includes('netlify.app') || 
+  window.location.protocol === 'https:' ||
+  import.meta.env.PROD
+);
+
+// In development, ONLY use test keys (no fallback to live keys)
+const stripePublishableKey = isProduction
+  ? import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY_LIVE
+  : import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+
+const stripePromise = loadStripe(stripePublishableKey || '');
 
 interface DepositModalProps {
   isOpen: boolean;
@@ -16,15 +48,23 @@ interface DepositModalProps {
   onSuccess?: () => void;
 }
 
-export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose, onSuccess }) => {
+// Payment form component
+const PaymentForm: React.FC<{ depositAmount: number; onSuccess: () => void; onClose: () => void }> = ({ 
+  depositAmount, 
+  onSuccess, 
+  onClose 
+}) => {
+  const stripe = useStripe();
+  const elements = useElements();
   const { user, refreshWalletBalance } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const handleTestCredit = async () => {
-    if (!user) {
-      setError('You must be logged in');
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!stripe || !elements || !user) {
       return;
     }
 
@@ -32,70 +72,298 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose, onS
     setError(null);
 
     try {
-      // Verify session is valid
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session) {
-        throw new Error('Session expired. Please log in again.');
+      // CRITICAL: Submit elements first before any async work
+      // This validates the form and prepares it for confirmation
+      const { error: submitError } = await elements.submit();
+      if (submitError) {
+        throw submitError;
       }
 
-      console.log('Calling credit_wallet RPC with:', {
-        p_user_id: user.id,
-        p_amount_cents: 100000,
-        p_ref: 'test_credit_' + Date.now(),
-        p_currency: 'usd'
+      // Calculate amounts
+      const depositAmountCents = Math.round(depositAmount * 100);
+      const platformFeeCents = Math.round(depositAmountCents * PLATFORM_FEE_PERCENT);
+      const totalChargeCents = depositAmountCents + platformFeeCents;
+
+      // Create payment intent
+      const functionUrl = getNetlifyFunctionUrl('create-payment-intent');
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deposit_amount_cents: depositAmountCents,
+          user_id: user.id,
+          currency: 'usd',
+        }),
       });
 
-      // Credit $1000 directly using credit_wallet RPC
-      const { data, error: creditError } = await supabase.rpc('credit_wallet', {
-        p_user_id: user.id,
-        p_amount_cents: 100000, // $1000 in cents
-        p_ref: 'test_credit_' + Date.now(),
-        p_currency: 'usd'
-      });
-
-      console.log('credit_wallet RPC response:', { data, error: creditError });
-
-      if (creditError) {
-        console.error('credit_wallet error details:', {
-          message: creditError.message,
-          details: creditError.details,
-          hint: creditError.hint,
-          code: creditError.code
-        });
-        throw new Error(creditError.message || creditError.details || 'Failed to credit wallet');
+      // Check if response is ok
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `Server error: ${response.status}`;
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.error || errorMessage;
+        } catch {
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
-      // Refresh wallet balance
+      // Parse JSON response
+      const responseText = await response.text();
+      if (!responseText) {
+        throw new Error('Empty response from server');
+      }
+
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Failed to parse response:', responseText);
+        throw new Error('Invalid response from server');
+      }
+
+      const { clientSecret, error: apiError } = responseData;
+
+      if (apiError || !clientSecret) {
+        throw new Error(apiError || 'Failed to create payment intent');
+      }
+
+      // Now confirm payment (elements.submit() was already called above)
+      const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        clientSecret,
+        confirmParams: {
+          return_url: `${window.location.origin}/portfolio`,
+        },
+        redirect: 'if_required',
+      });
+
+      if (confirmError) {
+        throw confirmError;
+      }
+
+      // Extract payment intent ID from clientSecret (format: pi_xxx_secret_xxx)
+      const paymentIntentId = paymentIntent?.id || clientSecret.split('_secret_')[0];
+
+      // Payment succeeded - check if webhook credited wallet, if not, manually credit
+      let walletCredited = false;
+      
+      // Get initial balance
+      await refreshWalletBalance();
+      let initialBalance = 0;
+      try {
+        initialBalance = user ? await walletService.getBalance(user.id) : 0;
+      } catch (balanceError) {
+        console.error('Error getting initial balance:', balanceError);
+        // Continue with 0 if balance check fails
+      }
+      
+      // Wait a moment for webhook to process
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Check if wallet was credited
+      await refreshWalletBalance();
+      let balanceAfterWait = 0;
+      try {
+        balanceAfterWait = user ? await walletService.getBalance(user.id) : 0;
+      } catch (balanceError) {
+        console.error('Error getting balance after wait:', balanceError);
+        // Continue with 0 if balance check fails
+      }
+      walletCredited = balanceAfterWait > initialBalance;
+
+      // If webhook didn't credit, manually credit via fallback endpoint
+      if (!walletCredited && paymentIntentId && user) {
+        console.log('Webhook did not credit wallet, using manual fallback...');
+        try {
+          const manualCreditUrl = getNetlifyFunctionUrl('manual-credit-wallet');
+          const manualCreditResponse = await fetch(manualCreditUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              payment_intent_id: paymentIntentId,
+              user_id: user.id,
+            }),
+          });
+
+          if (manualCreditResponse.ok) {
+            const manualCreditData = await manualCreditResponse.json();
+            console.log('Manual credit successful:', manualCreditData);
+            walletCredited = true;
+          } else {
+            const errorText = await manualCreditResponse.text();
+            console.error('Manual credit failed:', errorText);
+          }
+        } catch (manualCreditError) {
+          console.error('Error calling manual credit:', manualCreditError);
+        }
+      }
+      
+      // Final refresh
       await refreshWalletBalance();
       
+      // Also trigger wallet balance change event for other components
+      window.dispatchEvent(new CustomEvent('wallet-balance-changed'));
+
       toast({
-        title: "Test Credit Successful",
-        description: "$1000 has been credited to your wallet for testing.",
+        title: "Deposit Successful",
+        description: walletCredited 
+          ? `${formatCurrency(depositAmount)} has been credited to your wallet.`
+          : `${formatCurrency(depositAmount)} payment processed. Wallet will be updated shortly.`,
         variant: "default",
       });
 
-      onSuccess?.();
+      onSuccess();
       onClose();
     } catch (err: any) {
-      console.error('Error crediting wallet:', err);
-      
-      // Provide more specific error messages
-      let errorMessage = 'Failed to credit wallet';
-      if (err.message) {
-        errorMessage = err.message;
-      } else if (err instanceof TypeError && err.message.includes('fetch')) {
-        errorMessage = 'Network error. Please check your connection and try again.';
-      } else if (err.code === '42501') {
-        errorMessage = 'Permission denied. Please contact support.';
-      } else if (err.code === 'PGRST301') {
-        errorMessage = 'Function not found. Please contact support.';
-      }
-      
-      setError(errorMessage);
+      console.error('Payment error:', err);
+      setError(err.message || 'Payment failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <PaymentElement />
+      
+      {error && (
+        <div className="flex items-center gap-2 text-red-400 text-sm bg-red-900/20 border border-red-700/50 rounded p-3">
+          <AlertCircle className="w-4 h-4" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <Button
+        type="submit"
+        disabled={!stripe || isLoading}
+        className="w-full bg-gradient-primary hover:bg-gradient-primary/80 text-white font-semibold"
+      >
+        {isLoading ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Processing payment...
+          </>
+        ) : (
+          `Pay ${formatCurrency(depositAmount * (1 + PLATFORM_FEE_PERCENT))}`
+        )}
+      </Button>
+    </form>
+  );
+};
+
+export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose, onSuccess }) => {
+  const { user } = useAuth();
+  const [depositAmount, setDepositAmount] = useState<string>('100');
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const depositAmountNum = parseFloat(depositAmount) || 0;
+  const platformFee = depositAmountNum * PLATFORM_FEE_PERCENT;
+  const totalCharge = depositAmountNum + platformFee;
+
+  const handleAmountChange = (value: string) => {
+    // Only allow numbers and one decimal point
+    const cleaned = value.replace(/[^\d.]/g, '');
+    const parts = cleaned.split('.');
+    if (parts.length > 2) return; // Only one decimal point allowed
+    if (parts[1] && parts[1].length > 2) return; // Max 2 decimal places
+    setDepositAmount(cleaned);
+    setError(null);
+  };
+
+  const validateAmount = (): boolean => {
+    if (depositAmountNum < MIN_DEPOSIT_CENTS / 100) {
+      setError(`Minimum deposit is ${formatCurrency(MIN_DEPOSIT_CENTS / 100)}`);
+      return false;
+    }
+    return true;
+  };
+
+  const handleContinue = async () => {
+    if (!user || !validateAmount()) {
+      return;
+    }
+
+    setError(null);
+
+    try {
+      const depositAmountCents = Math.round(depositAmountNum * 100);
+
+      const functionUrl = getNetlifyFunctionUrl('create-payment-intent');
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deposit_amount_cents: depositAmountCents,
+          user_id: user.id,
+          currency: 'usd',
+        }),
+      });
+
+      // Check if response is ok
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `Server error: ${response.status}`;
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.error || errorMessage;
+        } catch {
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+
+      // Parse JSON response
+      const responseText = await response.text();
+      if (!responseText) {
+        throw new Error('Empty response from server');
+      }
+
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Failed to parse response:', responseText);
+        throw new Error('Invalid response from server');
+      }
+
+      const { clientSecret: secret, error: apiError } = responseData;
+
+      if (apiError || !secret) {
+        throw new Error(apiError || 'Failed to create payment intent');
+      }
+
+      setClientSecret(secret);
+    } catch (err: any) {
+      console.error('Error creating payment intent:', err);
+      setError(err.message || 'Failed to initialize payment. Please try again.');
+    }
+  };
+
+  const handleBack = () => {
+    setClientSecret(null);
+    setError(null);
+  };
+
+  const options = clientSecret
+    ? {
+        clientSecret,
+        appearance: {
+          theme: 'night' as const,
+          variables: {
+            colorPrimary: '#3b82f6',
+            colorBackground: '#1f2937',
+            colorText: '#f3f4f6',
+            colorDanger: '#ef4444',
+            fontFamily: 'system-ui, sans-serif',
+            spacingUnit: '4px',
+            borderRadius: '8px',
+          },
+        },
+      }
+    : undefined;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -108,54 +376,90 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose, onS
         </DialogHeader>
 
         <div className="py-4 space-y-4">
-          {STRIPE_DISABLED ? (
+          {!clientSecret ? (
             <>
-              <div className="bg-yellow-900/30 border border-yellow-700/50 rounded-lg p-4">
-                <p className="text-yellow-300 text-sm font-medium mb-2">
-                  ⚠️ Stripe Payment Disabled
-                </p>
-                <p className="text-gray-400 text-xs">
-                  Stripe payments are temporarily disabled for testing. Use the test credit button below to add funds directly.
-                </p>
-              </div>
-
               <div className="space-y-4">
-                <div className="bg-gradient-card p-6 rounded-lg border border-trading-primary/20">
-                  <div className="text-center space-y-2">
-                    <p className="text-gray-300 font-medium">Test Credit Amount</p>
-                    <p className="text-3xl font-bold text-green-400">{formatCurrency(1000)}</p>
-                    <p className="text-xs text-gray-400">This will credit $1000 directly to your wallet</p>
+                <div>
+                  <Label htmlFor="deposit-amount" className="text-gray-300 mb-2 block">
+                    Deposit Amount
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                    <Input
+                      id="deposit-amount"
+                      type="text"
+                      value={depositAmount}
+                      onChange={(e) => handleAmountChange(e.target.value)}
+                      placeholder="100.00"
+                      className="pl-8 bg-gray-700/50 border-gray-600 text-white"
+                    />
                   </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Minimum: {formatCurrency(MIN_DEPOSIT_CENTS / 100)}
+                  </p>
                 </div>
 
+                {depositAmountNum > 0 && (
+                  <div className="bg-gradient-card p-4 rounded-lg border border-trading-primary/20 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-300">Deposit Amount:</span>
+                      <span className="text-white font-medium">{formatCurrency(depositAmountNum)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-300">Platform Fee (5%):</span>
+                      <span className="text-gray-400">{formatCurrency(platformFee)}</span>
+                    </div>
+                    <div className="border-t border-gray-600 pt-2 flex justify-between">
+                      <span className="text-gray-200 font-medium">Total Charge:</span>
+                      <span className="text-green-400 font-bold">{formatCurrency(totalCharge)}</span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-2">
+                      You will receive {formatCurrency(depositAmountNum)} in your wallet
+                    </p>
+                  </div>
+                )}
+
                 {error && (
-                  <div className="text-red-400 text-sm text-center">{error}</div>
+                  <div className="flex items-center gap-2 text-red-400 text-sm bg-red-900/20 border border-red-700/50 rounded p-3">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{error}</span>
+                  </div>
                 )}
 
                 <Button
-                  onClick={handleTestCredit}
-                  disabled={isLoading || !user}
-                  className="w-full bg-gradient-success hover:bg-gradient-success/80 text-white font-semibold"
+                  onClick={handleContinue}
+                  disabled={!user || depositAmountNum < MIN_DEPOSIT_CENTS / 100}
+                  className="w-full bg-gradient-primary hover:bg-gradient-primary/80 text-white font-semibold"
                 >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Crediting wallet...
-                    </>
-                  ) : (
-                    `Credit ${formatCurrency(1000)} to Wallet`
-                  )}
+                  Continue to Payment
                 </Button>
               </div>
             </>
           ) : (
-            <div className="text-center py-4">
-              <p className="text-gray-400">Stripe payment integration is enabled.</p>
-            </div>
+            <>
+              {stripePromise && options && (
+                <Elements stripe={stripePromise} options={options}>
+                  <PaymentForm 
+                    depositAmount={depositAmountNum} 
+                    onSuccess={() => {
+                      onSuccess?.();
+                      onClose();
+                    }} 
+                    onClose={onClose}
+                  />
+                </Elements>
+              )}
+              <Button
+                onClick={handleBack}
+                variant="outline"
+                className="w-full border-gray-600 text-gray-300 hover:bg-gray-700"
+              >
+                Back
+              </Button>
+            </>
           )}
         </div>
       </DialogContent>
     </Dialog>
   );
 };
-

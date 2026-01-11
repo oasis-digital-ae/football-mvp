@@ -62,3 +62,8 @@ src/config/db_password
 src/config/env.local
 # Local Netlify folder
 .netlify
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/

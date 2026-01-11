@@ -7,45 +7,127 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    // Validate environment variables
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY_LIVE;
+    // Detect environment: production uses live keys, development uses test keys
+    const isProduction = process.env.NETLIFY_ENV === 'production' || 
+                         process.env.CONTEXT === 'production' ||
+                         process.env.NODE_ENV === 'production';
+    
+    console.log('Environment detection:', {
+      NETLIFY_ENV: process.env.NETLIFY_ENV,
+      CONTEXT: process.env.CONTEXT,
+      NODE_ENV: process.env.NODE_ENV,
+      isProduction,
+    });
+    
+    // Use live keys in production, test keys in development
+    // In development, ONLY use test keys (no fallback to live keys)
+    const stripeSecretKey = isProduction
+      ? process.env.STRIPE_SECRET_KEY_LIVE
+      : process.env.STRIPE_SECRET_KEY;
+    
     if (!stripeSecretKey) {
-      console.error('Missing STRIPE_SECRET_KEY_LIVE');
+      const errorMsg = `Missing Stripe secret key. In ${isProduction ? 'production' : 'development'}, need ${isProduction ? 'STRIPE_SECRET_KEY_LIVE' : 'STRIPE_SECRET_KEY'}`;
+      console.error(errorMsg);
+      console.error('Available env vars:', {
+        hasTestKey: !!process.env.STRIPE_SECRET_KEY,
+        hasLiveKey: !!process.env.STRIPE_SECRET_KEY_LIVE,
+      });
       return { 
         statusCode: 500, 
-        body: JSON.stringify({ error: 'Server configuration error: Missing Stripe credentials' }) 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          error: 'Server configuration error: Missing Stripe credentials',
+          details: errorMsg
+        }) 
       };
     }
+    
+    console.log(`Using ${isProduction ? 'LIVE' : 'TEST'} Stripe keys (key prefix: ${stripeSecretKey.substring(0, 7)})`);
 
     const stripe = new Stripe(stripeSecretKey, {
       apiVersion: '2024-06-20',
     });
 
-    const { amount_cents, user_id, currency } = JSON.parse(event.body || '{}');
-
-    if (!amount_cents || !user_id) {
-      return { 
-        statusCode: 400, 
-        body: JSON.stringify({ error: 'amount_cents and user_id are required' }) 
+    // Parse request body
+    let requestBody;
+    try {
+      requestBody = typeof event.body === 'string' ? JSON.parse(event.body) : event.body || {};
+    } catch (parseError: any) {
+      console.error('Failed to parse request body:', parseError);
+      return {
+        statusCode: 400,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: 'Invalid request body', details: parseError.message })
       };
     }
 
-    if (Number(amount_cents) < 1000) { // Minimum $10.00 in cents
+    const { deposit_amount_cents, user_id, currency } = requestBody;
+
+    if (!deposit_amount_cents || !user_id) {
+      console.error('Missing required parameters:', {
+        hasDepositAmount: !!deposit_amount_cents,
+        hasUserId: !!user_id,
+        requestBody: JSON.stringify(requestBody),
+      });
+      return { 
+        statusCode: 400,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: 'deposit_amount_cents and user_id are required' }) 
+      };
+    }
+
+    const depositAmountCents = Number(deposit_amount_cents);
+    if (depositAmountCents < 1000) { // Minimum $10.00 in cents
       return { 
         statusCode: 400, 
         body: JSON.stringify({ error: 'Minimum deposit amount is $10.00' }) 
       };
     }
 
-    const paymentIntent = await stripe.paymentIntents.create(
-      {
-        amount: Number(amount_cents),
-        currency: (currency || 'usd').toLowerCase(),
-        metadata: { user_id: String(user_id), purpose: 'wallet_top_up' },
-        automatic_payment_methods: { enabled: true },
-      },
-      { idempotencyKey: `pi_topup_${user_id}_${amount_cents}_${Date.now()}` }
-    );
+    // Calculate 5% platform fee
+    const platformFeeCents = Math.round(depositAmountCents * 0.05);
+    const totalChargeCents = depositAmountCents + platformFeeCents;
+
+    console.log('Creating PaymentIntent:', {
+      depositAmountCents,
+      platformFeeCents,
+      totalChargeCents,
+      userId: user_id,
+      currency: currency || 'usd',
+    });
+
+    let paymentIntent;
+    try {
+      paymentIntent = await stripe.paymentIntents.create(
+        {
+          amount: totalChargeCents, // Charge total (deposit + fee)
+          currency: (currency || 'usd').toLowerCase(),
+          metadata: { 
+            user_id: String(user_id), 
+            purpose: 'wallet_top_up',
+            deposit_amount_cents: String(depositAmountCents), // Store original deposit amount
+            platform_fee_cents: String(platformFeeCents),
+          },
+          automatic_payment_methods: { enabled: true },
+        },
+        { idempotencyKey: `pi_topup_${user_id}_${depositAmountCents}_${Date.now()}` }
+      );
+    } catch (stripeError: any) {
+      console.error('Stripe API error:', {
+        type: stripeError.type,
+        code: stripeError.code,
+        message: stripeError.message,
+        statusCode: stripeError.statusCode,
+      });
+      return {
+        statusCode: 500,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          error: 'Failed to create payment intent',
+          details: stripeError.message || 'Stripe API error'
+        })
+      };
+    }
 
     if (!paymentIntent.client_secret) {
       console.error('PaymentIntent created but no client_secret:', paymentIntent);

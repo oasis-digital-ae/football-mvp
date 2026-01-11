@@ -36,6 +36,7 @@ export interface PortfolioItem {
   totalValue: number;
   profitLoss: number;
   purchaseMarketCapPrecise: number; // Full precision purchase market cap for calculations (no rounding)
+  totalInvestedCents: number; // Total invested in cents (BIGINT from database) - for full precision calculations
 }
 
 export interface Transaction {
@@ -48,6 +49,7 @@ export interface Transaction {
   date: string; // Display date (formatted)
   timestamp: string; // Full ISO timestamp for sorting (executed_at or created_at)
   orderType: 'BUY' | 'SELL';
+  marketCapBefore?: number; // Market cap in cents at purchase time - for exact price calculation
 }
 
 export const PREMIER_LEAGUE_CLUBS = [

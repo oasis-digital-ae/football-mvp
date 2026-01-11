@@ -26,7 +26,7 @@ import {
   calculateProfitLoss,
   calculatePriceImpactPercent
 } from '@/shared/lib/utils/calculations';
-import { toDecimal, roundForDisplay, fromCents } from '@/shared/lib/utils/decimal';
+import { toDecimal, roundForDisplay, fromCents, Decimal } from '@/shared/lib/utils/decimal';
 
 export const ClubValuesPage: React.FC = () => {
   const { clubs, matches, purchaseClub, user, refreshData } = useAppContext();
@@ -119,25 +119,30 @@ export const ClubValuesPage: React.FC = () => {
       }
 
       // Group by team_id and get the latest match only
-      const latestMatches = new Map<number, { marketCapBefore: number; marketCapAfter: number; date: string }>();
+      // Calculate percentage from full-precision values (matching backend 4-decimal precision)
+      const latestMatches = new Map<number, { marketCapBefore: Decimal; marketCapAfter: Decimal; date: string }>();
       
       (ledgerData || []).forEach(entry => {
         const teamId = entry.team_id;
         // Only store the first (latest) match for each team
         if (!latestMatches.has(teamId) && entry.market_cap_before && entry.market_cap_after) {
           latestMatches.set(teamId, {
-            marketCapBefore: roundForDisplay(fromCents(entry.market_cap_before || 0)),
-            marketCapAfter: roundForDisplay(fromCents(entry.market_cap_after || 0)),
+            marketCapBefore: toDecimal(fromCents(entry.market_cap_before || 0)),
+            marketCapAfter: toDecimal(fromCents(entry.market_cap_after || 0)),
             date: entry.event_date
           });
         }
       });
 
       // Calculate latest match's price impact percentage for each team
+      // Calculate from full-precision values, then round only the final result (matching backend)
       latestMatches.forEach((match, teamId) => {
-        // Calculate percentage change from the latest match
-        const percentChange = calculatePriceImpactPercent(match.marketCapAfter, match.marketCapBefore);
-        const change = match.marketCapAfter - match.marketCapBefore;
+        // Calculate percentage change from full-precision Decimal values
+        const percentChange = calculatePriceImpactPercent(
+          match.marketCapAfter.toNumber(),
+          match.marketCapBefore.toNumber()
+        );
+        const change = roundForDisplay(match.marketCapAfter.minus(match.marketCapBefore).toNumber());
         
         changesMap.set(teamId.toString(), { change, percentChange });
       });

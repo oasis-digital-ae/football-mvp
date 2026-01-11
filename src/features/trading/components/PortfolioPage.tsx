@@ -12,7 +12,7 @@ import {
   calculatePercentChange,
   calculatePortfolioPercentage
 } from '@/shared/lib/utils/calculations';
-import { toDecimal, roundForDisplay, fromCents } from '@/shared/lib/utils/decimal';
+import { toDecimal, roundForDisplay, fromCents, Decimal } from '@/shared/lib/utils/decimal';
 import TeamLogo from '@/shared/components/TeamLogo';
 import ClickableTeamName from '@/shared/components/ClickableTeamName';
 import { supabase } from '@/shared/lib/supabase';
@@ -21,6 +21,7 @@ import { calculatePriceImpactPercent } from '@/shared/lib/utils/calculations';
 const PortfolioPage: React.FC = () => {
   const { portfolio, getTransactionsByClub, sellClub, clubs } = useContext(AppContext);
   const [matchdayChanges, setMatchdayChanges] = useState<Map<string, number>>(new Map());
+  const [currentMarketCaps, setCurrentMarketCaps] = useState<Map<string, Decimal>>(new Map()); // Full-precision market caps in Decimal
   const [selectedClub, setSelectedClub] = useState<{ id: string; name: string; externalId?: number } | null>(null);
   const [sellModalData, setSellModalData] = useState<{
     clubId: string;
@@ -32,6 +33,36 @@ const PortfolioPage: React.FC = () => {
   const [isSelling, setIsSelling] = useState(false);
   const { user, profile } = useAuth();
   const { toast } = useToast();
+
+  // Load current market caps in full precision (from database, in cents, as Decimal)
+  useEffect(() => {
+    const loadCurrentMarketCaps = async () => {
+      if (clubs.length === 0) return;
+
+      try {
+        const teamIds = clubs.map(c => parseInt(c.id));
+        const marketCapsMap = new Map<string, Decimal>();
+
+        const { data: teamsData } = await supabase
+          .from('teams')
+          .select('id, market_cap')
+          .in('id', teamIds);
+
+        (teamsData || []).forEach(team => {
+          // Get market cap in cents from database, convert to Decimal (full precision)
+          const marketCapCents = team.market_cap || 0;
+          const marketCapDecimal = fromCents(marketCapCents); // Returns Decimal, full precision
+          marketCapsMap.set(team.id.toString(), marketCapDecimal);
+        });
+
+        setCurrentMarketCaps(marketCapsMap);
+      } catch (error) {
+        console.error('Error loading current market caps:', error);
+      }
+    };
+
+    loadCurrentMarketCaps();
+  }, [clubs]);
 
   // Load latest match result percentages for each club
   useEffect(() => {
@@ -49,20 +80,25 @@ const PortfolioPage: React.FC = () => {
           .in('ledger_type', ['match_win', 'match_loss', 'match_draw'])
           .order('event_date', { ascending: false });
 
-        const latestMatches = new Map<number, { marketCapBefore: number; marketCapAfter: number }>();
+        // Calculate percentage from full-precision values (matching backend 4-decimal precision)
+        const latestMatches = new Map<number, { marketCapBefore: Decimal; marketCapAfter: Decimal }>();
         
         (ledgerData || []).forEach(entry => {
           const teamId = entry.team_id;
           if (!latestMatches.has(teamId) && entry.market_cap_before && entry.market_cap_after) {
             latestMatches.set(teamId, {
-              marketCapBefore: roundForDisplay(fromCents(entry.market_cap_before || 0)),
-              marketCapAfter: roundForDisplay(fromCents(entry.market_cap_after || 0))
+              marketCapBefore: toDecimal(fromCents(entry.market_cap_before || 0)),
+              marketCapAfter: toDecimal(fromCents(entry.market_cap_after || 0))
             });
           }
         });
 
+        // Calculate from full-precision values, then round only the final result (matching backend)
         latestMatches.forEach((match, teamId) => {
-          const percentChange = calculatePriceImpactPercent(match.marketCapAfter, match.marketCapBefore);
+          const percentChange = calculatePriceImpactPercent(
+            match.marketCapAfter.toNumber(),
+            match.marketCapBefore.toNumber()
+          );
           changesMap.set(teamId.toString(), percentChange);
         });
 
@@ -74,6 +110,93 @@ const PortfolioPage: React.FC = () => {
 
     loadMatchdayChanges();
   }, [clubs]);
+
+  // Check if purchase prices match pre-match prices (for debugging discrepancy)
+  useEffect(() => {
+    const checkPurchaseVsPreMatchPrices = async () => {
+      if (portfolio.length === 0) {
+        console.log('[Price Check] Portfolio is empty');
+        return;
+      }
+
+      try {
+        const teamIds = portfolio.map(item => parseInt(item.clubId));
+        console.log('[Price Check] Checking teams:', teamIds);
+        
+        // Get latest match data for all teams
+        const { data: ledgerData, error: ledgerError } = await supabase
+          .from('total_ledger')
+          .select('team_id, market_cap_before, event_date')
+          .in('team_id', teamIds)
+          .in('ledger_type', ['match_win', 'match_loss', 'match_draw'])
+          .order('event_date', { ascending: false });
+
+        if (ledgerError) {
+          console.error('[Price Check] Error fetching ledger data:', ledgerError);
+          return;
+        }
+
+        console.log('[Price Check] Ledger data:', ledgerData?.length || 0, 'entries');
+
+        const latestMatches = new Map<number, number>();
+        (ledgerData || []).forEach(entry => {
+          const teamId = entry.team_id;
+          if (!latestMatches.has(teamId) && entry.market_cap_before) {
+            latestMatches.set(teamId, roundForDisplay(fromCents(entry.market_cap_before || 0)));
+          }
+        });
+
+        console.log('[Price Check] Latest matches found:', latestMatches.size);
+
+        // Compare purchase prices with pre-match prices
+        portfolio.forEach((item) => {
+          const transactions = getTransactionsByClub(item.clubId);
+          const netInvested = transactions.reduce((sum, t) => {
+            const value = toDecimal(t.totalValue);
+            return t.orderType === 'BUY' ? sum.plus(value) : sum.minus(value);
+          }, toDecimal(0));
+          const totalUnitsFromTransactions = transactions.reduce((sum, t) => {
+            const units = toDecimal(t.units);
+            return t.orderType === 'BUY' ? sum.plus(units) : sum.minus(units);
+          }, toDecimal(0));
+          
+          const avgPrice = totalUnitsFromTransactions.gt(0) 
+            ? roundForDisplay(netInvested.dividedBy(totalUnitsFromTransactions))
+            : 0;
+
+          const preMatchMarketCap = latestMatches.get(parseInt(item.clubId));
+          
+          console.log(`[Price Check] ${item.clubName}:`, {
+            avgPrice,
+            preMatchMarketCap: preMatchMarketCap || 'No match data',
+            hasTransactions: transactions.length > 0,
+            totalUnits: totalUnitsFromTransactions.toNumber()
+          });
+
+          if (preMatchMarketCap && avgPrice > 0) {
+            const preMatchPrice = roundForDisplay(preMatchMarketCap / 1000);
+            const diff = Math.abs(avgPrice - preMatchPrice);
+            
+            console.log(`[Price Check] ${item.clubName} - Comparison:`, {
+              purchasePrice: avgPrice,
+              preMatchPrice: preMatchPrice,
+              difference: diff.toFixed(4),
+              purchasePriceFromMarketCap: roundForDisplay(avgPrice * 1000),
+              preMatchMarketCap: preMatchMarketCap,
+              currentPrice: item.currentPrice,
+              marketplaceChange: matchdayChanges.get(item.clubId) || 'N/A'
+            });
+          } else if (!preMatchMarketCap) {
+            console.log(`[Price Check] ${item.clubName}: No pre-match data found`);
+          }
+        });
+      } catch (error) {
+        console.error('[Price Check] Error:', error);
+      }
+    };
+
+    checkPurchaseVsPreMatchPrices();
+  }, [portfolio, matchdayChanges, getTransactionsByClub]);
 
   // Memoized KPI calculations
   const { totalInvested, totalMarketValue, totalProfitLoss } = useMemo(() => {
@@ -163,36 +286,77 @@ const PortfolioPage: React.FC = () => {
 
   // Memoized portfolio table rows
   const memoizedPortfolioRows = useMemo(() => portfolio.map((item) => {
-    // Calculate average price from transactions: net invested / total units
-    // Use Decimal for precision to prevent rounding drift
+    // Calculate average price from orders using exact market price at purchase time
+    // Use market_cap_before / total_shares for each BUY order to get exact purchase price
+    // This ensures avg price matches the exact market share price when shares were bought
     const transactions = getTransactionsByClub(item.clubId);
-    const netInvested = transactions.reduce((sum, t) => {
-      const value = toDecimal(t.totalValue);
-      return t.orderType === 'BUY' ? sum.plus(value) : sum.minus(value);
-    }, toDecimal(0));
-    const totalUnitsFromTransactions = transactions.reduce((sum, t) => {
-      const units = toDecimal(t.units);
-      return t.orderType === 'BUY' ? sum.plus(units) : sum.minus(units);
-    }, toDecimal(0));
+    const totalShares = 1000; // Fixed shares model
     
-    // Calculate average price using Decimal precision, round only at display
-    const avgPrice = totalUnitsFromTransactions.gt(0) 
-      ? roundForDisplay(netInvested.dividedBy(totalUnitsFromTransactions))
-      : 0;
+    let totalInvestedFromOrders = toDecimal(0);
+    let totalUnitsFromOrders = toDecimal(0);
     
-    // Calculate P&L: current value - net invested (includes both unrealized and realized P&L)
-    // Use Decimal for precision
-    const currentValueDecimal = toDecimal(item.totalValue);
-    const profitLoss = roundForDisplay(currentValueDecimal.minus(netInvested));
+    transactions.forEach(t => {
+      if (t.orderType === 'BUY') {
+        // Use exact market price at purchase time (market_cap_before / total_shares)
+        // This is the exact price that existed when the share was bought
+        if (t.marketCapBefore) {
+          const purchasePriceExact = fromCents(t.marketCapBefore).dividedBy(totalShares);
+          totalInvestedFromOrders = totalInvestedFromOrders.plus(purchasePriceExact.times(t.units));
+        } else {
+          // Fallback to pricePerUnit if marketCapBefore not available
+          totalInvestedFromOrders = totalInvestedFromOrders.plus(toDecimal(t.pricePerUnit).times(t.units));
+        }
+        totalUnitsFromOrders = totalUnitsFromOrders.plus(t.units);
+      } else if (t.orderType === 'SELL') {
+        // For SELL orders, subtract the units (FIFO/LIFO would be more complex, but for average we just subtract)
+        if (t.marketCapBefore) {
+          const sellPriceExact = fromCents(t.marketCapBefore).dividedBy(totalShares);
+          totalInvestedFromOrders = totalInvestedFromOrders.minus(sellPriceExact.times(t.units));
+        } else {
+          totalInvestedFromOrders = totalInvestedFromOrders.minus(toDecimal(t.pricePerUnit).times(t.units));
+        }
+        totalUnitsFromOrders = totalUnitsFromOrders.minus(t.units);
+      }
+    });
     
-    // Calculate percentage change: (Current Price - Avg Price) / Avg Price * 100
-    // This shows the change from the user's average purchase price to the current price
-    let percentChange = calculatePercentChange(item.currentPrice, avgPrice);
-    // Round very small changes to 0.00% to avoid showing "+0.03%" when it should be "0.00%"
-    // This handles floating point precision issues where prices are effectively the same
-    if (Math.abs(percentChange) < 0.01) {
-      percentChange = 0;
+    // Calculate average price from exact purchase prices
+    const avgPricePrecise = totalUnitsFromOrders.gt(0)
+      ? totalInvestedFromOrders.dividedBy(totalUnitsFromOrders)
+      : toDecimal(0);
+    
+    // Round average price only for display
+    const avgPrice = roundForDisplay(avgPricePrecise);
+    
+    // Also keep totalInvestedCents for P&L calculation
+    const totalInvestedCents = item.totalInvestedCents || 0;
+    
+    // Calculate percentage change from exact purchase price to current price
+    // Both prices use the same calculation: market_cap / total_shares (full precision Decimal)
+    // If no matches have been played, market_cap equals market_cap_before from purchases, so percentage = 0%
+    let percentChange = 0;
+    if (avgPricePrecise.gt(0)) {
+      // Get current price from database market cap (in cents, as Decimal)
+      // Use the exact same calculation method as average price: market_cap / total_shares
+      const marketCapDecimal = currentMarketCaps.get(item.clubId);
+      if (!marketCapDecimal) {
+        // Market cap not loaded yet - cannot calculate percentage accurately
+        percentChange = 0;
+      } else {
+        // Calculate current price using exact same method as purchase price calculation
+        const currentPricePrecise = marketCapDecimal.dividedBy(totalShares);
+        
+        // Calculate percentage change from exact purchase price to current price
+        // Both use full precision Decimal, round only the final result
+        const changeDecimal = currentPricePrecise.minus(avgPricePrecise).dividedBy(avgPricePrecise).times(100);
+        percentChange = roundForDisplay(changeDecimal);
+      }
     }
+    
+    // Calculate P&L: current value - total invested (includes both unrealized and realized P&L)
+    // Use Decimal for precision - use totalInvestedCents for full precision
+    const currentValueDecimal = toDecimal(item.totalValue);
+    const totalInvestedDecimal = fromCents(totalInvestedCents);
+    const profitLoss = roundForDisplay(currentValueDecimal.minus(totalInvestedDecimal));
     const portfolioPercent = calculatePortfolioPercentage(item.totalValue, totalMarketValue);
     
     return (
@@ -227,7 +391,7 @@ const PortfolioPage: React.FC = () => {
         </td>
       </tr>
     );
-  }), [portfolio, clubs, totalMarketValue, handleClubClick, handleSellClick, getTransactionsByClub, matchdayChanges]);
+  }), [portfolio, clubs, totalMarketValue, handleClubClick, handleSellClick, getTransactionsByClub, matchdayChanges, currentMarketCaps]);
 
   // Realtime portfolio updates
   useEffect(() => {
@@ -395,36 +559,74 @@ const PortfolioPage: React.FC = () => {
                     // Find club to get external_id
                     const club = clubs.find(c => c.id === item.clubId);
                     
-                    // Calculate average price from transactions: net invested / total units
-                    // Use Decimal for precision to prevent rounding drift
+                    // Calculate average price from orders using exact market price at purchase time
+                    // Use market_cap_before / total_shares for each BUY order to get exact purchase price
+                    // This ensures avg price matches the exact market share price when shares were bought
                     const transactions = getTransactionsByClub(item.clubId);
-                    const netInvested = transactions.reduce((sum, t) => {
-                      const value = toDecimal(t.totalValue);
-                      return t.orderType === 'BUY' ? sum.plus(value) : sum.minus(value);
-                    }, toDecimal(0));
-                    const totalUnitsFromTransactions = transactions.reduce((sum, t) => {
-                      const units = toDecimal(t.units);
-                      return t.orderType === 'BUY' ? sum.plus(units) : sum.minus(units);
-                    }, toDecimal(0));
+                    const totalShares = 1000; // Fixed shares model
                     
-                    // Calculate average price using Decimal precision, round only at display
-                    const avgPrice = totalUnitsFromTransactions.gt(0) 
-                      ? roundForDisplay(netInvested.dividedBy(totalUnitsFromTransactions))
-                      : 0;
+                    let totalInvestedFromOrders = toDecimal(0);
+                    let totalUnitsFromOrders = toDecimal(0);
                     
-                    // Calculate P&L: current value - net invested (includes both unrealized and realized P&L)
-                    // Use Decimal for precision
-                    const currentValueDecimal = toDecimal(item.totalValue);
-                    const profitLoss = roundForDisplay(currentValueDecimal.minus(netInvested));
+                    transactions.forEach(t => {
+                      if (t.orderType === 'BUY') {
+                        // Use exact market price at purchase time (market_cap_before / total_shares)
+                        if (t.marketCapBefore) {
+                          const purchasePriceExact = fromCents(t.marketCapBefore).dividedBy(totalShares);
+                          totalInvestedFromOrders = totalInvestedFromOrders.plus(purchasePriceExact.times(t.units));
+                        } else {
+                          totalInvestedFromOrders = totalInvestedFromOrders.plus(toDecimal(t.pricePerUnit).times(t.units));
+                        }
+                        totalUnitsFromOrders = totalUnitsFromOrders.plus(t.units);
+                      } else if (t.orderType === 'SELL') {
+                        if (t.marketCapBefore) {
+                          const sellPriceExact = fromCents(t.marketCapBefore).dividedBy(totalShares);
+                          totalInvestedFromOrders = totalInvestedFromOrders.minus(sellPriceExact.times(t.units));
+                        } else {
+                          totalInvestedFromOrders = totalInvestedFromOrders.minus(toDecimal(t.pricePerUnit).times(t.units));
+                        }
+                        totalUnitsFromOrders = totalUnitsFromOrders.minus(t.units);
+                      }
+                    });
                     
-                    // Calculate percentage change: (Current Price - Avg Price) / Avg Price * 100
-                    // This shows the change from the user's average purchase price to the current price
-                    let percentChange = calculatePercentChange(item.currentPrice, avgPrice);
-                    // Round very small changes to 0.00% to avoid showing "+0.03%" when it should be "0.00%"
-                    // This handles floating point precision issues where prices are effectively the same
-                    if (Math.abs(percentChange) < 0.01) {
-                      percentChange = 0;
+                    // Calculate average price from exact purchase prices
+                    const avgPricePrecise = totalUnitsFromOrders.gt(0)
+                      ? totalInvestedFromOrders.dividedBy(totalUnitsFromOrders)
+                      : toDecimal(0);
+                    
+                    // Round average price only for display
+                    const avgPrice = roundForDisplay(avgPricePrecise);
+                    
+                    // Also keep totalInvestedCents for P&L calculation
+                    const totalInvestedCents = item.totalInvestedCents || 0;
+                    
+                    // Calculate percentage change from exact purchase price to current price
+                    // Both prices use the same calculation: market_cap / total_shares (full precision Decimal)
+                    // If no matches have been played, market_cap equals market_cap_before from purchases, so percentage = 0%
+                    let percentChange = 0;
+                    if (avgPricePrecise.gt(0)) {
+                      // Get current price from database market cap (in cents, as Decimal)
+                      // Use the exact same calculation method as average price: market_cap / total_shares
+                      const marketCapDecimal = currentMarketCaps.get(item.clubId);
+                      if (!marketCapDecimal) {
+                        // Market cap not loaded yet - cannot calculate percentage accurately
+                        percentChange = 0;
+                      } else {
+                        // Calculate current price using exact same method as purchase price calculation
+                        const currentPricePrecise = marketCapDecimal.dividedBy(totalShares);
+                        
+                        // Calculate percentage change from exact purchase price to current price
+                        // Both use full precision Decimal, round only the final result
+                        const changeDecimal = currentPricePrecise.minus(avgPricePrecise).dividedBy(avgPricePrecise).times(100);
+                        percentChange = roundForDisplay(changeDecimal);
+                      }
                     }
+                    
+                    // Calculate P&L: current value - total invested (includes both unrealized and realized P&L)
+                    // Use Decimal for precision - use totalInvestedCents for full precision
+                    const currentValueDecimal = toDecimal(item.totalValue);
+                    const totalInvestedDecimal = fromCents(totalInvestedCents);
+                    const profitLoss = roundForDisplay(currentValueDecimal.minus(totalInvestedDecimal));
                     
                     return (
                       <div

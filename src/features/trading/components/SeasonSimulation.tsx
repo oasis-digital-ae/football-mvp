@@ -184,6 +184,9 @@ const SeasonSimulation: React.FC = () => {
                         await (window as any).refreshClubValuesFixtures();
                     }
                     
+                    // Trigger refresh event for TeamDetailsSlideDown components
+                    window.dispatchEvent(new CustomEvent('refreshTeamDetails'));
+                    
                     // Refresh available games to move the played game to the played tab
             await loadAvailableGames();
                 } catch (processError) {
