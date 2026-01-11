@@ -278,15 +278,17 @@ const PortfolioPage: React.FC = () => {
   }, [sellModalData, sellClub, toast]);
 
   // Memoized portfolio table rows
-  const memoizedPortfolioRows = useMemo(() => portfolio.map((item) => {
-    // Calculate average price from orders using exact market price at purchase time
-    // Use market_cap_before / total_shares for each BUY order to get exact purchase price
-    // This ensures avg price matches the exact market share price when shares were bought
-    const transactions = getTransactionsByClub(item.clubId);
-    const totalShares = 1000; // Fixed shares model
+  const memoizedPortfolioRows = useMemo(() => {
+    const totalShares = 1000; // Fixed shares model - declare once for all items
     
-    let totalInvestedFromOrders = toDecimal(0);
-    let totalUnitsFromOrders = toDecimal(0);
+    return portfolio.map((item) => {
+      // Calculate average price from orders using exact market price at purchase time
+      // Use market_cap_before / total_shares for each BUY order to get exact purchase price
+      // This ensures avg price matches the exact market share price when shares were bought
+      const transactions = getTransactionsByClub(item.clubId);
+      
+      let totalInvestedFromOrders = toDecimal(0);
+      let totalUnitsFromOrders = toDecimal(0);
     
     transactions.forEach(t => {
       if (t.orderType === 'BUY') {
@@ -301,7 +303,7 @@ const PortfolioPage: React.FC = () => {
         }
         totalUnitsFromOrders = totalUnitsFromOrders.plus(t.units);
       } else if (t.orderType === 'SELL') {
-        // For SELL orders, subtract the units (FIFO/LIFO would be more complex, but for average we just subtract)
+        // For SELL orders, subtract using exact market price at sale time
         if (t.marketCapBefore) {
           const sellPriceExact = fromCents(t.marketCapBefore).dividedBy(totalShares);
           totalInvestedFromOrders = totalInvestedFromOrders.minus(sellPriceExact.times(t.units));
@@ -326,6 +328,7 @@ const PortfolioPage: React.FC = () => {
     // Calculate percentage change from exact purchase price to current price
     // Both prices use the same calculation: market_cap / total_shares (full precision Decimal)
     // If no matches have been played, market_cap equals market_cap_before from purchases, so percentage = 0%
+    let currentPrice = item.currentPrice; // Fallback to item.currentPrice if market cap not loaded
     let percentChange = 0;
     if (avgPricePrecise.gt(0)) {
       // Get current price from database market cap (in cents, as Decimal)
@@ -336,7 +339,10 @@ const PortfolioPage: React.FC = () => {
         percentChange = 0;
       } else {
         // Calculate current price using exact same method as purchase price calculation
+        // marketCapDecimal is in dollars (from fromCents), so divide by totalShares to get price per share
         const currentPricePrecise = marketCapDecimal.dividedBy(totalShares);
+        // Convert to dollars for display (rounded to 2 decimals)
+        currentPrice = roundForDisplay(currentPricePrecise);
         
         // Calculate percentage change from exact purchase price to current price
         // Both use full precision Decimal, round only the final result
@@ -361,7 +367,7 @@ const PortfolioPage: React.FC = () => {
         </td>
         <td className="px-3 text-right font-mono">{formatNumber(item.units)}</td>
         <td className="px-3 text-right font-mono">{formatCurrency(avgPrice)}</td>
-        <td className="px-3 text-right font-mono">{formatCurrency(item.currentPrice)}</td>
+        <td className="px-3 text-right font-mono">{formatCurrency(currentPrice)}</td>
         <td className={`px-3 text-right font-semibold ${percentChange === 0 ? 'text-gray-400' : percentChange > 0 ? 'price-positive' : 'price-negative'}`}>
           {percentChange > 0 ? '+' : ''}{percentChange.toFixed(2)}%
         </td>
@@ -382,7 +388,8 @@ const PortfolioPage: React.FC = () => {
         </td>
       </tr>
     );
-  }), [portfolio, clubs, totalMarketValue, handleClubClick, handleSellClick, getTransactionsByClub, matchdayChanges, currentMarketCaps]);
+    });
+  }, [portfolio, clubs, totalMarketValue, handleClubClick, handleSellClick, getTransactionsByClub, matchdayChanges, currentMarketCaps]);
 
   // Realtime portfolio updates
   useEffect(() => {
@@ -570,6 +577,7 @@ const PortfolioPage: React.FC = () => {
                         }
                         totalUnitsFromOrders = totalUnitsFromOrders.plus(t.units);
                       } else if (t.orderType === 'SELL') {
+                        // For SELL orders, subtract using exact market price at sale time
                         if (t.marketCapBefore) {
                           const sellPriceExact = fromCents(t.marketCapBefore).dividedBy(totalShares);
                           totalInvestedFromOrders = totalInvestedFromOrders.minus(sellPriceExact.times(t.units));
@@ -604,6 +612,7 @@ const PortfolioPage: React.FC = () => {
                         percentChange = 0;
                       } else {
                         // Calculate current price using exact same method as purchase price calculation
+                        const totalShares = 1000; // Fixed shares model
                         const currentPricePrecise = marketCapDecimal.dividedBy(totalShares);
                         
                         // Calculate percentage change from exact purchase price to current price

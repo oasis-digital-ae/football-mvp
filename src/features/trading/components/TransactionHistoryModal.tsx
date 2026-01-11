@@ -28,12 +28,34 @@ const TransactionHistoryModal: React.FC<TransactionHistoryModalProps> = ({
     return t.orderType === 'BUY' ? sum + t.units : sum - t.units;
   }, 0);
   
-  // Calculate net cash invested: total spent on buys - total received from sells
-  const totalInvested = transactions.reduce((sum, t) => {
-    return t.orderType === 'BUY' ? sum + t.totalValue : sum - t.totalValue;
-  }, 0);
+  // Calculate net invested using precise market_cap_before calculations (matches PortfolioPage)
+  // This uses the exact market price at transaction time, not rounded values
+  const totalShares = 1000; // Fixed shares model
+  let totalInvested = 0;
   
-  // Average price = net invested / total units (always calculate from transactions)
+  transactions.forEach(t => {
+    if (t.orderType === 'BUY') {
+      // Use exact market price at purchase time (market_cap_before / total_shares)
+      if (t.marketCapBefore) {
+        const purchasePriceExact = (t.marketCapBefore / 100) / totalShares; // Convert cents to dollars, then divide by shares
+        totalInvested += purchasePriceExact * t.units;
+      } else {
+        // Fallback to totalValue if marketCapBefore not available
+        totalInvested += t.totalValue;
+      }
+    } else if (t.orderType === 'SELL') {
+      // For SELL orders, subtract using exact market price at sale time
+      if (t.marketCapBefore) {
+        const sellPriceExact = (t.marketCapBefore / 100) / totalShares; // Convert cents to dollars, then divide by shares
+        totalInvested -= sellPriceExact * t.units;
+      } else {
+        // Fallback to totalValue if marketCapBefore not available
+        totalInvested -= t.totalValue;
+      }
+    }
+  });
+  
+  // Average price = net invested / total units (using precise calculations)
   const avgPrice = totalUnits > 0 ? totalInvested / totalUnits : 0;
 
   return (

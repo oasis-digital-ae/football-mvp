@@ -4,7 +4,7 @@
 
 ### Current Implementation
 
-The Stripe integration uses **live keys by default** in both development and production. Here's how it's configured:
+The Stripe integration uses **live keys by default** with fallback to test keys. Here's how it's configured:
 
 #### Frontend (DepositModal.tsx)
 - **Publishable Key**: Uses `VITE_STRIPE_PUBLISHABLE_KEY_LIVE` with fallback to `VITE_STRIPE_PUBLISHABLE_KEY`
@@ -12,8 +12,8 @@ The Stripe integration uses **live keys by default** in both development and pro
 - **Location**: Client-side (visible in browser)
 
 #### Backend Functions
-- **create-payment-intent.ts**: Uses `STRIPE_SECRET_KEY_LIVE` (hardcoded)
-- **stripe-webhook.ts**: Uses `STRIPE_SECRET_KEY_LIVE` and `STRIPE_WEBHOOK_SECRET_LIVE` (hardcoded)
+- **create-payment-intent.ts**: Uses `STRIPE_SECRET_KEY_LIVE` with fallback to `STRIPE_SECRET_KEY`
+- **stripe-webhook.ts**: Uses `STRIPE_SECRET_KEY_LIVE` and `STRIPE_WEBHOOK_SECRET_LIVE` with fallback to test keys
 
 ### Payment Flow
 

@@ -7,8 +7,8 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    // Use test keys for now (can switch to live keys later)
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY_LIVE;
+    // Prioritize live keys for production (can fallback to test keys if live not available)
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY_LIVE || process.env.STRIPE_SECRET_KEY;
     
     if (!stripeSecretKey) {
       const errorMsg = 'Missing Stripe secret key. Need STRIPE_SECRET_KEY or STRIPE_SECRET_KEY_LIVE';

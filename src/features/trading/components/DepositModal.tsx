@@ -27,8 +27,8 @@ const getNetlifyFunctionUrl = (functionName: string): string => {
   return `/.netlify/functions/${functionName}`;
 };
 
-// Use test keys for now (can switch to live keys later)
-const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY_LIVE;
+// Prioritize live keys for production (can fallback to test keys if live not available)
+const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY_LIVE || import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 
 const stripePromise = loadStripe(stripePublishableKey || '');
 

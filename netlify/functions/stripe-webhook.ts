@@ -9,13 +9,13 @@ export const config = {
 
 export const handler: Handler = async (event) => {
   try {
-    // Use test keys for now (can switch to live keys later)
+    // Prioritize live keys for production (can fallback to test keys if live not available)
     // Validate required environment variables
     const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY_LIVE;
-    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET_LIVE;
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY_LIVE || process.env.STRIPE_SECRET_KEY;
+    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET_LIVE || process.env.STRIPE_WEBHOOK_SECRET;
 
     if (!supabaseUrl || !supabaseServiceKey) {
       console.error('Missing Supabase credentials:', {
