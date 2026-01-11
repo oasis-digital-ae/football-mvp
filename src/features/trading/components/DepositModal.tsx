@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
@@ -27,18 +27,8 @@ const getNetlifyFunctionUrl = (functionName: string): string => {
   return `/.netlify/functions/${functionName}`;
 };
 
-// Initialize Stripe - Detect environment and use appropriate keys
-// In production, use live keys; in development, use test keys
-const isProduction = typeof window !== 'undefined' && (
-  window.location.hostname.includes('netlify.app') || 
-  window.location.protocol === 'https:' ||
-  import.meta.env.PROD
-);
-
-// In development, ONLY use test keys (no fallback to live keys)
-const stripePublishableKey = isProduction
-  ? import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY_LIVE
-  : import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+// Use test keys for now (can switch to live keys later)
+const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY_LIVE;
 
 const stripePromise = loadStripe(stripePublishableKey || '');
 
@@ -373,6 +363,9 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose, onS
             <Wallet className="w-5 h-5" />
             Deposit Funds
           </DialogTitle>
+          <DialogDescription className="text-center text-gray-400">
+            Add funds to your wallet to start trading. A 5% platform fee applies to all deposits.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="py-4 space-y-4">

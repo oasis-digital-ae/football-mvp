@@ -13,20 +13,12 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    // Detect environment
-    const isProduction = process.env.NETLIFY_ENV === 'production' || 
-                         process.env.CONTEXT === 'production' ||
-                         process.env.NODE_ENV === 'production';
-    
+    // Use test keys for now (can switch to live keys later)
     // Validate required environment variables
     const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     
-    // Use live keys in production, test keys in development
-    // In development, ONLY use test keys (no fallback to live keys)
-    const stripeSecretKey = isProduction
-      ? process.env.STRIPE_SECRET_KEY_LIVE
-      : process.env.STRIPE_SECRET_KEY;
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY_LIVE;
 
     if (!supabaseUrl || !supabaseServiceKey) {
       return { 

@@ -7,31 +7,12 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    // Detect environment: production uses live keys, development uses test keys
-    const isProduction = process.env.NETLIFY_ENV === 'production' || 
-                         process.env.CONTEXT === 'production' ||
-                         process.env.NODE_ENV === 'production';
-    
-    console.log('Environment detection:', {
-      NETLIFY_ENV: process.env.NETLIFY_ENV,
-      CONTEXT: process.env.CONTEXT,
-      NODE_ENV: process.env.NODE_ENV,
-      isProduction,
-    });
-    
-    // Use live keys in production, test keys in development
-    // In development, ONLY use test keys (no fallback to live keys)
-    const stripeSecretKey = isProduction
-      ? process.env.STRIPE_SECRET_KEY_LIVE
-      : process.env.STRIPE_SECRET_KEY;
+    // Use test keys for now (can switch to live keys later)
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY_LIVE;
     
     if (!stripeSecretKey) {
-      const errorMsg = `Missing Stripe secret key. In ${isProduction ? 'production' : 'development'}, need ${isProduction ? 'STRIPE_SECRET_KEY_LIVE' : 'STRIPE_SECRET_KEY'}`;
+      const errorMsg = 'Missing Stripe secret key. Need STRIPE_SECRET_KEY or STRIPE_SECRET_KEY_LIVE';
       console.error(errorMsg);
-      console.error('Available env vars:', {
-        hasTestKey: !!process.env.STRIPE_SECRET_KEY,
-        hasLiveKey: !!process.env.STRIPE_SECRET_KEY_LIVE,
-      });
       return { 
         statusCode: 500, 
         headers: { 'Content-Type': 'application/json' },
@@ -42,7 +23,8 @@ export const handler: Handler = async (event) => {
       };
     }
     
-    console.log(`Using ${isProduction ? 'LIVE' : 'TEST'} Stripe keys (key prefix: ${stripeSecretKey.substring(0, 7)})`);
+    const keyType = stripeSecretKey.startsWith('sk_live_') ? 'LIVE' : 'TEST';
+    console.log(`Using ${keyType} Stripe keys (key prefix: ${stripeSecretKey.substring(0, 7)})`);
 
     const stripe = new Stripe(stripeSecretKey, {
       apiVersion: '2024-06-20',
