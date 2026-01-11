@@ -200,26 +200,19 @@ const PortfolioPage: React.FC = () => {
 
   // Memoized KPI calculations
   const { totalInvested, totalMarketValue, totalProfitLoss } = useMemo(() => {
-    // Calculate net invested and P&L from transactions for each portfolio item
+    // Calculate net invested and total P&L from portfolio items
     // Use Decimal for precision to prevent rounding drift
     let invested = toDecimal(0);
     let profitLoss = toDecimal(0);
     
     portfolio.forEach((item) => {
-      const transactions = getTransactionsByClub(item.clubId);
-      // Calculate net invested: total BUY - total SELL (using Decimal precision)
-      const netInvested = transactions.reduce((sum, t) => {
-        const value = toDecimal(t.totalValue);
-        return t.orderType === 'BUY' ? sum.plus(value) : sum.minus(value);
-      }, toDecimal(0));
+      // Use totalInvestedCents from portfolio item (from database)
+      const itemInvested = fromCents(item.totalInvestedCents || 0);
+      invested = invested.plus(itemInvested);
       
-      // Calculate P&L: current value - net invested
-      // This includes both unrealized P&L (from current holdings) and realized P&L (from sales)
-      const currentValueDecimal = toDecimal(item.totalValue);
-      const itemProfitLoss = currentValueDecimal.minus(netInvested);
-      
-      invested = invested.plus(netInvested);
-      profitLoss = profitLoss.plus(itemProfitLoss);
+      // Use profitLoss from portfolio item (which now uses total_pnl from database)
+      // This includes both realized P&L (from sales) and unrealized P&L (current holdings)
+      profitLoss = profitLoss.plus(toDecimal(item.profitLoss));
     });
     
     const marketValue = portfolio.reduce((sum, item) => {
@@ -231,7 +224,7 @@ const PortfolioPage: React.FC = () => {
       totalMarketValue: roundForDisplay(marketValue),
       totalProfitLoss: roundForDisplay(profitLoss)
     };
-  }, [portfolio, getTransactionsByClub]);
+  }, [portfolio]);
 
   const handleClubClick = useCallback((clubId: string, clubName: string) => {
     const club = clubs.find(c => c.id === clubId);
@@ -352,11 +345,9 @@ const PortfolioPage: React.FC = () => {
       }
     }
     
-    // Calculate P&L: current value - total invested (includes both unrealized and realized P&L)
-    // Use Decimal for precision - use totalInvestedCents for full precision
-    const currentValueDecimal = toDecimal(item.totalValue);
-    const totalInvestedDecimal = fromCents(totalInvestedCents);
-    const profitLoss = roundForDisplay(currentValueDecimal.minus(totalInvestedDecimal));
+    // Use profitLoss from portfolio item (which uses total_pnl from database)
+    // This includes both realized P&L (from sales) and unrealized P&L (current holdings)
+    const profitLoss = item.profitLoss;
     const portfolioPercent = calculatePortfolioPercentage(item.totalValue, totalMarketValue);
     
     return (
@@ -622,11 +613,9 @@ const PortfolioPage: React.FC = () => {
                       }
                     }
                     
-                    // Calculate P&L: current value - total invested (includes both unrealized and realized P&L)
-                    // Use Decimal for precision - use totalInvestedCents for full precision
-                    const currentValueDecimal = toDecimal(item.totalValue);
-                    const totalInvestedDecimal = fromCents(totalInvestedCents);
-                    const profitLoss = roundForDisplay(currentValueDecimal.minus(totalInvestedDecimal));
+                    // Use profitLoss from portfolio item (which uses total_pnl from database)
+                    // This includes both realized P&L (from sales) and unrealized P&L (current holdings)
+                    const profitLoss = item.profitLoss;
                     
                     return (
                       <div

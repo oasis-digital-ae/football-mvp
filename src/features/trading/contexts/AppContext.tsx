@@ -225,11 +225,19 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
         // Use centralized calculation functions for consistency
         const totalValue = calculateTotalValue(currentPrice, position.quantity);
         
-        // Calculate unrealized P&L: current_value - total_invested (for current positions)
-        const unrealizedPL = calculateProfitLoss(currentPrice, avgCostForDisplay) * position.quantity;
+        // Use total_pnl from database (includes both realized and unrealized P&L)
+        // If total_pnl is not available, fall back to calculating unrealized P&L
+        const totalPnlCents = position.total_pnl ?? null;
+        let profitLoss: number;
         
-        // Use only unrealized P&L (not including realized P&L from sales)
-        const profitLoss = unrealizedPL;
+        if (totalPnlCents !== null && totalPnlCents !== undefined) {
+          // Use total_pnl from database (realized + unrealized)
+          profitLoss = fromCents(totalPnlCents).toNumber();
+        } else {
+          // Fallback: Calculate unrealized P&L only (if total_pnl not available)
+          const unrealizedPL = calculateProfitLoss(currentPrice, avgCostForDisplay) * position.quantity;
+          profitLoss = unrealizedPL;
+        }
         
         // Calculate purchase market cap with full precision (no rounding)
         // purchase_market_cap = (total_invested / quantity) * totalShares

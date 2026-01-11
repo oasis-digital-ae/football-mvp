@@ -9,6 +9,7 @@ export interface DatabasePosition {
   team_id: number;
   quantity: number; // Changed from shares to quantity to match database
   total_invested: number;
+  total_pnl?: number; // Total P&L in cents (realized + unrealized) - BIGINT from database
   is_latest: boolean;
   created_at: string;
   updated_at: string;
