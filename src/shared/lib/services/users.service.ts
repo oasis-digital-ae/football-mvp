@@ -267,9 +267,7 @@ export const usersService = {
         .eq('user_id', userId)
         .gt('quantity', 0);
 
-      if (positionsError) throw positionsError;
-
-      // Get orders (include market_cap_before for accurate purchase market cap calculation)
+      if (positionsError) throw positionsError;      // Get orders (include market_cap_before for accurate purchase market cap calculation)
       // Need ALL orders (BUY and SELL) for accurate realized P&L calculation
       // Query all orders first (to bypass RLS when querying other users' orders), then filter by user_id
       const { data: allOrdersData, error: ordersError } = await supabase
@@ -290,7 +288,7 @@ export const usersService = {
         `)
         .in('order_type', ['BUY', 'SELL'])
         .not('executed_at', 'is', null) // Only get orders that have been executed (implies FILLED)
-        .order('executed_at', { ascending: true, nullsFirst: false }); // Oldest first for cost basis tracking
+        .order('executed_at', { ascending: false, nullsFirst: false }); // Latest first for display (will be re-sorted for cost basis calculations)
 
       if (ordersError) {
         console.error('[getUserDetails] Error fetching orders:', ordersError);
@@ -314,16 +312,19 @@ export const usersService = {
           quantity: fromCents(o.quantity || 0).toNumber(),
           executedAt: o.executed_at
         }))
-      });
-
-      // Calculate realized P&L per team from SELL orders
+      });      // Calculate realized P&L per team from SELL orders
       // For each team, sum up: (sell_price * quantity) - (cost_basis_for_sold_shares)
       // We'll track cost basis by reconstructing position history from orders
       const realizedPLByTeam = new Map<number, number>();
       const teamCostBasis = new Map<number, { totalInvested: Decimal; totalQuantity: Decimal }>();
       
-      // Process orders chronologically to track cost basis (already sorted oldest first)
-      const sortedOrders = orders || [];
+      // Process orders chronologically (oldest first) to track cost basis
+      // Note: orders are fetched latest first for display, so we need to reverse for cost basis calc
+      const sortedOrders = [...(orders || [])].sort((a, b) => {
+        const aTime = a.executed_at ? new Date(a.executed_at).getTime() : 0;
+        const bTime = b.executed_at ? new Date(b.executed_at).getTime() : 0;
+        return aTime - bTime; // Oldest first
+      });
 
       // Log orders processing - use console.log for visibility
       console.log('[getUserDetails] Processing orders for realized P&L', {
