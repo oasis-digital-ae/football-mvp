@@ -464,104 +464,111 @@ const MatchResultsPage: React.FC = () => {
                               )}
                             </div>
                           </div>
-                        </div>
-
-                        {/* Desktop/Tablet Layout */}
-                        <div className="hidden md:flex items-center justify-between gap-4">
+                        </div>{/* Desktop/Tablet Layout */}
+                        <div className="hidden md:grid grid-cols-[140px_50px_1fr_32px_80px_32px_1fr_50px_120px] items-center gap-2">
                           {/* Left: Matchday & Status */}
-                          <div className="flex items-center gap-3 min-w-[100px]">
+                          <div className="flex items-center gap-3">
                             <div className="text-xs text-gray-500 font-mono">
                               MD{fixture.matchday}
                             </div>
                             {getStatusBadge(fixture.status)}
+                          </div>{/* Home Buy Button */}
+                          <div className="flex justify-end -mr-1">
+                            {fixture.home_team_id && fixture.status !== 'applied' && (
+                              <Button
+                                onClick={() => handlePurchaseClick(
+                                  fixture.home_team_id,
+                                  fixture.home_team?.name || 'Home Team',
+                                  fixture.home_team?.external_id ? parseInt(fixture.home_team.external_id) : undefined
+                                )}
+                                size="sm"
+                                disabled={isPurchasing || purchasingClubId === fixture.home_team_id.toString()}
+                                className="bg-[#10B981] hover:bg-[#059669] text-white font-medium px-2 py-1 text-xs rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed h-7 touch-manipulation w-full"
+                                title="Buy shares"
+                              >
+                                {isPurchasing && purchasingClubId === fixture.home_team_id.toString() ? '...' : 'Buy'}
+                              </Button>
+                            )}
                           </div>
 
-                          {/* Center: Match Details */}
-                          <div className="flex-1 flex items-center justify-center gap-4">
-                            {/* Home Team */}
-                            <div className="flex items-center gap-2 flex-1 justify-end">
-                              {fixture.home_team_id && (
-                                <Button
-                                  onClick={() => handlePurchaseClick(
-                                    fixture.home_team_id,
-                                    fixture.home_team?.name || 'Home Team',
-                                    fixture.home_team?.external_id ? parseInt(fixture.home_team.external_id) : undefined
-                                  )}
-                                  size="sm"
-                                  disabled={isPurchasing || purchasingClubId === fixture.home_team_id.toString()}
-                                  className="bg-[#10B981] hover:bg-[#059669] text-white font-medium px-2 py-1 text-xs rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed h-7 touch-manipulation"
-                                  title="Buy shares"
-                                >
-                                  {isPurchasing && purchasingClubId === fixture.home_team_id.toString() ? '...' : 'Buy'}
-                                </Button>
-                              )}
-                              <ClickableTeamName
-                                teamName={fixture.home_team?.name || 'Home Team'}
-                                teamId={fixture.home_team_id}
-                                externalId={fixture.home_team?.external_id ? parseInt(fixture.home_team.external_id) : undefined}
-                                className="text-sm font-medium text-white hover:text-trading-primary transition-colors text-right"
-                              />
-                              <TeamLogo 
-                                teamName={fixture.home_team?.name || 'Home Team'} 
-                                externalId={fixture.home_team?.external_id ? parseInt(fixture.home_team.external_id) : undefined}
-                                size="sm" 
-                              />
-                            </div>
+                          {/* Home Team Name */}
+                          <div className="flex items-center gap-2 justify-end overflow-hidden -ml-1">
+                            <ClickableTeamName
+                              teamName={fixture.home_team?.name || 'Home Team'}
+                              teamId={fixture.home_team_id}
+                              externalId={fixture.home_team?.external_id ? parseInt(fixture.home_team.external_id) : undefined}
+                              className="text-sm font-medium text-white hover:text-trading-primary transition-colors text-right truncate"
+                            />
+                          </div>
 
-                            {/* Score */}
-                            <div className="flex items-center gap-2 min-w-[80px] justify-center">
-                              {fixture.status === 'applied' && fixture.home_score !== null ? (
-                                <>
-                                  <span className={`text-lg font-bold ${
-                                    fixture.result === 'home_win' ? 'text-green-400' : 
-                                    fixture.result === 'away_win' ? 'text-gray-400' : 'text-white'
-                                  }`}>
-                                    {fixture.home_score}
-                                  </span>
-                                  <span className="text-gray-500 text-xs">-</span>
-                                  <span className={`text-lg font-bold ${
-                                    fixture.result === 'away_win' ? 'text-green-400' : 
-                                    fixture.result === 'home_win' ? 'text-gray-400' : 'text-white'
-                                  }`}>
-                                    {fixture.away_score}
-                                  </span>
-                                </>
-                              ) : (
-                                <span className="text-xs text-gray-500 font-mono">
-                                  {formatTime(fixture.kickoff_at)}
+                          {/* Home Team Logo */}
+                          <div className="flex justify-center">
+                            <TeamLogo 
+                              teamName={fixture.home_team?.name || 'Home Team'} 
+                              externalId={fixture.home_team?.external_id ? parseInt(fixture.home_team.external_id) : undefined}
+                              size="sm" 
+                            />
+                          </div>
+
+                          {/* Score/Time */}
+                          <div className="flex items-center gap-2 justify-center">
+                            {fixture.status === 'applied' && fixture.home_score !== null ? (
+                              <>
+                                <span className={`text-lg font-bold ${
+                                  fixture.result === 'home_win' ? 'text-green-400' : 
+                                  fixture.result === 'away_win' ? 'text-gray-400' : 'text-white'
+                                }`}>
+                                  {fixture.home_score}
                                 </span>
-                              )}
-                            </div>
+                                <span className="text-gray-500 text-xs">-</span>
+                                <span className={`text-lg font-bold ${
+                                  fixture.result === 'away_win' ? 'text-green-400' : 
+                                  fixture.result === 'home_win' ? 'text-gray-400' : 'text-white'
+                                }`}>
+                                  {fixture.away_score}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-xs text-gray-500 font-mono">
+                                {formatTime(fixture.kickoff_at)}
+                              </span>
+                            )}
+                          </div>
 
-                            {/* Away Team */}
-                            <div className="flex items-center gap-2 flex-1 justify-start">
-                              <TeamLogo 
-                                teamName={fixture.away_team?.name || 'Away Team'} 
-                                externalId={fixture.away_team?.external_id ? parseInt(fixture.away_team.external_id) : undefined}
-                                size="sm" 
-                              />
-                              <ClickableTeamName
-                                teamName={fixture.away_team?.name || 'Away Team'}
-                                teamId={fixture.away_team_id}
-                                externalId={fixture.away_team?.external_id ? parseInt(fixture.away_team.external_id) : undefined}
-                                className="text-sm font-medium text-white hover:text-trading-primary transition-colors text-left"
-                              />
-                              {fixture.away_team_id && (
-                                <Button
-                                  onClick={() => handlePurchaseClick(
-                                    fixture.away_team_id,
-                                    fixture.away_team?.name || 'Away Team',
-                                    fixture.away_team?.external_id ? parseInt(fixture.away_team.external_id) : undefined
-                                  )}
-                                  size="sm"
-                                  disabled={isPurchasing || purchasingClubId === fixture.away_team_id.toString()}
-                                  className="bg-[#10B981] hover:bg-[#059669] text-white font-medium px-2 py-1 text-xs rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed h-7 touch-manipulation"
-                                  title="Buy shares"
-                                >
-                                  {isPurchasing && purchasingClubId === fixture.away_team_id.toString() ? '...' : 'Buy'}
-                                </Button>
-                              )}
-                            </div>
+                          {/* Away Team Logo */}
+                          <div className="flex justify-center">
+                            <TeamLogo 
+                              teamName={fixture.away_team?.name || 'Away Team'} 
+                              externalId={fixture.away_team?.external_id ? parseInt(fixture.away_team.external_id) : undefined}
+                              size="sm" 
+                            />
+                          </div>{/* Away Team Name */}
+                          <div className="flex items-center gap-2 justify-start overflow-hidden -mr-1">
+                            <ClickableTeamName
+                              teamName={fixture.away_team?.name || 'Away Team'}
+                              teamId={fixture.away_team_id}
+                              externalId={fixture.away_team?.external_id ? parseInt(fixture.away_team.external_id) : undefined}
+                              className="text-sm font-medium text-white hover:text-trading-primary transition-colors text-left truncate"
+                            />
+                          </div>
+
+                          {/* Away Buy Button */}
+                          <div className="flex justify-start -ml-1">
+                            {fixture.away_team_id && fixture.status !== 'applied' && (
+                              <Button
+                                onClick={() => handlePurchaseClick(
+                                  fixture.away_team_id,
+                                  fixture.away_team?.name || 'Away Team',
+                                  fixture.away_team?.external_id ? parseInt(fixture.away_team.external_id) : undefined
+                                )}
+                                size="sm"
+                                disabled={isPurchasing || purchasingClubId === fixture.away_team_id.toString()}
+                                className="bg-[#10B981] hover:bg-[#059669] text-white font-medium px-2 py-1 text-xs rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed h-7 touch-manipulation w-full"
+                                title="Buy shares"
+                              >
+                                {isPurchasing && purchasingClubId === fixture.away_team_id.toString() ? '...' : 'Buy'}
+                              </Button>
+                            )}
                           </div>
 
                           {/* Right: Buy Window Info (for scheduled matches) */}

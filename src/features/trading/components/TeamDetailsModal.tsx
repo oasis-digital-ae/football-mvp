@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/shared/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
@@ -184,20 +184,16 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
     }
   };
 
-
   const loadMatchHistory = async (fixturesData: DatabaseFixture[], teamsData: DatabaseTeam[], currentUserPosition?: any) => {
     try {
       console.log('🎯🎯🎯 LOAD MATCH HISTORY FUNCTION CALLED 🎯🎯🎯');
       console.log('Loading match history from total_ledger for teamId:', teamId);
       
-      // Query total_ledger for match history instead of fixtures
-      // Only get matches that have actually been played (kickoff_at <= NOW())
+      // Query total_ledger for match history
+      // Load ledger data separately (no join needed)
       const { data: ledgerData, error: ledgerError } = await supabase
         .from('total_ledger')
-        .select(`
-          *,
-          fixture:fixtures!total_ledger_trigger_event_id_fkey(kickoff_at)
-        `)
+        .select('*')
         .eq('team_id', teamId)
         .in('ledger_type', ['match_win', 'match_loss', 'match_draw'])
         .order('event_date', { ascending: false })
@@ -418,7 +414,6 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
         return 'bg-gray-600';
     }
   };
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-gray-900 border-gray-700">
@@ -427,6 +422,9 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
             <TrendingUp className="h-5 w-5 text-green-400" />
             {teamName} - Match History & Share Price Impact
           </DialogTitle>
+          <DialogDescription className="text-gray-400">
+            View detailed match history and share price impact for {teamName}
+          </DialogDescription>
         </DialogHeader>
 
         {loading && (

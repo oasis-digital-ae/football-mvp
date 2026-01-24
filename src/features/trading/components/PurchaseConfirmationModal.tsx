@@ -37,7 +37,7 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
   isProcessing = false
 }) => {
   const { walletBalance, refreshWalletBalance } = useAuth();
-  const [shares, setShares] = useState<number>(1);
+  const [shares, setShares] = useState<string>('');
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [buyWindowStatus, setBuyWindowStatus] = useState<any>(null);
   const [depositModalOpen, setDepositModalOpen] = useState(false);
@@ -45,7 +45,7 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
   // Reset shares when modal opens
   useEffect(() => {
     if (isOpen) {
-      setShares(1);
+      setShares('');
       setValidationErrors({});
       
       // Fetch buy window status
@@ -63,8 +63,22 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
   const handleSharesChange = (value: string) => {
     // Sanitize and validate input
     const sanitizedValue = sanitizeInput(value, 'number');
-    const numShares = parseInt(sanitizedValue) || 0;
-    setShares(numShares);
+    
+    // Allow empty string to clear the input
+    if (sanitizedValue === '') {
+      setShares('');
+      setValidationErrors({});
+      return;
+    }
+    
+    const numShares = parseInt(sanitizedValue);
+    
+    // Only update if it's a valid number
+    if (isNaN(numShares)) {
+      return;
+    }
+    
+    setShares(sanitizedValue);
     
     // Validate the input using enhanced validation with sanitization
     const validation = validateAndSanitize(AppValidators.sharePurchaseModal, {
@@ -77,15 +91,17 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
     
     setValidationErrors(validation.errors);
   };
-
   const handleConfirm = () => {
     // Prevent multiple clicks while processing
     if (isProcessing) return;
     
     try {
+      // Parse shares to number
+      const numShares = parseInt(shares);
+      
       // Final validation before confirming using enhanced validation with sanitization
       const validation = validateAndSanitize(AppValidators.sharePurchaseModal, {
-        units: shares,
+        units: numShares,
         pricePerShare: pricePerShare
       }, {
         units: 'number',
@@ -106,9 +122,10 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
     }
   };
 
-  const totalValue = shares * pricePerShare;
+  const numericShares = parseInt(shares) || 0;
+  const totalValue = numericShares * pricePerShare;
   const hasSufficientBalance = walletBalance >= totalValue;
-  const isValid = Object.keys(validationErrors).length === 0 && shares > 0 && hasSufficientBalance;
+  const isValid = Object.keys(validationErrors).length === 0 && numericShares > 0 && hasSufficientBalance;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -149,8 +166,7 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
             <div className="space-y-1">
               <Label htmlFor="shares" className="text-[10px] sm:text-xs text-gray-400 font-medium uppercase tracking-wide">
                 Shares
-              </Label>
-              <Input
+              </Label>              <Input
                 id="shares"
                 type="number"
                 min="1"
@@ -160,7 +176,7 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
                 className={`bg-gray-700/50 border-gray-600 text-white text-base sm:text-lg font-semibold h-12 sm:h-14 touch-manipulation text-center ${
                   !isValid ? 'border-red-500 focus:border-red-500' : 'focus:border-blue-500'
                 }`}
-                placeholder="0"
+                placeholder="Enter quantity"
               />
               {validationErrors.units && (
                 <p className="text-red-400 text-[10px] sm:text-xs mt-0.5">
@@ -180,10 +196,9 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
                 <span className="text-gray-500">Price</span>
                 <span className="font-medium text-gray-300">{formatCurrency(pricePerShare)}</span>
               </div>
-              
-              <div className="flex justify-between items-center text-[10px] sm:text-xs">
+                <div className="flex justify-between items-center text-[10px] sm:text-xs">
                 <span className="text-gray-500">Qty</span>
-                <span className="font-medium text-gray-300">{shares.toLocaleString()}</span>
+                <span className="font-medium text-gray-300">{numericShares.toLocaleString()}</span>
               </div>
               
               <div className="border-t border-gray-600/30 pt-2 space-y-1.5">
@@ -215,11 +230,10 @@ export const PurchaseConfirmationModal: React.FC<PurchaseConfirmationModalProps>
           </div>
         </div>
         
-        {/* Action Buttons - Financial App Style */}
-        <DialogFooter className="flex flex-col gap-2 pt-3 border-t border-gray-700/50">
+        {/* Action Buttons - Financial App Style */}        <DialogFooter className="flex flex-col gap-2 pt-3 border-t border-gray-700/50">
           <Button
             onClick={handleConfirm}
-            disabled={!isValid || shares <= 0 || isProcessing || !buyWindowStatus?.isOpen || !hasSufficientBalance}
+            disabled={!isValid || numericShares <= 0 || isProcessing || !buyWindowStatus?.isOpen || !hasSufficientBalance}
             className="w-full bg-[#10B981] hover:bg-[#059669] disabled:bg-gray-600 disabled:opacity-50 text-white font-semibold transition-all duration-200 disabled:hover:scale-100 h-12 sm:h-14 touch-manipulation text-sm sm:text-base shadow-lg"
             title={
               !buyWindowStatus?.isOpen 

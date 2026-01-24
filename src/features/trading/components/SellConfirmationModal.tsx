@@ -34,14 +34,14 @@ export const SellConfirmationModal: React.FC<SellConfirmationModalProps> = ({
   isProcessing = false
 }) => {
   const { walletBalance, refreshWalletBalance } = useAuth();
-  const [shares, setShares] = useState<number>(1);
+  const [shares, setShares] = useState<string>('');
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   // Reset shares when modal opens
   useEffect(() => {
     if (isOpen) {
-      // Default to selling 1 share, or all shares if user only has 1
-      setShares(Math.min(1, currentQuantity));
+      // Start with empty input instead of pre-filled value
+      setShares('');
       setValidationErrors({});
     }
   }, [isOpen, currentQuantity]);
@@ -49,8 +49,22 @@ export const SellConfirmationModal: React.FC<SellConfirmationModalProps> = ({
   const handleSharesChange = (value: string) => {
     // Sanitize and validate input
     const sanitizedValue = sanitizeInput(value, 'number');
-    const numShares = parseInt(sanitizedValue) || 0;
-    setShares(numShares);
+    
+    // Allow empty string to clear the input
+    if (sanitizedValue === '') {
+      setShares('');
+      setValidationErrors({});
+      return;
+    }
+    
+    const numShares = parseInt(sanitizedValue);
+    
+    // Only update if it's a valid number
+    if (isNaN(numShares)) {
+      return;
+    }
+    
+    setShares(sanitizedValue);
     
     // Validate the input
     if (numShares <= 0) {
@@ -65,24 +79,26 @@ export const SellConfirmationModal: React.FC<SellConfirmationModalProps> = ({
     
     setValidationErrors({});
   };
-
   const handleConfirm = () => {
     // Prevent multiple clicks while processing
     if (isProcessing) return;
     
     try {
+      // Parse shares to number
+      const numShares = parseInt(shares);
+      
       // Final validation before confirming
-      if (shares <= 0) {
+      if (isNaN(numShares) || numShares <= 0) {
         setValidationErrors({ units: 'Must sell at least 1 share' });
         return;
       }
       
-      if (shares > currentQuantity) {
+      if (numShares > currentQuantity) {
         setValidationErrors({ units: `You only own ${currentQuantity} share(s)` });
         return;
       }
       
-      onConfirm(shares);
+      onConfirm(numShares);
     } catch (error) {
       if (error instanceof ValidationError) {
         setValidationErrors({ general: error.message });
@@ -90,9 +106,10 @@ export const SellConfirmationModal: React.FC<SellConfirmationModalProps> = ({
     }
   };
 
-  const totalProceeds = shares * pricePerShare;
+  const numericShares = parseInt(shares) || 0;
+  const totalProceeds = numericShares * pricePerShare;
   const newWalletBalance = walletBalance + totalProceeds;
-  const isValid = Object.keys(validationErrors).length === 0 && shares > 0 && shares <= currentQuantity;
+  const isValid = Object.keys(validationErrors).length === 0 && numericShares > 0 && numericShares <= currentQuantity;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -158,10 +175,9 @@ export const SellConfirmationModal: React.FC<SellConfirmationModalProps> = ({
                 <span className="text-gray-300 font-medium">Price per share:</span>
                 <span className="font-semibold text-white">{formatCurrency(pricePerShare)}</span>
               </div>
-              
-              <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center">
                 <span className="text-gray-300 font-medium">Number of shares:</span>
-                <span className="font-semibold text-white">{shares.toLocaleString()}</span>
+                <span className="font-semibold text-white">{numericShares.toLocaleString()}</span>
               </div>
               
               <div className="border-t border-trading-primary/30 pt-4 space-y-2">
@@ -193,19 +209,18 @@ export const SellConfirmationModal: React.FC<SellConfirmationModalProps> = ({
             className="flex-1 bg-gray-700 hover:bg-gray-600 text-white border-gray-600 hover:border-gray-500 font-semibold"
           >
             Cancel
-          </Button>
-          <Button
+          </Button>          <Button
             onClick={handleConfirm}
-            disabled={!isValid || shares <= 0 || isProcessing || shares > currentQuantity}
+            disabled={!isValid || numericShares <= 0 || isProcessing || numericShares > currentQuantity}
             className="flex-1 bg-gradient-danger hover:bg-gradient-danger/80 disabled:bg-gray-600 text-white font-semibold transition-all duration-200 disabled:hover:scale-100"
             title={
-              shares > currentQuantity 
+              numericShares > currentQuantity 
                 ? 'Cannot sell more shares than you own' 
                 : 'Confirm sale'
             }
           >
             {isProcessing ? 'Processing...' : 
-             shares > currentQuantity ? '❌ Invalid Quantity' :
+             numericShares > currentQuantity ? '❌ Invalid Quantity' :
              'Confirm Sale'}
           </Button>
         </DialogFooter>
