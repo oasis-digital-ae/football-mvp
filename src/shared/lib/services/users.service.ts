@@ -13,7 +13,9 @@ export interface UserListItem {
   wallet_balance: number;
   total_invested: number;
   portfolio_value: number;
-  profit_loss: number;
+  unrealized_pnl: number;
+  realized_pnl: number;
+  profit_loss: number; // Total P&L (unrealized + realized)
   positions_count: number;
   last_activity: string;
   created_at: string;
@@ -29,7 +31,9 @@ export interface UserDetails extends UserListItem {
     quantity: number;
     total_invested: number;
     current_value: number;
-    profit_loss: number;
+    unrealized_pnl: number;
+    realized_pnl: number;
+    profit_loss: number; // Total P&L (unrealized + realized)
     price_per_share: number; // Current share price (market cap / total shares)
     avg_price: number; // Average purchase price (total_invested / quantity) - matches user portfolio calculation
     market_cap: number; // Current market cap in dollars
@@ -79,7 +83,7 @@ export const usersService = {
 
       if (profilesError) throw profilesError;
 
-      // Get positions for all users
+      // Get positions for all users (include total_pnl to match portfolio page P&L)
       const { data: positions, error: positionsError } = await supabase
         .from('positions')
         .select(`
@@ -87,6 +91,7 @@ export const usersService = {
           team_id,
           quantity,
           total_invested,
+          total_pnl,
           teams!inner(name, market_cap, total_shares)
         `)
         .gt('quantity', 0);
@@ -164,54 +169,57 @@ export const usersService = {
         }
       });
 
-      // Calculate metrics for each user
+      // Calculate metrics for each user (including unrealized/realized/total P&L)
       const userMetrics = new Map<string, {
         totalInvested: number;
         portfolioValue: number;
+        unrealizedPnl: number;
+        realizedPnl: number;
         profitLoss: number;
         positionsCount: number;
       }>();
 
-      // Convert cents to dollars: market_cap and total_invested are now BIGINT (cents)
+      // Use same calculation functions as portfolio page for consistency
+      // (calculateSharePrice, calculateTotalValue, total_pnl from DB, realized from orders)
       (positions || []).forEach(position => {
         const team = teamsMap.get(position.team_id);
         if (!team) return;
 
         const totalShares = team.total_shares || 1000;
         const marketCapDollars = fromCents(team.market_cap || 0).toNumber();
-        const sharePrice = totalShares > 0 ? marketCapDollars / totalShares : 0;
-        const currentValue = Number(position.quantity) * sharePrice;
+        const sharePrice = calculateSharePrice(marketCapDollars, totalShares, 20.00);
+        const currentValue = calculateTotalValue(sharePrice, position.quantity);
         const totalInvestedDollars = fromCents(position.total_invested || 0).toNumber();
-        
-        // Calculate unrealized P&L: current_value - total_invested
-        const unrealizedPL = currentValue - totalInvestedDollars;
-        
-        // Use only unrealized P&L (not including realized P&L from sales)
-        const profitLoss = unrealizedPL;
+        const totalPnl = fromCents(position.total_pnl ?? 0).toNumber();
+        const realizedPnl = realizedPLByUserTeam.get(`${position.user_id}:${position.team_id}`) ?? 0;
+        const unrealizedPnl = totalPnl - realizedPnl;
 
         const existing = userMetrics.get(position.user_id) || {
           totalInvested: 0,
           portfolioValue: 0,
+          unrealizedPnl: 0,
+          realizedPnl: 0,
           profitLoss: 0,
           positionsCount: 0
         };
 
         existing.totalInvested += totalInvestedDollars;
         existing.portfolioValue += currentValue;
-        existing.profitLoss += profitLoss;
+        existing.unrealizedPnl += unrealizedPnl;
+        existing.realizedPnl += realizedPnl;
+        existing.profitLoss += totalPnl;
         existing.positionsCount += 1;
 
         userMetrics.set(position.user_id, existing);
       });
-
-      // Note: Realized P&L from sales is no longer included in profit/loss calculations
-      // Only unrealized P&L (current value - total invested) is used
 
       // Combine profiles with metrics
       const userList: UserListItem[] = (profiles || []).map(profile => {
         const metrics = userMetrics.get(profile.id) || {
           totalInvested: 0,
           portfolioValue: 0,
+          unrealizedPnl: 0,
+          realizedPnl: 0,
           profitLoss: 0,
           positionsCount: 0
         };
@@ -222,9 +230,11 @@ export const usersService = {
           first_name: profile.first_name,
           last_name: profile.last_name,
           email: profile.email,
-          wallet_balance: fromCents(profile.wallet_balance || 0).toNumber(), // Convert cents to dollars
+          wallet_balance: fromCents(profile.wallet_balance || 0).toNumber(),
           total_invested: metrics.totalInvested,
           portfolio_value: metrics.portfolioValue,
+          unrealized_pnl: metrics.unrealizedPnl,
+          realized_pnl: metrics.realizedPnl,
           profit_loss: metrics.profitLoss,
           positions_count: metrics.positionsCount,
           last_activity: lastActivityMap.get(profile.id) || profile.created_at,
@@ -456,40 +466,87 @@ export const usersService = {
         }
       }
 
-      // Calculate portfolio metrics
+      // Calculate portfolio metrics (including unrealized/realized/total P&L)
       let totalInvested = 0;
       let portfolioValue = 0;
+      let unrealizedPnl = 0;
+      let realizedPnl = 0;
       let profitLoss = 0;
 
-      
       // Convert cents to dollars: market_cap, total_invested, price_per_share, total_amount, wallet_balance are now BIGINT (cents)
+      // For Avg Price and % Change, use the SAME order-based calculation as the Portfolio page
+      // (reconstruct cost basis from BUY/SELL orders using market_cap_before when available)
       const positionsList = (positions || []).map(pos => {
         const team = pos.teams as any;
         const totalShares = team.total_shares || 1000;
-        const marketCapDollars = fromCents(team.market_cap || 0).toNumber();
-        // Use centralized calculation function (same as Portfolio page) - rounds to 2 decimals
-        const sharePrice = calculateSharePrice(marketCapDollars, totalShares, 20.00);
-        // Use centralized calculation function (same as Portfolio page) - rounds to 2 decimals
-        const currentValue = calculateTotalValue(sharePrice, pos.quantity);
-        const totalInvestedDollars = fromCents(pos.total_invested || 0).toNumber();
-        // Calculate average cost using centralized function
-        const avgCost = calculateAverageCost(totalInvestedDollars, pos.quantity);
-        // Use total_pnl from database (already calculated and stored)
-        // This includes both unrealized and realized P&L
-        const pl = fromCents(pos.total_pnl || 0).toNumber();
 
-        // Calculate percentage change: (Current Price - Avg Price) / Avg Price * 100
-        // This shows the change from the user's average purchase price to the current price
-        let percentChangeFromPurchase = calculatePercentChange(sharePrice, avgCost);
-        // Round very small changes to 0.00% to avoid showing "+0.03%" when it should be "0.00%"
-        // This handles floating point precision issues where prices are effectively the same
-        // Matches the logic in PortfolioPage.tsx for consistency
-        if (Math.abs(percentChangeFromPurchase) < 0.01) {
-          percentChangeFromPurchase = 0;
+        // Current market data
+        const marketCapDecimal = fromCents(team.market_cap || 0); // Decimal dollars
+        const marketCapDollars = marketCapDecimal.toNumber();
+        const sharePricePrecise = marketCapDecimal.dividedBy(totalShares); // Decimal price per share
+        const sharePrice = roundForDisplay(sharePricePrecise); // Display price/share
+        const currentValue = calculateTotalValue(sharePrice, pos.quantity);
+
+        // Totals from positions table (for P&L and invested aggregates)
+        const totalInvestedDollars = fromCents(pos.total_invested || 0).toNumber();
+        const pl = fromCents(pos.total_pnl || 0).toNumber();
+        const realized = realizedPLByTeam.get(pos.team_id) ?? 0;
+        const unrealized = pl - realized;
+
+        // Rebuild average cost from orders using the same logic as PortfolioPage:
+        // - Use market_cap_before / total_shares when available for exact historical price
+        // - Fallback to price_per_share when market_cap_before is missing
+        let totalInvestedFromOrders = new Decimal(0);
+        let totalUnitsFromOrders = new Decimal(0);
+
+        const teamOrders = sortedOrders.filter(o => o.team_id === pos.team_id);
+
+        teamOrders.forEach(order => {
+          const quantity = toDecimal(order.quantity || 0); // number of shares (same units as portfolio)
+
+          // Determine exact price for this order
+          let priceExact: Decimal;
+          if (order.market_cap_before) {
+            // market_cap_before is in cents -> dollars, then divide by totalShares
+            priceExact = fromCents(order.market_cap_before).dividedBy(totalShares);
+          } else {
+            // Fallback to price_per_share (in cents)
+            priceExact = fromCents(order.price_per_share || 0);
+          }
+
+          if (order.order_type === 'BUY') {
+            // Add to cost basis
+            totalInvestedFromOrders = totalInvestedFromOrders.plus(priceExact.times(quantity));
+            totalUnitsFromOrders = totalUnitsFromOrders.plus(quantity);
+          } else if (order.order_type === 'SELL') {
+            // Subtract from cost basis
+            totalInvestedFromOrders = totalInvestedFromOrders.minus(priceExact.times(quantity));
+            totalUnitsFromOrders = totalUnitsFromOrders.minus(quantity);
+          }
+        });
+
+        let avgCostPrecise = new Decimal(0);
+        if (totalUnitsFromOrders.gt(0)) {
+          avgCostPrecise = totalInvestedFromOrders.dividedBy(totalUnitsFromOrders);
+        }
+        const avgCost = roundForDisplay(avgCostPrecise); // Display average cost/share (order-based)
+
+        // Percent change from purchase using the same base as Portfolio page
+        let percentChangeFromPurchase = 0;
+        if (avgCostPrecise.gt(0)) {
+          const changeDecimal = sharePricePrecise.minus(avgCostPrecise).dividedBy(avgCostPrecise).times(100);
+          percentChangeFromPurchase = roundForDisplay(changeDecimal);
+
+          // Round very small changes to 0.00% for stability (same UX as before)
+          if (Math.abs(percentChangeFromPurchase) < 0.01) {
+            percentChangeFromPurchase = 0;
+          }
         }
 
         totalInvested += totalInvestedDollars;
         portfolioValue += currentValue;
+        unrealizedPnl += unrealized;
+        realizedPnl += realized;
         profitLoss += pl;
 
         return {
@@ -498,11 +555,13 @@ export const usersService = {
           quantity: Number(pos.quantity),
           total_invested: totalInvestedDollars,
           current_value: currentValue,
+          unrealized_pnl: unrealized,
+          realized_pnl: realized,
           profit_loss: pl,
-          price_per_share: sharePrice, // Current share price (market cap / total shares)
-          avg_price: avgCost, // Average purchase price (total_invested / quantity) - matches user portfolio calculation
-          market_cap: marketCapDollars, // Include market cap for accurate percentage calculations
-          percent_change_from_purchase: percentChangeFromPurchase // Change from purchase price: (current_share_price - avg_price) / avg_price * 100
+          price_per_share: sharePrice,
+          avg_price: avgCost,
+          market_cap: marketCapDollars,
+          percent_change_from_purchase: percentChangeFromPurchase
         };
       });
 
@@ -511,8 +570,8 @@ export const usersService = {
         team_name: (order.teams as any)?.name || 'Unknown',
         order_type: order.order_type as 'BUY' | 'SELL',
         quantity: order.quantity,
-        price_per_share: fromCents(order.price_per_share || 0).toNumber(), // Convert cents to dollars
-        total_amount: fromCents(order.total_amount || 0).toNumber(), // Convert cents to dollars
+        price_per_share: fromCents(order.price_per_share || 0).toNumber(),
+        total_amount: fromCents(order.total_amount || 0).toNumber(),
         executed_at: order.executed_at || order.created_at,
         status: order.status
       }));
@@ -526,9 +585,11 @@ export const usersService = {
         birthday: profile.birthday,
         country: profile.country,
         phone: profile.phone,
-        wallet_balance: fromCents(profile.wallet_balance || 0).toNumber(), // Convert cents to dollars
+        wallet_balance: fromCents(profile.wallet_balance || 0).toNumber(),
         total_invested: totalInvested,
         portfolio_value: portfolioValue,
+        unrealized_pnl: unrealizedPnl,
+        realized_pnl: realizedPnl,
         profit_loss: profitLoss,
         positions_count: positionsList.length,
         last_activity: ordersList[0]?.executed_at || profile.created_at,

@@ -14,7 +14,7 @@ import { useAuth } from '@/features/auth/contexts/AuthContext';
 const MatchResultsPage: React.FC = () => {
   const { clubs, purchaseClub, refreshData } = useAppContext();
   const { toast } = useToast();
-  const { refreshWalletBalance } = useAuth();
+  const { refreshWalletBalance, user } = useAuth();
   const [fixtures, setFixtures] = useState<DatabaseFixtureWithTeams[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'finished' | 'upcoming'>('upcoming');
@@ -371,19 +371,21 @@ const MatchResultsPage: React.FC = () => {
                           <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-700/30">
                             {/* Home Team Row */}
                             <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <TeamLogo 
-                                  teamName={fixture.home_team?.name || 'Home Team'} 
-                                  externalId={fixture.home_team?.external_id ? parseInt(fixture.home_team.external_id) : undefined}
-                                  size="sm" 
-                                />
-                                <ClickableTeamName
-                                  teamName={fixture.home_team?.name || 'Home Team'}
-                                  teamId={fixture.home_team_id}
-                                  externalId={fixture.home_team?.external_id ? parseInt(fixture.home_team.external_id) : undefined}
-                                  className="text-sm font-semibold text-white hover:text-trading-primary transition-colors truncate"
-                                />
-                              </div>
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <TeamLogo 
+                                teamName={fixture.home_team?.name || 'Home Team'} 
+                                externalId={fixture.home_team?.external_id ? parseInt(fixture.home_team.external_id) : undefined}
+                                size="sm" 
+                              />
+                              <ClickableTeamName
+                                teamName={fixture.home_team?.name || 'Home Team'}
+                                teamId={fixture.home_team_id}
+                                externalId={fixture.home_team?.external_id ? parseInt(fixture.home_team.external_id) : undefined}
+                                userId={user?.id}
+                                variant="default"
+                                className="text-sm font-semibold text-white hover:text-trading-primary transition-colors truncate text-left"
+                              />
+                            </div>
                               {fixture.status === 'applied' && fixture.home_score !== null ? (
                                 <span className={`text-lg font-bold ml-2 ${
                                   fixture.result === 'home_win' ? 'text-green-400' : 
@@ -435,7 +437,9 @@ const MatchResultsPage: React.FC = () => {
                                   teamName={fixture.away_team?.name || 'Away Team'}
                                   teamId={fixture.away_team_id}
                                   externalId={fixture.away_team?.external_id ? parseInt(fixture.away_team.external_id) : undefined}
-                                  className="text-sm font-semibold text-white hover:text-trading-primary transition-colors truncate"
+                                  userId={user?.id}
+                                  variant="default"
+                                  className="text-sm font-semibold text-white hover:text-trading-primary transition-colors truncate text-left"
                                 />
                               </div>
                               {fixture.status === 'applied' && fixture.away_score !== null ? (
@@ -497,6 +501,8 @@ const MatchResultsPage: React.FC = () => {
                               teamName={fixture.home_team?.name || 'Home Team'}
                               teamId={fixture.home_team_id}
                               externalId={fixture.home_team?.external_id ? parseInt(fixture.home_team.external_id) : undefined}
+                              userId={user?.id}
+                              variant="default"
                               className="text-sm font-medium text-white hover:text-trading-primary transition-colors text-right truncate"
                             />
                           </div>
@@ -542,12 +548,15 @@ const MatchResultsPage: React.FC = () => {
                               externalId={fixture.away_team?.external_id ? parseInt(fixture.away_team.external_id) : undefined}
                               size="sm" 
                             />
-                          </div>{/* Away Team Name */}
+                          </div>
+                          {/* Away Team Name */}
                           <div className="flex items-center gap-2 justify-start overflow-hidden -mr-1">
                             <ClickableTeamName
                               teamName={fixture.away_team?.name || 'Away Team'}
                               teamId={fixture.away_team_id}
                               externalId={fixture.away_team?.external_id ? parseInt(fixture.away_team.external_id) : undefined}
+                              userId={user?.id}
+                              variant="default"
                               className="text-sm font-medium text-white hover:text-trading-primary transition-colors text-left truncate"
                             />
                           </div>

@@ -329,8 +329,14 @@ export const UsersManagementPanel: React.FC = () => {
                     </Button>
                   </TableHead>
                   <TableHead className="text-center">
+                    <span className="font-medium">Unrealized P&L</span>
+                  </TableHead>
+                  <TableHead className="text-center">
+                    <span className="font-medium">Realized P&L</span>
+                  </TableHead>
+                  <TableHead className="text-center">
                     <Button variant="ghost" onClick={() => handleSort('profit_loss')} className="h-auto p-0 font-medium">
-                      P&L <SortIcon field="profit_loss" />
+                      Total P&L <SortIcon field="profit_loss" />
                     </Button>
                   </TableHead>
                   <TableHead className="text-center">
@@ -370,6 +376,16 @@ export const UsersManagementPanel: React.FC = () => {
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="font-medium font-mono">{formatCurrency(user.portfolio_value)}</div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className={`font-mono text-sm ${(user.unrealized_pnl ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {(user.unrealized_pnl ?? 0) >= 0 ? '+' : ''}{formatCurrency(user.unrealized_pnl ?? 0)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className={`font-mono text-sm ${(user.realized_pnl ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {(user.realized_pnl ?? 0) >= 0 ? '+' : ''}{formatCurrency(user.realized_pnl ?? 0)}
+                      </span>
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1">
@@ -559,7 +575,9 @@ export const UsersManagementPanel: React.FC = () => {
                             <th className="h-12 px-2 sm:px-3 md:px-4 text-center align-middle font-medium text-muted-foreground">Price/Share</th>
                             <th className="h-12 px-2 sm:px-3 md:px-4 text-center align-middle font-medium text-muted-foreground">% Change</th>
                             <th className="h-12 px-2 sm:px-3 md:px-4 text-center align-middle font-medium text-muted-foreground">Total Value</th>
-                            <th className="h-12 px-2 sm:px-3 md:px-4 text-center align-middle font-medium text-muted-foreground">P&L</th>
+                            <th className="h-12 px-2 sm:px-3 md:px-4 text-center align-middle font-medium text-muted-foreground">Unrealized</th>
+                            <th className="h-12 px-2 sm:px-3 md:px-4 text-center align-middle font-medium text-muted-foreground">Realized</th>
+                            <th className="h-12 px-2 sm:px-3 md:px-4 text-center align-middle font-medium text-muted-foreground">Total P&L</th>
                           </tr>
                         </thead>
                         <tbody className="[&_tr:last-child]:border-0">
@@ -589,6 +607,16 @@ export const UsersManagementPanel: React.FC = () => {
                                 </td>
                                 <td className="p-2 sm:p-3 md:p-4 text-center font-mono font-semibold align-middle text-sm">
                                   {formatCurrency(pos.current_value)}
+                                </td>
+                                <td className={`p-2 sm:p-3 md:p-4 text-center font-mono font-semibold align-middle text-sm ${
+                                  (pos.unrealized_pnl ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                                }`}>
+                                  {(pos.unrealized_pnl ?? 0) >= 0 ? '+' : ''}{formatCurrency(pos.unrealized_pnl ?? 0)}
+                                </td>
+                                <td className={`p-2 sm:p-3 md:p-4 text-center font-mono font-semibold align-middle text-sm ${
+                                  (pos.realized_pnl ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                                }`}>
+                                  {(pos.realized_pnl ?? 0) >= 0 ? '+' : ''}{formatCurrency(pos.realized_pnl ?? 0)}
                                 </td>
                                 <td className={`p-2 sm:p-3 md:p-4 text-center font-mono font-semibold align-middle text-sm ${
                                   pos.profit_loss >= 0 ? 'text-green-600' : 'text-red-600'

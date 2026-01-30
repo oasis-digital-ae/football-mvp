@@ -199,30 +199,33 @@ const PortfolioPage: React.FC = () => {
   }, [portfolio, matchdayChanges, getTransactionsByClub]);
 
   // Memoized KPI calculations
-  const { totalInvested, totalMarketValue, totalProfitLoss } = useMemo(() => {
-    // Calculate net invested and total P&L from portfolio items
+  const { totalInvested, totalMarketValue, totalUnrealizedPnl, totalRealizedPnl, totalProfitLoss } = useMemo(() => {
+    // Calculate net invested and P&L breakdown from portfolio items
     // Use Decimal for precision to prevent rounding drift
     let invested = toDecimal(0);
-    let profitLoss = toDecimal(0);
+    let unrealizedPnl = toDecimal(0);
+    let realizedPnl = toDecimal(0);
     
     portfolio.forEach((item) => {
       // Use totalInvestedCents from portfolio item (from database)
       const itemInvested = fromCents(item.totalInvestedCents || 0);
       invested = invested.plus(itemInvested);
-      
-      // Use profitLoss from portfolio item (which now uses total_pnl from database)
-      // This includes both realized P&L (from sales) and unrealized P&L (current holdings)
-      profitLoss = profitLoss.plus(toDecimal(item.profitLoss));
+      unrealizedPnl = unrealizedPnl.plus(toDecimal(item.unrealizedPnl ?? 0));
+      realizedPnl = realizedPnl.plus(toDecimal(item.realizedPnl ?? 0));
     });
     
     const marketValue = portfolio.reduce((sum, item) => {
       return sum.plus(toDecimal(item.totalValue));
     }, toDecimal(0));
     
+    const totalPnl = unrealizedPnl.plus(realizedPnl);
+    
     return {
       totalInvested: roundForDisplay(invested),
       totalMarketValue: roundForDisplay(marketValue),
-      totalProfitLoss: roundForDisplay(profitLoss)
+      totalUnrealizedPnl: roundForDisplay(unrealizedPnl),
+      totalRealizedPnl: roundForDisplay(realizedPnl),
+      totalProfitLoss: roundForDisplay(totalPnl)
     };
   }, [portfolio]);
 
@@ -351,10 +354,16 @@ const PortfolioPage: React.FC = () => {
       }
     }
     
-    // Use profitLoss from portfolio item (which uses total_pnl from database)
-    // This includes both realized P&L (from sales) and unrealized P&L (current holdings)
+    const unrealizedPnl = item.unrealizedPnl ?? 0;
+    const realizedPnl = item.realizedPnl ?? 0;
     const profitLoss = item.profitLoss;
     const portfolioPercent = calculatePortfolioPercentage(item.totalValue, totalMarketValue);
+    
+    const pnlCell = (val: number) => (
+      <td className={`px-3 text-right font-semibold ${val === 0 ? 'text-gray-400' : val > 0 ? 'price-positive' : 'price-negative'}`}>
+        {val > 0 ? '+' : ''}{formatCurrency(val)}
+      </td>
+    );
     
     return (
       <tr 
@@ -373,9 +382,9 @@ const PortfolioPage: React.FC = () => {
         </td>
         <td className="px-3 text-right font-mono">{formatCurrency(item.totalValue)}</td>
         <td className="px-3 text-right font-semibold text-trading-primary">{portfolioPercent.toFixed(2)}%</td>
-        <td className={`px-3 text-right font-semibold ${profitLoss === 0 ? 'text-gray-400' : profitLoss > 0 ? 'price-positive' : 'price-negative'}`}>
-          {profitLoss > 0 ? '+' : ''}{formatCurrency(profitLoss)}
-        </td>
+        {pnlCell(unrealizedPnl)}
+        {pnlCell(realizedPnl)}
+        {pnlCell(profitLoss)}
         <td className="px-3 text-center" onClick={(e) => handleSellClick(e, item)}>
           <Button
             size="sm"
@@ -422,7 +431,7 @@ const PortfolioPage: React.FC = () => {
       )}
       
       {/* Portfolio Overview Cards - Mobile Optimized */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 lg:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-3 lg:gap-4">
         {/* Total Invested */}
         <Card className="trading-card group">
           <CardContent className="p-3 sm:p-4 lg:p-6">
@@ -452,6 +461,60 @@ const PortfolioPage: React.FC = () => {
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                 </svg>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Unrealized P&L */}
+        <Card className="trading-card group">
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-400 text-xs sm:text-sm font-medium mb-1 sm:mb-2">Unrealized P&L</p>
+                <p className={`text-lg sm:text-xl lg:text-2xl font-bold ${totalUnrealizedPnl === 0 ? 'text-gray-400' : totalUnrealizedPnl > 0 ? 'price-positive' : 'price-negative'}`}>
+                  {formatCurrency(totalUnrealizedPnl)}
+                </p>
+              </div>
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center group-hover:animate-bounce-gentle ${
+                totalUnrealizedPnl > 0 ? 'bg-gradient-success' : totalUnrealizedPnl < 0 ? 'bg-gradient-danger' : 'bg-gray-600'
+              }`}>
+                {totalUnrealizedPnl !== 0 ? (
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                ) : (
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                  </svg>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Realized P&L */}
+        <Card className="trading-card group">
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-400 text-xs sm:text-sm font-medium mb-1 sm:mb-2">Realized P&L</p>
+                <p className={`text-lg sm:text-xl lg:text-2xl font-bold ${totalRealizedPnl === 0 ? 'text-gray-400' : totalRealizedPnl > 0 ? 'price-positive' : 'price-negative'}`}>
+                  {formatCurrency(totalRealizedPnl)}
+                </p>
+              </div>
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center group-hover:animate-bounce-gentle ${
+                totalRealizedPnl > 0 ? 'bg-gradient-success' : totalRealizedPnl < 0 ? 'bg-gradient-danger' : 'bg-gray-600'
+              }`}>
+                {totalRealizedPnl !== 0 ? (
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l9.2-9.2M17 17V7H7" />
+                  </svg>
+                ) : (
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                  </svg>
+                )}
               </div>
             </div>
           </CardContent>
@@ -527,7 +590,9 @@ const PortfolioPage: React.FC = () => {
                       <th className="text-right px-3">% Change</th>
                       <th className="text-right px-3">Total Value</th>
                       <th className="text-right px-3">% Portfolio</th>
-                      <th className="text-right px-3">P&L</th>
+                      <th className="text-right px-3">Unrealized</th>
+                      <th className="text-right px-3">Realized</th>
+                      <th className="text-right px-3">Total P&L</th>
                       <th className="text-center px-3">Action</th>
                     </tr>
                   </thead>

@@ -1,20 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/shared/components/ui/dialog';
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
-import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { footballApiService } from '@/shared/lib/football-api';
 import { fixturesService, teamsService, positionsService } from '@/shared/lib/database';
 import { supabase } from '@/shared/lib/supabase';
 import type { TeamDetails, FootballMatch, Standing } from '@/shared/lib/football-api';
 import type { DatabaseFixture, DatabaseTeam } from '@/shared/lib/database';
 import type { DatabasePositionWithTeam } from '@/shared/types/database.types';
-import { formatCurrency, formatNumber } from '@/shared/lib/formatters';
 import { Loader2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import TeamLogo from '@/shared/components/TeamLogo';
 import { toDecimal, roundForDisplay, fromCents } from '@/shared/lib/utils/decimal';
 import { calculatePriceImpactPercent } from '@/shared/lib/utils/calculations';
+import TeamDetailsSlideDown from './TeamDetailsSlideDown';
 
 interface TeamDetailsModalProps {
   isOpen: boolean;
@@ -441,27 +437,31 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
   };
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col bg-gray-900 border-gray-700 overflow-hidden">
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="flex items-center gap-2 text-white">
+      {/* 
+        Override default dialog sizing so this modal can be wider,
+        while still staying responsive on smaller viewports.
+      */}
+      <DialogContent className="w-[min(1400px,100vw-2rem)] max-w-none sm:max-w-none md:max-w-none lg:max-w-none xl:max-w-none max-h-[88vh] flex flex-col bg-gray-900/95 border border-gray-700 shadow-2xl overflow-hidden rounded-2xl">
+        <DialogHeader className="flex-shrink-0 pb-2 mb-2 border-b border-gray-800/70">
+          <DialogTitle className="flex items-center gap-2 text-white text-xl sm:text-2xl">
             <TrendingUp className="h-5 w-5 text-green-400" />
             {teamName} - Match History & Share Price Impact
           </DialogTitle>
-          <DialogDescription className="text-gray-400">
-            View detailed match history and share price impact for {teamName}
+          <DialogDescription className="text-gray-400 text-sm sm:text-base">
+            Detailed match history and share price impact for {teamName}
           </DialogDescription>
         </DialogHeader>
 
         {loading && (
-          <div className="flex items-center justify-center py-8 flex-shrink-0">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
-            <span className="ml-2 text-gray-400">Loading team data...</span>
+          <div className="flex items-center justify-center py-4 flex-shrink-0">
+            <Loader2 className="h-5 w-5 animate-spin text-blue-400" />
+            <span className="ml-2 text-gray-400 text-sm">Loading team data...</span>
           </div>
         )}
 
         {error && (
-          <div className="text-center py-8 flex-shrink-0">
-            <p className="text-red-400 mb-4">{error}</p>
+          <div className="text-center py-4 flex-shrink-0">
+            <p className="text-red-400 mb-3 text-sm">{error}</p>
             <Button
               onClick={loadTeamData}
               variant="outline"
@@ -472,143 +472,29 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
           </div>
         )}
 
-        {!loading && (
-          <div className="flex-1 flex flex-col min-h-0 w-full space-y-4 overflow-hidden">
-            <Tabs defaultValue="match-history" className="flex-1 flex flex-col min-h-0 w-full">
-              <TabsList className="flex-shrink-0 grid w-full grid-cols-1 bg-gray-800">
-                <TabsTrigger value="match-history" className="data-[state=active]:bg-gray-700">
-                  <TrendingUp className="h-4 w-4 mr-2" />
-                  Match History
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="match-history" className="flex-1 flex flex-col min-h-0 mt-4 overflow-hidden">
-                <Card className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                  <CardHeader className="flex-shrink-0">
-                    <CardTitle className="flex items-center gap-2">
-                      <TrendingUp className="h-5 w-5" />
-                      Match History & Share Price Impact
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex-1 overflow-y-auto overflow-x-hidden">
-                {matchHistory.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-400">No completed matches found</p>
-                    <p className="text-sm text-gray-500 mt-2">
-                      Matches will appear here once they are completed and market cap transfers are applied.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2 sm:space-y-3">
-                    {matchHistory.map((match, index) => {
-                      console.log('Match history item:', {
-                        fixtureId: match.fixture.id,
-                        kickoff_at: match.fixture.kickoff_at,
-                        result: match.result,
-                        score: match.score
-                      });
-                      const isPositive = match.priceImpactPercent > 0;
-                      const isNegative = match.priceImpactPercent < 0;
-                      const isNeutral = match.priceImpactPercent === 0;
-                      
-                      return (
-                      <div
-                        key={match.fixture.id}
-                        className="bg-gray-800/40 border border-gray-700/30 rounded-lg p-3 sm:p-4"
-                      >
-                        {/* Header Row: Date + Opponent + Result Badge */}
-                        <div className="flex items-start justify-between gap-2 mb-3">
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <span className="text-xs text-gray-400 font-medium whitespace-nowrap">
-                              {formatDate(match.fixture.kickoff_at)}
-                            </span>
-                            <div className="h-4 w-px bg-gray-700"></div>
-                            <TeamLogo 
-                              teamName={match.opponent.name} 
-                              externalId={match.opponent.external_id ? parseInt(match.opponent.external_id.toString()) : undefined}
-                              size="sm" 
-                            />
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                              <span className="text-sm font-semibold text-white truncate">{match.opponent.name}</span>
-                              <span className="text-gray-400">•</span>
-                              <span className="text-gray-300 font-mono text-sm">{match.score}</span>
-                            </div>
-                          </div>
-                          <Badge className={`${getResultColor(match.result)} text-white px-2.5 py-1 text-xs font-semibold flex-shrink-0`}>
-                            {match.result === 'win' ? 'W' : match.result === 'loss' ? 'L' : 'D'}
-                          </Badge>
-                        </div>
+        {/* Main marketplace-style dropdown content */}
+        <div className="flex-1 flex flex-col min-h-0 w-full overflow-y-auto px-0 sm:px-1 md:px-2">
+          <TeamDetailsSlideDown
+            isOpen={true}
+            teamId={teamId}
+            teamName={teamName}
+            userId={userId || ''}
+            fixtures={[]}
+            teams={teams}
+          />
+        </div>
 
-                        {/* Stats Row: Market Cap + Share Price */}
-                        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-700/20">
-                          {/* Market Cap */}
-                          <div>
-                            <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Market Cap</p>
-                            <div className="space-y-1">
-                              <p className="text-sm font-semibold font-mono text-white">
-                                {formatCurrency(match.postMatchCap)}
-                              </p>
-                              <div className={`flex items-center gap-1 text-xs font-medium ${
-                                isPositive ? 'text-green-400' : 
-                                isNegative ? 'text-red-400' : 
-                                'text-gray-500'
-                              }`}>
-                                {isPositive && <TrendingUp className="h-3 w-3" />}
-                                {isNegative && <TrendingDown className="h-3 w-3" />}
-                                {isNeutral && <Minus className="h-3 w-3" />}
-                                <span>
-                                  {isPositive ? '+' : ''}{match.priceImpactPercent.toFixed(2)}%
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* Share Price */}
-                          <div>
-                            <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Share Price</p>
-                            <p className={`text-sm font-semibold font-mono ${
-                              isPositive ? 'text-green-400' : 
-                              isNegative ? 'text-red-400' : 
-                              'text-white'
-                            }`}>
-                              {formatCurrency(match.postMatchSharePrice)}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        {/* User P/L */}
-                        {userId && match.userPL !== 0 && (
-                          <div className="mt-3 pt-3 border-t border-gray-700/20">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] text-gray-500 uppercase tracking-wider">
-                                Your P/L
-                              </span>
-                              <div className={`flex items-center gap-1.5 text-base font-bold ${
-                                match.userPL > 0 ? 'text-green-400' : 'text-red-400'
-                              }`}>
-                                {match.userPL > 0 ? (
-                                  <TrendingUp className="h-4 w-4" />
-                                ) : (
-                                  <TrendingDown className="h-4 w-4" />
-                                )}
-                                <span>
-                                  {match.userPL > 0 ? '+' : ''}{formatCurrency(match.userPL)}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      );
-                    })}
-                  </div>
-                )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </div>
-        )}
+        {/* Subtle footer with an explicit close affordance */}
+        <div className="flex items-center justify-end pt-3 mt-1 border-t border-gray-800/70">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onClose}
+            className="text-gray-200 border-gray-700 hover:bg-gray-800"
+          >
+            Close
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

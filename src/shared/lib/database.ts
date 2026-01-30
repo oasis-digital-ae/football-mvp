@@ -161,6 +161,7 @@ export const convertPositionToPortfolioItem = (position: DatabasePositionWithTea
   // Convert cents to dollars: database stores as BIGINT (cents)
   const marketCapDollars = fromCents(position.team.market_cap).toNumber();
   const totalInvestedDollars = fromCents(position.total_invested).toNumber();
+  const totalInvestedCents = Number(position.total_invested || 0);
   
   // Use centralized calculation functions (now use Decimal internally)
   const currentPrice = totalShares > 0 ? 
@@ -168,24 +169,28 @@ export const convertPositionToPortfolioItem = (position: DatabasePositionWithTea
   const avgCost = position.quantity > 0 ? 
     calculateAverageCost(totalInvestedDollars, position.quantity) : 0;
   
-  // Calculate P&L using Decimal-based calculations
-  // All values are already rounded to 2 decimals by calculation functions
-  const profitLoss = calculateProfitLoss(currentPrice, avgCost) * position.quantity;
+  // Unrealized P&L only (this helper has no order history for realized)
+  const unrealizedPnl = calculateProfitLoss(currentPrice, avgCost) * position.quantity;
+  const totalPnl = fromCents(position.total_pnl ?? 0).toNumber();
+  const realizedPnl = totalPnl - unrealizedPnl;
+  const profitLoss = roundToTwoDecimals(totalPnl);
   const totalValue = calculateTotalValue(currentPrice, position.quantity);
   
   // Calculate purchase market cap (full precision, no rounding)
-  // This is the market cap at the time of purchase for accurate calculations
   const purchaseMarketCapPrecise = marketCapDollars; // Use current market cap as approximation
   
   return {
     clubId: position.team_id.toString(),
     clubName: position.team.name,
     units: position.quantity,
-    purchasePrice: avgCost, // Already rounded to 2 decimals by calculateAverageCost
-    currentPrice: currentPrice, // Already rounded to 2 decimals by calculateSharePrice
-    totalValue: totalValue, // Already rounded to 2 decimals by calculateTotalValue
-    profitLoss: roundToTwoDecimals(profitLoss), // Round final P&L to ensure 2 decimals
-    purchaseMarketCapPrecise: purchaseMarketCapPrecise
+    purchasePrice: avgCost,
+    currentPrice,
+    totalValue,
+    profitLoss,
+    unrealizedPnl: roundToTwoDecimals(unrealizedPnl),
+    realizedPnl: roundToTwoDecimals(realizedPnl),
+    purchaseMarketCapPrecise,
+    totalInvestedCents
   };
 };
 

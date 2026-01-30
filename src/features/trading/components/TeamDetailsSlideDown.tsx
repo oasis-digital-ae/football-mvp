@@ -253,7 +253,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
     } finally {
       setLoading(prev => ({ ...prev, matches: false }));
     }
-  }, [isOpen, teamId, userId]); // Removed fixtures and teams - they're not used in this function
+  }, [isOpen, teamId, userId, fixtures, teams]);
 
   // Load match data when opened
   useEffect(() => {

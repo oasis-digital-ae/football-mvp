@@ -228,15 +228,16 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
         // Use total_pnl from database (includes both realized and unrealized P&L)
         // If total_pnl is not available, fall back to calculating unrealized P&L
         const totalPnlCents = position.total_pnl ?? null;
-        let profitLoss: number;
+        const realizedPnl = realizedPLByTeam.get(teamId) ?? 0;
+        let totalPnl: number;
+        let unrealizedPnl: number;
         
         if (totalPnlCents !== null && totalPnlCents !== undefined) {
-          // Use total_pnl from database (realized + unrealized)
-          profitLoss = fromCents(totalPnlCents).toNumber();
+          totalPnl = fromCents(totalPnlCents).toNumber();
+          unrealizedPnl = totalPnl - realizedPnl;
         } else {
-          // Fallback: Calculate unrealized P&L only (if total_pnl not available)
-          const unrealizedPL = calculateProfitLoss(currentPrice, avgCostForDisplay) * position.quantity;
-          profitLoss = unrealizedPL;
+          unrealizedPnl = calculateProfitLoss(currentPrice, avgCostForDisplay) * position.quantity;
+          totalPnl = unrealizedPnl + realizedPnl;
         }
         
         // Calculate purchase market cap with full precision (no rounding)
@@ -252,7 +253,9 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
           purchasePrice: avgCostForDisplay, // Display: user's actual purchase price (rounded to 2 decimals)
           currentPrice,
           totalValue,
-          profitLoss,
+          profitLoss: totalPnl,
+          unrealizedPnl,
+          realizedPnl,
           // Full precision purchase market cap for percentage calculation (no rounding)
           purchaseMarketCapPrecise: purchaseMarketCapPrecise.toNumber(),
           // Total invested in cents (from database) - for full precision average price calculation
@@ -354,12 +357,16 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
                 const marketCapDollars = fromCents(updatedTeam.market_cap).toNumber();
                 const newPrice = calculateSharePrice(marketCapDollars, totalShares, item.currentPrice);
                 const totalValue = calculateTotalValue(newPrice, item.units);
-                const profitLoss = calculateProfitLoss(newPrice, item.purchasePrice) * item.units;
+                const unrealizedPnl = calculateProfitLoss(newPrice, item.purchasePrice) * item.units;
+                const realizedPnl = item.realizedPnl ?? 0;
+                const profitLoss = unrealizedPnl + realizedPnl;
                 return {
                   ...item,
                   currentPrice: newPrice,
-                  totalValue: totalValue,
-                  profitLoss: profitLoss
+                  totalValue,
+                  profitLoss,
+                  unrealizedPnl,
+                  realizedPnl
                 };
               }
               return item;

@@ -34,7 +34,9 @@ export interface PortfolioItem {
   purchasePrice: number; // Display: user's actual purchase price from total_invested (rounded to 2 decimals)
   currentPrice: number;
   totalValue: number;
-  profitLoss: number;
+  profitLoss: number; // Total P&L (unrealized + realized)
+  unrealizedPnl: number; // P&L on current holdings (current value - cost basis)
+  realizedPnl: number; // P&L from sold shares
   purchaseMarketCapPrecise: number; // Full precision purchase market cap for calculations (no rounding)
   totalInvestedCents: number; // Total invested in cents (BIGINT from database) - for full precision calculations
 }
