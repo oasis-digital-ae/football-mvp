@@ -691,16 +691,18 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                 </tr>
                               </thead>                              <tbody>                                {upcomingMatches.map((match, index) => {
                                   const matchDate = new Date(match.date);
-                                  const formattedDate = matchDate.toLocaleDateString('en-US', {
+                                  const datePart = matchDate.toLocaleDateString('en-US', {
                                     month: 'short',
                                     day: 'numeric',
-                                    year: 'numeric'
+                                    timeZone: 'Asia/Dubai'
                                   });
-                                  const formattedTime = matchDate.toLocaleTimeString('en-US', {
+                                  const timePart = matchDate.toLocaleTimeString('en-US', {
                                     hour: 'numeric',
                                     minute: '2-digit',
-                                    hour12: true
+                                    hour12: true,
+                                    timeZone: 'Asia/Dubai'
                                   });
+                                  const formattedDateTime = `${datePart}, ${timePart}`;
                                   
                                   return (
                                     <tr key={index} className="border-b border-gray-800/30">
@@ -714,13 +716,8 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                           <span className="text-xs font-medium">Match vs {match.opponent}</span>
                                         </div>
                                       </td>
-                                      <td className="px-3 py-2.5" style={{ textAlign: 'center' }}>
-                                        <div className="flex flex-col items-center gap-1">
-                                          <span className="text-[10px] font-mono text-muted-foreground">{formattedDate}</span>
-                                          <span className="px-2 py-0.5 text-[10px] font-semibold bg-white/90 text-gray-900 rounded">
-                                            {formattedTime}
-                                          </span>
-                                        </div>
+                                      <td className="px-3 py-2.5 text-xs font-mono" style={{ textAlign: 'center', color: '#C9A961' }}>
+                                        {formattedDateTime}
                                       </td>
                                       <td className="px-3 py-2.5 text-xs font-mono font-semibold text-white" style={{ textAlign: 'center' }}>
                                         {formatCurrency(match.teamSharePrice)}
@@ -739,20 +736,21 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                 })}
                               </tbody>
                             </table>
-                          </div>                          {/* Mobile/Tablet Card View */}
-                          <div className="md:hidden space-y-2">
+                          </div>                          {/* Mobile/Tablet Card View */}                          <div className="md:hidden space-y-2">
                             {upcomingMatches.map((match, index) => {
                               const dateObj = new Date(match.date);
-                              const formattedDate = dateObj.toLocaleDateString('en-US', {
+                              const datePart = dateObj.toLocaleDateString('en-US', {
                                 month: 'short',
                                 day: 'numeric',
-                                year: 'numeric'
+                                timeZone: 'Asia/Dubai'
                               });
-                              const formattedTime = dateObj.toLocaleTimeString('en-US', {
+                              const timePart = dateObj.toLocaleTimeString('en-US', {
                                 hour: 'numeric',
                                 minute: '2-digit',
-                                hour12: true
+                                hour12: true,
+                                timeZone: 'Asia/Dubai'
                               });
+                              const formattedDateTime = `${datePart}, ${timePart}`;
 
                               return (                                <div
                                   key={index}
@@ -771,14 +769,9 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                         <p className="text-[11px] sm:text-xs font-semibold text-white truncate">
                                           Match vs {match.opponent}
                                         </p>
-                                        <div className="flex items-center gap-1.5 mt-0.5">
-                                          <p className="text-[9px] sm:text-[10px] text-gray-400">
-                                            {formattedDate}
-                                          </p>
-                                          <span className="px-1.5 py-0.5 text-[9px] font-semibold bg-white/90 text-gray-900 rounded">
-                                            {formattedTime}
-                                          </span>
-                                        </div>
+                                        <p className="text-[9px] sm:text-[10px] font-mono mt-0.5" style={{ color: '#C9A961' }}>
+                                          {formattedDateTime}
+                                        </p>
                                       </div>
                                     </div>
                                   </div>
