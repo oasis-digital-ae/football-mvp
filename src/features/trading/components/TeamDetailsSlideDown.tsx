@@ -85,12 +85,12 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
   launchPrice,
   currentPrice,
   currentPercentChange
-}) => {
-  const [activeTab, setActiveTab] = useState<'matches' | 'chart'>('matches');
+}) => {  const [activeTab, setActiveTab] = useState<'matches' | 'upcoming' | 'chart'>('matches');
   const [matchHistory, setMatchHistory] = useState<any[]>([]);
+  const [upcomingMatches, setUpcomingMatches] = useState<any[]>([]);
   const [userPosition, setUserPosition] = useState<DatabasePositionWithTeam | null>(null);
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
-  const [loading, setLoading] = useState({ matches: false, chart: false });
+  const [loading, setLoading] = useState({ matches: false, upcoming: false, chart: false });
 
   const fixtures = parentFixtures || [];
   const teams = parentTeams || [];
@@ -254,14 +254,65 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
       setLoading(prev => ({ ...prev, matches: false }));
     }
   }, [isOpen, teamId, userId, fixtures, teams]);
+  const loadUpcomingMatches = useCallback(async () => {
+    if (!isOpen || !teamId) return;
+
+    setLoading(prev => ({ ...prev, upcoming: true }));
+    try {
+      const fixturesData = fixtures.length > 0 ? fixtures : await fixturesService.getAll();
+      const teamsMap = new Map((teams || []).map(t => [t.id, t]));
+      
+      // Get the selected team's info
+      const selectedTeam = teamsMap.get(teamId);
+      
+      // Filter upcoming matches for this team
+      const now = new Date();
+      const upcomingFixtures = (fixturesData || [])
+        .filter(fixture => {
+          const kickoffDate = new Date(fixture.kickoff_at);
+          const isUpcoming = kickoffDate > now && fixture.status !== 'applied';
+          const isTeamInFixture = fixture.home_team_id === teamId || fixture.away_team_id === teamId;
+          return isUpcoming && isTeamInFixture;
+        })
+        .sort((a, b) => new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime());      // Process upcoming fixtures
+      const processedUpcoming = upcomingFixtures.map(fixture => {
+        const isHome = fixture.home_team_id === teamId;
+        const opponentId = isHome ? fixture.away_team_id : fixture.home_team_id;
+        const opponentTeam = teamsMap.get(opponentId);
+        
+        // Calculate share prices (market cap / total shares)
+        const TOTAL_SHARES = 1000;
+        const teamSharePrice = (selectedTeam?.market_cap || 0) / TOTAL_SHARES;
+        const opponentSharePrice = (opponentTeam?.market_cap || 0) / TOTAL_SHARES;
+        
+        return {
+          date: fixture.kickoff_at,
+          opponent: opponentTeam?.name || 'Unknown',
+          isHome,
+          teamMarketCap: selectedTeam?.market_cap || 0,
+          opponentMarketCap: opponentTeam?.market_cap || 0,
+          teamSharePrice,
+          opponentSharePrice,
+          matchday: fixture.matchday
+        };
+      });
+
+      setUpcomingMatches(processedUpcoming);
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') console.error('Error loading upcoming matches:', error);
+      setUpcomingMatches([]);
+    } finally {
+      setLoading(prev => ({ ...prev, upcoming: false }));
+    }
+  }, [isOpen, teamId, fixtures, teams]);
 
   // Load match data when opened
   useEffect(() => {
     if (isOpen && teamId && userId) {
       loadMatchesData();
+      loadUpcomingMatches();
     }
-  }, [isOpen, teamId, userId, loadMatchesData]);
-
+  }, [isOpen, teamId, userId, loadMatchesData, loadUpcomingMatches]);
   // Expose refresh function for external components to call
   useEffect(() => {
     if (teamId) {
@@ -269,6 +320,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
       (window as any)[refreshKey] = async () => {
         if (isOpen) {
           await loadMatchesData();
+          await loadUpcomingMatches();
           await loadChartData();
         }
       };
@@ -276,8 +328,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
         delete (window as any)[refreshKey];
       };
     }
-  }, [teamId, isOpen, loadMatchesData, loadChartData]);
-
+  }, [teamId, isOpen, loadMatchesData, loadUpcomingMatches, loadChartData]);
   // Listen for global refresh signal
   useEffect(() => {
     const handleRefresh = async () => {
@@ -285,6 +336,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
         // Small delay to ensure database triggers have completed
         await new Promise(resolve => setTimeout(resolve, 300));
         await loadMatchesData();
+        await loadUpcomingMatches();
         if (activeTab === 'chart') {
           await loadChartData();
         }
@@ -296,7 +348,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
     return () => {
       window.removeEventListener('refreshTeamDetails', handleRefresh);
     };
-  }, [isOpen, teamId, userId, activeTab, loadMatchesData, loadChartData]);
+  }, [isOpen, teamId, userId, activeTab, loadMatchesData, loadUpcomingMatches, loadChartData]);
 
 
   // Load chart data when switching to chart tab
@@ -305,12 +357,12 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
       loadChartData();
     }
   }, [activeTab, teamId, loadChartData, chartData.length, loading.chart]);
-
   // Reset data when panel closes
   useEffect(() => {
     if (!isOpen) {
       setActiveTab('matches');
       setMatchHistory([]);
+      setUpcomingMatches([]);
       setUserPosition(null);
       setChartData([]);
     }
@@ -363,8 +415,8 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
       <div className="slide-down-panel-inner">
         <div className="slide-down-panel-content">
           <div className="border-t border-gray-800/30 bg-secondary/20">
-            <div className="px-4 pt-2 pb-4">
-              {/* Tab Navigation - Mobile Optimized */}
+            <div className="px-4 pt-2 pb-4">              
+            {/* Tab Navigation - Mobile Optimized */}
               <div className="flex items-center gap-1 mb-3 sm:mb-4 border-b border-gray-800/30">
                 <button
                   onClick={() => setActiveTab('matches')}
@@ -375,6 +427,16 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                   }`}
                 >
                   Match History
+                </button>
+                <button
+                  onClick={() => setActiveTab('upcoming')}
+                  className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold transition-colors border-b-2 touch-manipulation ${
+                    activeTab === 'upcoming'
+                      ? 'border-trading-primary text-foreground'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Upcoming Matches
                 </button>
                 <button
                   onClick={() => setActiveTab('chart')}
@@ -392,6 +454,10 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'hsl(var(--muted-foreground))' }} />
                 </div>
+              ) : loading.upcoming && activeTab === 'upcoming' ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'hsl(var(--muted-foreground))' }} />
+                </div>
               ) : loading.chart && activeTab === 'chart' ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'hsl(var(--muted-foreground))' }} />
@@ -405,8 +471,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                           <p className="text-xs sm:text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>No match history available</p>
                         </div>
                       ) : (
-                        <>
-                          {/* Desktop Table View */}
+                        <> {/* Desktop Table View */}
                           <div className="hidden md:block overflow-x-auto">
                             <table className="trading-table w-full">
                               <thead>
@@ -416,6 +481,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                   <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>Market Cap</th>
                                   <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>Change</th>
                                   <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>%</th>
+                                  <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>Price</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -457,6 +523,9 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                       event.priceImpactPercent >= 0 ? 'price-positive' : 'price-negative'
                                     }`} style={{ textAlign: 'center' }}>
                                       {event.priceImpactPercent >= 0 ? '+' : ''}{event.priceImpactPercent.toFixed(2)}%
+                                    </td>
+                                    <td className="px-3 py-2.5 text-xs font-mono font-semibold text-white" style={{ textAlign: 'center' }}>
+                                      {formatCurrency(event.sharePriceAfter)}
                                     </td>
                                   </tr>
                                 ))}
@@ -500,26 +569,18 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                         </p>
                                       </div>
                                     </div>
-                                  </div>
-
-                                  {/* Stats Row: Market Cap + Change */}
-                                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-700/20">
+                                  </div>                               
+                                  {/* Stats Row: Market Cap + Change + Share Price */}
+                                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-700/20">
                                     <div>
                                       <p className="text-[9px] sm:text-[10px] text-gray-400 mb-0.5">Market Cap</p>
                                       <p className="text-[11px] sm:text-xs font-semibold font-mono text-white">
                                         {formatCurrency(event.marketCapAfter)}
                                       </p>
                                     </div>
-                                    <div className="text-right">
+                                    <div className="text-center">
                                       <p className="text-[9px] sm:text-[10px] text-gray-400 mb-0.5">Change</p>
-                                      <div className="flex items-center justify-end gap-1">
-                                        {sharePriceChange !== 0 && (
-                                          <p className={`text-[10px] sm:text-xs font-semibold font-mono ${
-                                            isPositive ? 'text-[#10B981]' : 'text-[#EF4444]'
-                                          }`}>
-                                            {sharePriceChange > 0 ? '+' : ''}${sharePriceChange.toFixed(2)}
-                                          </p>
-                                        )}
+                                      <div className="flex items-center justify-center gap-1">
                                         <p className={`text-[11px] sm:text-xs font-bold ${
                                           event.matchResult === 'draw' ? 'text-white' :
                                           isPositive ? 'text-[#10B981]' : 'text-[#EF4444]'
@@ -527,6 +588,12 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                           {isPositive ? '+' : ''}{event.priceImpactPercent.toFixed(1)}%
                                         </p>
                                       </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="text-[9px] sm:text-[10px] text-gray-400 mb-0.5">Share Price</p>
+                                      <p className="text-[11px] sm:text-xs font-semibold font-mono text-white">
+                                        {formatCurrency(event.sharePriceAfter)}
+                                      </p>
                                     </div>
                                   </div>
                                 </div>
@@ -597,6 +664,154 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                 showAxes={true}
                               />
                             </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {activeTab === 'upcoming' && (
+                    <div className="space-y-2 sm:space-y-3">
+                      {upcomingMatches.length === 0 ? (
+                        <div className="text-center py-8">
+                          <p className="text-xs sm:text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>No upcoming matches</p>
+                        </div>
+                      ) : (
+                        <>                          {/* Desktop Table View */}
+                          <div className="hidden md:block overflow-x-auto">
+                            <table className="trading-table w-full">
+                              <thead>
+                                <tr>
+                                  <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'left' }}>Match</th>
+                                  <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>Date & Time</th>
+                                  <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>{teamName} Price</th>
+                                  <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>{teamName} Market Cap</th>
+                                  <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>Opponent Price</th>
+                                  <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>Opponent Market Cap</th>
+                                </tr>
+                              </thead>                              <tbody>                                {upcomingMatches.map((match, index) => {
+                                  const matchDate = new Date(match.date);
+                                  const datePart = matchDate.toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    timeZone: 'Asia/Dubai'
+                                  });
+                                  const timePart = matchDate.toLocaleTimeString('en-US', {
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                    hour12: true,
+                                    timeZone: 'Asia/Dubai'
+                                  });
+                                  const formattedDateTime = `${datePart}, ${timePart}`;
+                                  
+                                  return (
+                                    <tr key={index} className="border-b border-gray-800/30">
+                                      <td className="px-3 py-2.5" style={{ textAlign: 'left' }}>
+                                        <div className="flex items-center gap-2">
+                                          <div className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+                                            match.isHome ? 'bg-[#10B981]/20 text-[#10B981]' : 'bg-[#F59E0B]/20 text-[#F59E0B]'
+                                          }`}>
+                                            {match.isHome ? 'H' : 'A'}
+                                          </div>
+                                          <span className="text-xs font-medium">Match vs {match.opponent}</span>
+                                        </div>
+                                      </td>
+                                      <td className="px-3 py-2.5 text-xs font-mono" style={{ textAlign: 'center', color: '#C9A961' }}>
+                                        {formattedDateTime}
+                                      </td>
+                                      <td className="px-3 py-2.5 text-xs font-mono font-semibold text-white" style={{ textAlign: 'center' }}>
+                                        {formatCurrency(match.teamSharePrice)}
+                                      </td>
+                                      <td className="px-3 py-2.5 text-xs font-mono font-semibold text-white" style={{ textAlign: 'center' }}>
+                                        {formatCurrency(match.teamMarketCap)}
+                                      </td>
+                                      <td className="px-3 py-2.5 text-xs font-mono font-semibold text-white" style={{ textAlign: 'center' }}>
+                                        {formatCurrency(match.opponentSharePrice)}
+                                      </td>
+                                      <td className="px-3 py-2.5 text-xs font-mono font-semibold text-white" style={{ textAlign: 'center' }}>
+                                        {formatCurrency(match.opponentMarketCap)}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>                          {/* Mobile/Tablet Card View */}                          <div className="md:hidden space-y-2">
+                            {upcomingMatches.map((match, index) => {
+                              const dateObj = new Date(match.date);
+                              const datePart = dateObj.toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                timeZone: 'Asia/Dubai'
+                              });
+                              const timePart = dateObj.toLocaleTimeString('en-US', {
+                                hour: 'numeric',
+                                minute: '2-digit',
+                                hour12: true,
+                                timeZone: 'Asia/Dubai'
+                              });
+                              const formattedDateTime = `${datePart}, ${timePart}`;
+
+                              return (                                <div
+                                  key={index}
+                                  className="bg-gray-800/40 border border-gray-700/30 rounded-lg p-2.5 sm:p-3 touch-manipulation"
+                                >                                  {/* Header Row: Badge + Opponent + Date */}
+                                  <div className="flex items-start justify-between gap-2 mb-2">
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+                                        match.isHome 
+                                          ? 'bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30' 
+                                          : 'bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30'
+                                      }`}>
+                                        {match.isHome ? 'H' : 'A'}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-[11px] sm:text-xs font-semibold text-white truncate">
+                                          Match vs {match.opponent}
+                                        </p>
+                                        <p className="text-[9px] sm:text-[10px] font-mono mt-0.5" style={{ color: '#C9A961' }}>
+                                          {formattedDateTime}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Stats Row: Share Prices and Market Caps */}
+                                  <div className="space-y-2 pt-2 border-t border-gray-700/20">
+                                    {/* Selected Team */}
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div>
+                                        <p className="text-[9px] sm:text-[10px] text-gray-400 mb-0.5">{teamName} Price</p>
+                                        <p className="text-[11px] sm:text-xs font-semibold font-mono text-white">
+                                          {formatCurrency(match.teamSharePrice)}
+                                        </p>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="text-[9px] sm:text-[10px] text-gray-400 mb-0.5">{teamName} Market Cap</p>
+                                        <p className="text-[11px] sm:text-xs font-semibold font-mono text-white">
+                                          {formatCurrency(match.teamMarketCap)}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    {/* Opponent Team */}
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div>
+                                        <p className="text-[9px] sm:text-[10px] text-gray-400 mb-0.5">Opponent Price</p>
+                                        <p className="text-[11px] sm:text-xs font-semibold font-mono text-white">
+                                          {formatCurrency(match.opponentSharePrice)}
+                                        </p>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="text-[9px] sm:text-[10px] text-gray-400 mb-0.5">Opponent Market Cap</p>
+                                        <p className="text-[11px] sm:text-xs font-semibold font-mono text-white">
+                                          {formatCurrency(match.opponentMarketCap)}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </>
                       )}

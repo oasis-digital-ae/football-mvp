@@ -445,13 +445,13 @@ export const UsersManagementPanel: React.FC = () => {
             <div className="space-y-4">
               <Skeleton className="h-20 w-full" />
               <Skeleton className="h-40 w-full" />
-            </div>
-          ) : selectedUser ? (
+            </div>          
+            ) : selectedUser ? (
             <Tabs defaultValue="profile" className="w-full">
               <TabsList>
                 <TabsTrigger value="profile">Profile</TabsTrigger>
                 <TabsTrigger value="wallet">Wallet</TabsTrigger>
-                <TabsTrigger value="positions">Positions</TabsTrigger>
+                <TabsTrigger value="positions">Portfolio</TabsTrigger>
                 <TabsTrigger value="orders">Orders</TabsTrigger>
               </TabsList>
 
@@ -525,27 +525,33 @@ export const UsersManagementPanel: React.FC = () => {
                     </div>
                     <div>
                       <p className="text-sm font-medium mb-2">Transaction History</p>
-                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                      <div className="space-y-2 max-h-64 overflow-y-auto">                        
                         {userTransactions.length === 0 ? (
                           <p className="text-sm text-muted-foreground">No transactions</p>
                         ) : (
-                          userTransactions.map((tx) => (
-                            <div key={tx.id} className="flex items-center justify-between p-2 border rounded">
-                              <div>
-                                <p className="text-sm font-medium">{tx.type}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {new Date(tx.created_at).toLocaleString()}
-                                </p>
+                          userTransactions.map((tx) => {
+                            // Types that add money to wallet (positive/green): deposit, sale, refund
+                            const isPositive = ['deposit', 'sale', 'refund'].includes(tx.type.toLowerCase());
+                            const amount = tx.amount_cents / 100;
+                            
+                            return (
+                              <div key={tx.id} className="flex items-center justify-between p-2 border rounded">
+                                <div>
+                                  <p className="text-sm font-medium capitalize">{tx.type}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {new Date(tx.created_at).toLocaleString()}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className={`text-sm font-medium ${
+                                    isPositive ? 'text-green-600' : 'text-red-600'
+                                  }`}>
+                                    {isPositive ? '+' : '-'}{formatCurrency(Math.abs(amount))}
+                                  </p>
+                                </div>
                               </div>
-                              <div className="text-right">
-                                <p className={`text-sm font-medium ${
-                                  tx.type === 'deposit' ? 'text-green-600' : 'text-red-600'
-                                }`}>
-                                  {tx.type === 'deposit' ? '+' : '-'}{formatCurrency(tx.amount_cents / 100)}
-                                </p>
-                              </div>
-                            </div>
-                          ))
+                            );
+                          })
                         )}
                       </div>
                     </div>
