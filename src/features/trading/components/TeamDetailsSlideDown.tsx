@@ -274,13 +274,16 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
           const isTeamInFixture = fixture.home_team_id === teamId || fixture.away_team_id === teamId;
           return isUpcoming && isTeamInFixture;
         })
-        .sort((a, b) => new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime());
-
-      // Process upcoming fixtures
+        .sort((a, b) => new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime());      // Process upcoming fixtures
       const processedUpcoming = upcomingFixtures.map(fixture => {
         const isHome = fixture.home_team_id === teamId;
         const opponentId = isHome ? fixture.away_team_id : fixture.home_team_id;
         const opponentTeam = teamsMap.get(opponentId);
+        
+        // Calculate share prices (market cap / total shares)
+        const TOTAL_SHARES = 1000;
+        const teamSharePrice = (selectedTeam?.market_cap || 0) / TOTAL_SHARES;
+        const opponentSharePrice = (opponentTeam?.market_cap || 0) / TOTAL_SHARES;
         
         return {
           date: fixture.kickoff_at,
@@ -288,6 +291,8 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
           isHome,
           teamMarketCap: selectedTeam?.market_cap || 0,
           opponentMarketCap: opponentTeam?.market_cap || 0,
+          teamSharePrice,
+          opponentSharePrice,
           matchday: fixture.matchday
         };
       });
@@ -410,7 +415,8 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
       <div className="slide-down-panel-inner">
         <div className="slide-down-panel-content">
           <div className="border-t border-gray-800/30 bg-secondary/20">
-            <div className="px-4 pt-2 pb-4">              {/* Tab Navigation - Mobile Optimized */}
+            <div className="px-4 pt-2 pb-4">              
+            {/* Tab Navigation - Mobile Optimized */}
               <div className="flex items-center gap-1 mb-3 sm:mb-4 border-b border-gray-800/30">
                 <button
                   onClick={() => setActiveTab('matches')}
@@ -671,48 +677,69 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                           <p className="text-xs sm:text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>No upcoming matches</p>
                         </div>
                       ) : (
-                        <>
-                          {/* Desktop Table View */}
+                        <>                          {/* Desktop Table View */}
                           <div className="hidden md:block overflow-x-auto">
                             <table className="trading-table w-full">
                               <thead>
                                 <tr>
                                   <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'left' }}>Match</th>
-                                  <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>Date</th>
+                                  <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>Date & Time</th>
+                                  <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>{teamName} Price</th>
                                   <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>{teamName} Market Cap</th>
+                                  <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>Opponent Price</th>
                                   <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>Opponent Market Cap</th>
                                 </tr>
-                              </thead>                              <tbody>                                {upcomingMatches.map((match, index) => (                                  <tr key={index} className="border-b border-gray-800/30">
-                                    <td className="px-3 py-2.5" style={{ textAlign: 'left' }}>
-                                      <div className="flex items-center gap-2">
-                                        <div className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
-                                          match.isHome ? 'bg-[#10B981]/20 text-[#10B981]' : 'bg-[#F59E0B]/20 text-[#F59E0B]'
-                                        }`}>
-                                          {match.isHome ? 'H' : 'A'}
+                              </thead>                              <tbody>                                {upcomingMatches.map((match, index) => {
+                                  const matchDate = new Date(match.date);
+                                  const formattedDate = matchDate.toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric'
+                                  });
+                                  const formattedTime = matchDate.toLocaleTimeString('en-US', {
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                    hour12: true
+                                  });
+                                  
+                                  return (
+                                    <tr key={index} className="border-b border-gray-800/30">
+                                      <td className="px-3 py-2.5" style={{ textAlign: 'left' }}>
+                                        <div className="flex items-center gap-2">
+                                          <div className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+                                            match.isHome ? 'bg-[#10B981]/20 text-[#10B981]' : 'bg-[#F59E0B]/20 text-[#F59E0B]'
+                                          }`}>
+                                            {match.isHome ? 'H' : 'A'}
+                                          </div>
+                                          <span className="text-xs font-medium">Match vs {match.opponent}</span>
                                         </div>
-                                        <span className="text-xs font-medium">Match vs {match.opponent}</span>
-                                      </div>
-                                    </td>
-                                    <td className="px-3 py-2.5 text-[10px] font-mono" style={{ color: 'hsl(var(--muted-foreground))', textAlign: 'center' }}>
-                                      {new Date(match.date).toLocaleDateString('en-US', {
-                                        month: 'short',
-                                        day: 'numeric',
-                                        year: 'numeric'
-                                      })}
-                                    </td>
-                                    <td className="px-3 py-2.5 text-xs font-mono font-semibold text-white" style={{ textAlign: 'center' }}>
-                                      {formatCurrency(match.teamMarketCap)}
-                                    </td>
-                                    <td className="px-3 py-2.5 text-xs font-mono font-semibold text-white" style={{ textAlign: 'center' }}>
-                                      {formatCurrency(match.opponentMarketCap)}
-                                    </td>
-                                  </tr>
-                                ))}
+                                      </td>
+                                      <td className="px-3 py-2.5" style={{ textAlign: 'center' }}>
+                                        <div className="flex flex-col items-center gap-1">
+                                          <span className="text-[10px] font-mono text-muted-foreground">{formattedDate}</span>
+                                          <span className="px-2 py-0.5 text-[10px] font-semibold bg-white/90 text-gray-900 rounded">
+                                            {formattedTime}
+                                          </span>
+                                        </div>
+                                      </td>
+                                      <td className="px-3 py-2.5 text-xs font-mono font-semibold text-white" style={{ textAlign: 'center' }}>
+                                        {formatCurrency(match.teamSharePrice)}
+                                      </td>
+                                      <td className="px-3 py-2.5 text-xs font-mono font-semibold text-white" style={{ textAlign: 'center' }}>
+                                        {formatCurrency(match.teamMarketCap)}
+                                      </td>
+                                      <td className="px-3 py-2.5 text-xs font-mono font-semibold text-white" style={{ textAlign: 'center' }}>
+                                        {formatCurrency(match.opponentSharePrice)}
+                                      </td>
+                                      <td className="px-3 py-2.5 text-xs font-mono font-semibold text-white" style={{ textAlign: 'center' }}>
+                                        {formatCurrency(match.opponentMarketCap)}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
                               </tbody>
                             </table>
-                          </div>
-
-                          {/* Mobile/Tablet Card View */}
+                          </div>                          {/* Mobile/Tablet Card View */}
                           <div className="md:hidden space-y-2">
                             {upcomingMatches.map((match, index) => {
                               const dateObj = new Date(match.date);
@@ -720,6 +747,11 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                 month: 'short',
                                 day: 'numeric',
                                 year: 'numeric'
+                              });
+                              const formattedTime = dateObj.toLocaleTimeString('en-US', {
+                                hour: 'numeric',
+                                minute: '2-digit',
+                                hour12: true
                               });
 
                               return (                                <div
@@ -739,26 +771,49 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                         <p className="text-[11px] sm:text-xs font-semibold text-white truncate">
                                           Match vs {match.opponent}
                                         </p>
-                                        <p className="text-[9px] sm:text-[10px] text-gray-400 mt-0.5">
-                                          {formattedDate}
-                                        </p>
+                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                          <p className="text-[9px] sm:text-[10px] text-gray-400">
+                                            {formattedDate}
+                                          </p>
+                                          <span className="px-1.5 py-0.5 text-[9px] font-semibold bg-white/90 text-gray-900 rounded">
+                                            {formattedTime}
+                                          </span>
+                                        </div>
                                       </div>
                                     </div>
                                   </div>
 
-                                  {/* Stats Row: Market Caps */}
-                                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-700/20">
-                                    <div>
-                                      <p className="text-[9px] sm:text-[10px] text-gray-400 mb-0.5">{teamName} Market Cap</p>
-                                      <p className="text-[11px] sm:text-xs font-semibold font-mono text-white">
-                                        {formatCurrency(match.teamMarketCap)}
-                                      </p>
+                                  {/* Stats Row: Share Prices and Market Caps */}
+                                  <div className="space-y-2 pt-2 border-t border-gray-700/20">
+                                    {/* Selected Team */}
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div>
+                                        <p className="text-[9px] sm:text-[10px] text-gray-400 mb-0.5">{teamName} Price</p>
+                                        <p className="text-[11px] sm:text-xs font-semibold font-mono text-white">
+                                          {formatCurrency(match.teamSharePrice)}
+                                        </p>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="text-[9px] sm:text-[10px] text-gray-400 mb-0.5">{teamName} Market Cap</p>
+                                        <p className="text-[11px] sm:text-xs font-semibold font-mono text-white">
+                                          {formatCurrency(match.teamMarketCap)}
+                                        </p>
+                                      </div>
                                     </div>
-                                    <div className="text-right">
-                                      <p className="text-[9px] sm:text-[10px] text-gray-400 mb-0.5">Opponent Market Cap</p>
-                                      <p className="text-[11px] sm:text-xs font-semibold font-mono text-white">
-                                        {formatCurrency(match.opponentMarketCap)}
-                                      </p>
+                                    {/* Opponent Team */}
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div>
+                                        <p className="text-[9px] sm:text-[10px] text-gray-400 mb-0.5">Opponent Price</p>
+                                        <p className="text-[11px] sm:text-xs font-semibold font-mono text-white">
+                                          {formatCurrency(match.opponentSharePrice)}
+                                        </p>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="text-[9px] sm:text-[10px] text-gray-400 mb-0.5">Opponent Market Cap</p>
+                                        <p className="text-[11px] sm:text-xs font-semibold font-mono text-white">
+                                          {formatCurrency(match.opponentMarketCap)}
+                                        </p>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
