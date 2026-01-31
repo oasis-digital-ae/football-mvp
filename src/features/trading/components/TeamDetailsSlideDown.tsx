@@ -5,6 +5,7 @@ import type { DatabaseFixture } from '@/shared/lib/services/fixtures.service';
 import type { DatabaseTeam } from '@/shared/lib/services/teams.service';
 import { formatCurrency } from '@/shared/lib/formatters';
 import { Loader2, TrendingUp, TrendingDown, Minus, BarChart3 } from 'lucide-react';
+import { Badge } from '@/shared/components/ui/badge';
 import { supabase } from '@/shared/lib/supabase';
 import { LineChart, ChartDataPoint } from '@/shared/components/ui/line-chart';
 import { ChartSkeleton } from '@/shared/components/ui/skeleton';
@@ -264,15 +265,15 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
       
       // Get the selected team's info
       const selectedTeam = teamsMap.get(teamId);
-      
-      // Filter upcoming matches for this team
+        // Filter upcoming and live matches for this team
       const now = new Date();
       const upcomingFixtures = (fixturesData || [])
         .filter(fixture => {
           const kickoffDate = new Date(fixture.kickoff_at);
-          const isUpcoming = kickoffDate > now && fixture.status !== 'applied';
+          // Include scheduled (upcoming) and closed (live) matches, exclude applied (finished)
+          const isUpcomingOrLive = (kickoffDate > now && fixture.status === 'scheduled') || fixture.status === 'closed';
           const isTeamInFixture = fixture.home_team_id === teamId || fixture.away_team_id === teamId;
-          return isUpcoming && isTeamInFixture;
+          return isUpcomingOrLive && isTeamInFixture;
         })
         .sort((a, b) => new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime());      // Process upcoming fixtures
       const processedUpcoming = upcomingFixtures.map(fixture => {
@@ -293,7 +294,10 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
           opponentMarketCap: opponentTeam?.market_cap || 0,
           teamSharePrice,
           opponentSharePrice,
-          matchday: fixture.matchday
+          matchday: fixture.matchday,
+          status: fixture.status,
+          homeScore: fixture.home_score,
+          awayScore: fixture.away_score
         };
       });
 
@@ -702,10 +706,10 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                     hour12: true,
                                     timeZone: 'Asia/Dubai'
                                   });
-                                  const formattedDateTime = `${datePart}, ${timePart}`;
-                                  
-                                  return (
-                                    <tr key={index} className="border-b border-gray-800/30">
+                                  const formattedDateTime = `${datePart}, ${timePart}`;                                  return (
+                                    <tr key={index} className={`border-b border-gray-800/30 ${
+                                      match.status === 'closed' ? 'bg-red-500/5 border-l-4 border-l-red-500' : ''
+                                    }`}>
                                       <td className="px-3 py-2.5" style={{ textAlign: 'left' }}>
                                         <div className="flex items-center gap-2">
                                           <div className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
@@ -714,10 +718,30 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                             {match.isHome ? 'H' : 'A'}
                                           </div>
                                           <span className="text-xs font-medium">Match vs {match.opponent}</span>
+                                          {match.status === 'closed' && (
+                                            <Badge variant="outline" className="ml-2 text-red-400 border-red-400/50 text-[10px] px-1.5 py-0 animate-pulse">
+                                              LIVE
+                                            </Badge>
+                                          )}
                                         </div>
                                       </td>
                                       <td className="px-3 py-2.5 text-xs font-mono" style={{ textAlign: 'center', color: '#C9A961' }}>
-                                        {formattedDateTime}
+                                        {match.status === 'closed' && match.homeScore !== null && match.awayScore !== null ? (
+                                          <div className="flex flex-col items-center gap-1">
+                                            <span className="text-[10px]">{formattedDateTime}</span>
+                                            <div className="flex items-center gap-1.5">
+                                              <span className="text-sm font-bold text-white">
+                                                {match.isHome ? match.homeScore : match.awayScore}
+                                              </span>
+                                              <span className="text-gray-500">-</span>
+                                              <span className="text-sm font-bold text-white">
+                                                {match.isHome ? match.awayScore : match.homeScore}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          formattedDateTime
+                                        )}
                                       </td>
                                       <td className="px-3 py-2.5 text-xs font-mono font-semibold text-white" style={{ textAlign: 'center' }}>
                                         {formatCurrency(match.teamSharePrice)}
@@ -750,12 +774,12 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                 hour12: true,
                                 timeZone: 'Asia/Dubai'
                               });
-                              const formattedDateTime = `${datePart}, ${timePart}`;
-
-                              return (                                <div
+                              const formattedDateTime = `${datePart}, ${timePart}`;                              return (                                <div
                                   key={index}
-                                  className="bg-gray-800/40 border border-gray-700/30 rounded-lg p-2.5 sm:p-3 touch-manipulation"
-                                >                                  {/* Header Row: Badge + Opponent + Date */}
+                                  className={`bg-gray-800/40 border border-gray-700/30 rounded-lg p-2.5 sm:p-3 touch-manipulation ${
+                                    match.status === 'closed' ? 'border-l-4 border-l-red-500 bg-red-500/5' : ''
+                                  }`}
+                                >{/* Header Row: Badge + Opponent + Date */}
                                   <div className="flex items-start justify-between gap-2 mb-2">
                                     <div className="flex items-center gap-2 flex-1 min-w-0">
                                       <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
@@ -766,12 +790,36 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                         {match.isHome ? 'H' : 'A'}
                                       </div>
                                       <div className="flex-1 min-w-0">
-                                        <p className="text-[11px] sm:text-xs font-semibold text-white truncate">
-                                          Match vs {match.opponent}
-                                        </p>
-                                        <p className="text-[9px] sm:text-[10px] font-mono mt-0.5" style={{ color: '#C9A961' }}>
-                                          {formattedDateTime}
-                                        </p>
+                                        <div className="flex items-center gap-2">
+                                          <p className="text-[11px] sm:text-xs font-semibold text-white truncate">
+                                            Match vs {match.opponent}
+                                          </p>
+                                          {match.status === 'closed' && (
+                                            <Badge variant="outline" className="text-red-400 border-red-400/50 text-[9px] px-1 py-0 animate-pulse">
+                                              LIVE
+                                            </Badge>
+                                          )}
+                                        </div>
+                                        {match.status === 'closed' && match.homeScore !== null && match.awayScore !== null ? (
+                                          <div className="flex items-center gap-2 mt-1">
+                                            <p className="text-[9px] sm:text-[10px] font-mono" style={{ color: '#C9A961' }}>
+                                              {formattedDateTime}
+                                            </p>
+                                            <div className="flex items-center gap-1">
+                                              <span className="text-sm font-bold text-white">
+                                                {match.isHome ? match.homeScore : match.awayScore}
+                                              </span>
+                                              <span className="text-[10px] text-gray-500">-</span>
+                                              <span className="text-sm font-bold text-white">
+                                                {match.isHome ? match.awayScore : match.homeScore}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <p className="text-[9px] sm:text-[10px] font-mono mt-0.5" style={{ color: '#C9A961' }}>
+                                            {formattedDateTime}
+                                          </p>
+                                        )}
                                       </div>
                                     </div>
                                   </div>
