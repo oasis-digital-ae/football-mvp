@@ -32,6 +32,8 @@ interface TeamDetailsSlideDownProps {
   userId: string;
   fixtures?: DatabaseFixture[];
   teams?: DatabaseTeam[];
+  /** When true, team.market_cap is already in dollars (e.g. from clubs); when false, it's in cents (raw DB). Default false. */
+  teamsMarketCapInDollars?: boolean;
   /** When provided, match history is shown immediately without a second load */
   initialMatchHistory?: InitialMatchHistoryItem[];
   initialUserPosition?: DatabasePositionWithTeam | null;
@@ -110,6 +112,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
   userId,
   fixtures: parentFixtures,
   teams: parentTeams,
+  teamsMarketCapInDollars = false,
   initialMatchHistory,
   initialUserPosition,
   launchPrice,
@@ -308,22 +311,28 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
           return isUpcoming && isTeamInFixture;
         })
         .sort((a, b) => new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime());      // Process upcoming fixtures
+      // market_cap: when teamsMarketCapInDollars (e.g. from marketplace clubs), use as dollars; else from DB (cents) convert with fromCents
+      const TOTAL_SHARES = 1000;
+      const toMarketCapDollars = (cap: number | undefined) =>
+        teamsMarketCapInDollars
+          ? roundForDisplay(cap ?? 0)
+          : roundForDisplay(fromCents(cap ?? 0));
       const processedUpcoming = upcomingFixtures.map(fixture => {
         const isHome = fixture.home_team_id === teamId;
         const opponentId = isHome ? fixture.away_team_id : fixture.home_team_id;
         const opponentTeam = teamsMap.get(opponentId);
         
-        // Calculate share prices (market cap / total shares)
-        const TOTAL_SHARES = 1000;
-        const teamSharePrice = (selectedTeam?.market_cap || 0) / TOTAL_SHARES;
-        const opponentSharePrice = (opponentTeam?.market_cap || 0) / TOTAL_SHARES;
+        const teamMarketCapDollars = toMarketCapDollars(selectedTeam?.market_cap);
+        const opponentMarketCapDollars = toMarketCapDollars(opponentTeam?.market_cap);
+        const teamSharePrice = roundForDisplay(toDecimal(teamMarketCapDollars).dividedBy(TOTAL_SHARES));
+        const opponentSharePrice = roundForDisplay(toDecimal(opponentMarketCapDollars).dividedBy(TOTAL_SHARES));
         
         return {
           date: fixture.kickoff_at,
           opponent: opponentTeam?.name || 'Unknown',
           isHome,
-          teamMarketCap: selectedTeam?.market_cap || 0,
-          opponentMarketCap: opponentTeam?.market_cap || 0,
+          teamMarketCap: teamMarketCapDollars,
+          opponentMarketCap: opponentMarketCapDollars,
           teamSharePrice,
           opponentSharePrice,
           matchday: fixture.matchday
