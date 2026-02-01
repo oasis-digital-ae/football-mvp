@@ -317,17 +317,21 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
         const opponentId = isHome ? fixture.away_team_id : fixture.home_team_id;
         const opponentTeam = teamsMap.get(opponentId);
         
-        // Calculate share prices (market cap / total shares)
+        // Convert market cap from cents to dollars
+        const teamMarketCapDollars = roundForDisplay(fromCents(selectedTeam?.market_cap || 0));
+        const opponentMarketCapDollars = roundForDisplay(fromCents(opponentTeam?.market_cap || 0));
+        
+        // Calculate share prices (market cap in dollars / total shares)
         const TOTAL_SHARES = 1000;
-        const teamSharePrice = (selectedTeam?.market_cap || 0) / TOTAL_SHARES;
-        const opponentSharePrice = (opponentTeam?.market_cap || 0) / TOTAL_SHARES;
+        const teamSharePrice = teamMarketCapDollars / TOTAL_SHARES;
+        const opponentSharePrice = opponentMarketCapDollars / TOTAL_SHARES;
         
         return {
           date: fixture.kickoff_at,
           opponent: opponentTeam?.name || 'Unknown',
           isHome,
-          teamMarketCap: selectedTeam?.market_cap || 0,
-          opponentMarketCap: opponentTeam?.market_cap || 0,
+          teamMarketCap: teamMarketCapDollars,
+          opponentMarketCap: opponentMarketCapDollars,
           teamSharePrice,
           opponentSharePrice,
           matchday: fixture.matchday,
@@ -716,7 +720,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                           <p className="text-xs sm:text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>No upcoming matches</p>
                         </div>
                       ) : (
-                        <>                          {/* Desktop Table View */}
+                        <> {/* Desktop Table View */}
                           <div className="hidden md:block overflow-x-auto">
                             <table className="trading-table w-full">
                               <thead>
@@ -728,7 +732,9 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                   <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>Opponent Price</th>
                                   <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>Opponent Market Cap</th>
                                 </tr>
-                              </thead>                              <tbody>                                {upcomingMatches.map((match, index) => {
+                              </thead>                              
+                              <tbody>                                
+                                {upcomingMatches.map((match, index) => {
                                   const matchDate = new Date(match.date);
                                   const datePart = matchDate.toLocaleDateString('en-US', {
                                     month: 'short',
@@ -741,7 +747,8 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                     hour12: true,
                                     timeZone: 'Asia/Dubai'
                                   });
-                                  const formattedDateTime = `${datePart}, ${timePart}`;                                  return (
+                                  const formattedDateTime = `${datePart}, ${timePart}`;                                  
+                                  return (
                                     <tr key={index} className={`border-b border-gray-800/30 ${
                                       match.status === 'closed' ? 'bg-red-500/5 border-l-4 border-l-red-500' : ''
                                     }`}>
