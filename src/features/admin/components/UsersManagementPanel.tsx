@@ -563,79 +563,95 @@ export const UsersManagementPanel: React.FC = () => {
                 {selectedUser.positions.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No positions</p>
                 ) : (
-                  <div className="rounded-md border overflow-hidden w-full">
-                    <div className="w-full overflow-x-visible">
-                      <table className="w-full caption-bottom text-sm table-fixed">
-                        <colgroup>
-                          <col className="w-[25%]" />
-                          <col className="w-[12%]" />
-                          <col className="w-[15%]" />
-                          <col className="w-[13%]" />
-                          <col className="w-[17%]" />
-                          <col className="w-[18%]" />
-                        </colgroup>
-                        <thead className="[&_tr]:border-b">
-                          <tr className="border-b transition-colors hover:bg-muted/50">
-                            <th className="h-12 px-2 sm:px-3 md:px-4 text-left align-middle font-medium text-muted-foreground">Team</th>
-                            <th className="h-12 px-2 sm:px-3 md:px-4 text-center align-middle font-medium text-muted-foreground">Quantity</th>
-                            <th className="h-12 px-2 sm:px-3 md:px-4 text-center align-middle font-medium text-muted-foreground">Price/Share</th>
-                            <th className="h-12 px-2 sm:px-3 md:px-4 text-center align-middle font-medium text-muted-foreground">% Change</th>
-                            <th className="h-12 px-2 sm:px-3 md:px-4 text-center align-middle font-medium text-muted-foreground">Total Value</th>
-                            <th className="h-12 px-2 sm:px-3 md:px-4 text-center align-middle font-medium text-muted-foreground">Unrealized</th>
-                            <th className="h-12 px-2 sm:px-3 md:px-4 text-center align-middle font-medium text-muted-foreground">Realized</th>
-                            <th className="h-12 px-2 sm:px-3 md:px-4 text-center align-middle font-medium text-muted-foreground">Total P&L</th>
-                          </tr>
-                        </thead>
-                        <tbody className="[&_tr:last-child]:border-0">
-                          {selectedUser.positions.map((pos, index) => {
-                            // Use price_per_share from service (calculated from market cap / total shares)
-                            // This ensures consistency: quantity * price_per_share = current_value
-                            const pricePerShare = pos.price_per_share || (pos.quantity > 0 ? pos.current_value / pos.quantity : 0);
-                            // Use percent_change_from_purchase which is calculated using market cap directly
-                            // This ensures it matches latest match change when shares were bought before the match
-                            const percentChange = pos.percent_change_from_purchase;
-                            
-                            return (
-                              <tr key={index} className="border-b transition-colors hover:bg-muted/50">
-                                <td className="p-2 sm:p-3 md:p-4 align-middle">
-                                  <p className="font-medium truncate">{pos.team_name}</p>
-                                </td>
-                                <td className="p-2 sm:p-3 md:p-4 text-center font-mono align-middle text-sm">
-                                  {pos.quantity}
-                                </td>
-                                <td className="p-2 sm:p-3 md:p-4 text-center font-mono align-middle text-sm">
-                                  {formatCurrency(pricePerShare)}
-                                </td>
-                                <td className={`p-2 sm:p-3 md:p-4 text-center font-mono align-middle text-sm ${
-                                  percentChange >= 0 ? 'text-green-600' : 'text-red-600'
-                                }`}>
-                                  {percentChange >= 0 ? '+' : ''}{percentChange.toFixed(2)}%
-                                </td>
-                                <td className="p-2 sm:p-3 md:p-4 text-center font-mono font-semibold align-middle text-sm">
-                                  {formatCurrency(pos.current_value)}
-                                </td>
-                                <td className={`p-2 sm:p-3 md:p-4 text-center font-mono font-semibold align-middle text-sm ${
-                                  (pos.unrealized_pnl ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'
-                                }`}>
-                                  {(pos.unrealized_pnl ?? 0) >= 0 ? '+' : ''}{formatCurrency(pos.unrealized_pnl ?? 0)}
-                                </td>
-                                <td className={`p-2 sm:p-3 md:p-4 text-center font-mono font-semibold align-middle text-sm ${
-                                  (pos.realized_pnl ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'
-                                }`}>
-                                  {(pos.realized_pnl ?? 0) >= 0 ? '+' : ''}{formatCurrency(pos.realized_pnl ?? 0)}
-                                </td>
-                                <td className={`p-2 sm:p-3 md:p-4 text-center font-mono font-semibold align-middle text-sm ${
-                                  pos.profit_loss >= 0 ? 'text-green-600' : 'text-red-600'
-                                }`}>
-                                  {pos.profit_loss >= 0 ? '+' : ''}{formatCurrency(pos.profit_loss)}
-                                </td>
+                  (() => {
+                    // Total portfolio value for % Portfolio column (matches user portfolio tab)
+                    const totalPortfolioValue = selectedUser.positions.reduce((sum, p) => sum + p.current_value, 0);
+                    return (
+                      <div className="rounded-md border overflow-hidden w-full">
+                        <div className="w-full overflow-x-auto">
+                          <table className="w-full caption-bottom text-sm min-w-[900px]">
+                            <colgroup>
+                              <col className="w-[18%]" />
+                              <col className="w-[8%]" />
+                              <col className="w-[10%]" />
+                              <col className="w-[10%]" />
+                              <col className="w-[9%]" />
+                              <col className="w-[12%]" />
+                              <col className="w-[10%]" />
+                              <col className="w-[11%]" />
+                              <col className="w-[11%]" />
+                              <col className="w-[11%]" />
+                            </colgroup>
+                            <thead className="[&_tr]:border-b">
+                              <tr className="border-b transition-colors hover:bg-muted/50">
+                                <th className="h-12 px-2 sm:px-3 md:px-4 text-left align-middle font-medium text-muted-foreground">Team</th>
+                                <th className="h-12 px-2 sm:px-3 md:px-4 text-right align-middle font-medium text-muted-foreground">Quantity</th>
+                                <th className="h-12 px-2 sm:px-3 md:px-4 text-right align-middle font-medium text-muted-foreground">Avg Price</th>
+                                <th className="h-12 px-2 sm:px-3 md:px-4 text-right align-middle font-medium text-muted-foreground">Current Price</th>
+                                <th className="h-12 px-2 sm:px-3 md:px-4 text-right align-middle font-medium text-muted-foreground">% Change</th>
+                                <th className="h-12 px-2 sm:px-3 md:px-4 text-right align-middle font-medium text-muted-foreground">Total Value</th>
+                                <th className="h-12 px-2 sm:px-3 md:px-4 text-right align-middle font-medium text-muted-foreground">% Portfolio</th>
+                                <th className="h-12 px-2 sm:px-3 md:px-4 text-right align-middle font-medium text-muted-foreground">Unrealized</th>
+                                <th className="h-12 px-2 sm:px-3 md:px-4 text-right align-middle font-medium text-muted-foreground">Realized</th>
+                                <th className="h-12 px-2 sm:px-3 md:px-4 text-right align-middle font-medium text-muted-foreground">Total P&L</th>
                               </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                            </thead>
+                            <tbody className="[&_tr:last-child]:border-0">
+                              {selectedUser.positions.map((pos, index) => {
+                                const pricePerShare = pos.price_per_share ?? (pos.quantity > 0 ? pos.current_value / pos.quantity : 0);
+                                const percentChange = pos.percent_change_from_purchase;
+                                const percentPortfolio = totalPortfolioValue > 0
+                                  ? (pos.current_value / totalPortfolioValue) * 100
+                                  : 0;
+                                return (
+                                  <tr key={index} className="border-b transition-colors hover:bg-muted/50">
+                                    <td className="p-2 sm:p-3 md:p-4 align-middle">
+                                      <p className="font-medium truncate">{pos.team_name}</p>
+                                    </td>
+                                    <td className="p-2 sm:p-3 md:p-4 text-right font-mono align-middle text-sm">
+                                      {pos.quantity}
+                                    </td>
+                                    <td className="p-2 sm:p-3 md:p-4 text-right font-mono align-middle text-sm">
+                                      {formatCurrency(pos.avg_price ?? 0)}
+                                    </td>
+                                    <td className="p-2 sm:p-3 md:p-4 text-right font-mono align-middle text-sm">
+                                      {formatCurrency(pricePerShare)}
+                                    </td>
+                                    <td className={`p-2 sm:p-3 md:p-4 text-right font-mono align-middle text-sm ${
+                                      percentChange >= 0 ? 'text-green-600' : 'text-red-600'
+                                    }`}>
+                                      {percentChange >= 0 ? '+' : ''}{percentChange.toFixed(2)}%
+                                    </td>
+                                    <td className="p-2 sm:p-3 md:p-4 text-right font-mono font-semibold align-middle text-sm">
+                                      {formatCurrency(pos.current_value)}
+                                    </td>
+                                    <td className="p-2 sm:p-3 md:p-4 text-right font-mono align-middle text-sm">
+                                      {percentPortfolio.toFixed(2)}%
+                                    </td>
+                                    <td className={`p-2 sm:p-3 md:p-4 text-right font-mono font-semibold align-middle text-sm ${
+                                      (pos.unrealized_pnl ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                                    }`}>
+                                      {(pos.unrealized_pnl ?? 0) >= 0 ? '+' : ''}{formatCurrency(pos.unrealized_pnl ?? 0)}
+                                    </td>
+                                    <td className={`p-2 sm:p-3 md:p-4 text-right font-mono font-semibold align-middle text-sm ${
+                                      (pos.realized_pnl ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                                    }`}>
+                                      {(pos.realized_pnl ?? 0) >= 0 ? '+' : ''}{formatCurrency(pos.realized_pnl ?? 0)}
+                                    </td>
+                                    <td className={`p-2 sm:p-3 md:p-4 text-right font-mono font-semibold align-middle text-sm ${
+                                      pos.profit_loss >= 0 ? 'text-green-600' : 'text-red-600'
+                                    }`}>
+                                      {pos.profit_loss >= 0 ? '+' : ''}{formatCurrency(pos.profit_loss)}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()
                 )}
               </TabsContent>
 

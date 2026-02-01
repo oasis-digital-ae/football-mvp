@@ -10,7 +10,7 @@ import type { DatabasePositionWithTeam } from '@/shared/types/database.types';
 import { Loader2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { toDecimal, roundForDisplay, fromCents } from '@/shared/lib/utils/decimal';
 import { calculatePriceImpactPercent } from '@/shared/lib/utils/calculations';
-import TeamDetailsSlideDown from './TeamDetailsSlideDown';
+import TeamDetailsSlideDown, { type InitialMatchHistoryItem } from './TeamDetailsSlideDown';
 
 interface TeamDetailsModalProps {
   isOpen: boolean;
@@ -27,6 +27,7 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [matchHistory, setMatchHistory] = useState<any[]>([]);
+  const [fixtures, setFixtures] = useState<DatabaseFixture[]>([]);
   const [teams, setTeams] = useState<DatabaseTeam[]>([]);
   const [userPosition, setUserPosition] = useState<DatabasePositionWithTeam | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(false); // Guard to prevent multiple simultaneous loads
@@ -93,7 +94,8 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
       ]);
 
       // Extract successful results
-      const fixtures = fixturesData.status === 'fulfilled' ? fixturesData.value : [];
+      const fixturesList = fixturesData.status === 'fulfilled' ? fixturesData.value : [];
+      setFixtures(fixturesList);
 
       // Try to get detailed team information
       let teamDetails = null;
@@ -123,11 +125,11 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
 
       // Load match history first (this should always work)
       console.log('🚀 About to load match history...');
-      console.log('Fixture count:', fixtures.length);
+      console.log('Fixture count:', fixturesList.length);
       console.log('Teams count:', allTeams.length);
       
       try {
-        await loadMatchHistory(fixtures, allTeams, null);
+        await loadMatchHistory(fixturesList, allTeams, null);
         console.log('✅ Match history loaded!');
       } catch (matchHistoryError) {
         console.error('Error loading match history:', matchHistoryError);
@@ -146,7 +148,7 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
           // Update match history with position data if available
           if (currentUserPosition) {
             try {
-              await loadMatchHistory(fixtures, allTeams, currentUserPosition);
+              await loadMatchHistory(fixturesList, allTeams, currentUserPosition);
             } catch (updateError) {
               console.warn('Error updating match history with position:', updateError);
             }
@@ -459,7 +461,7 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
           </div>
         )}
 
-        {error && (
+        {error && !loading && (
           <div className="text-center py-4 flex-shrink-0">
             <p className="text-red-400 mb-3 text-sm">{error}</p>
             <Button
@@ -472,17 +474,21 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
           </div>
         )}
 
-        {/* Main marketplace-style dropdown content */}
-        <div className="flex-1 flex flex-col min-h-0 w-full overflow-y-auto px-0 sm:px-1 md:px-2">
-          <TeamDetailsSlideDown
-            isOpen={true}
-            teamId={teamId}
-            teamName={teamName}
-            userId={userId || ''}
-            fixtures={[]}
-            teams={teams}
-          />
-        </div>
+        {/* Main content: only render after loading finishes so we never show spinner + table at once */}
+        {!loading && !error && (
+          <div className="flex-1 flex flex-col min-h-0 w-full overflow-y-auto px-0 sm:px-1 md:px-2">
+            <TeamDetailsSlideDown
+              isOpen={true}
+              teamId={teamId}
+              teamName={teamName}
+              userId={userId || ''}
+              fixtures={fixtures}
+              teams={teams}
+              initialMatchHistory={matchHistory as InitialMatchHistoryItem[]}
+              initialUserPosition={userPosition}
+            />
+          </div>
+        )}
 
         {/* Subtle footer with an explicit close affordance */}
         <div className="flex items-center justify-end pt-3 mt-1 border-t border-gray-800/70">

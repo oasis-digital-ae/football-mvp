@@ -588,6 +588,7 @@ export const ClubValuesPage: React.FC = () => {
                             userId={user?.id}
                             fixtures={fixtures}
                             teams={memoizedTeams}
+                            teamsMarketCapInDollars
                             launchPrice={club.launchValue}
                             currentPrice={club.currentValue}
                             currentPercentChange={club.percentChange}
@@ -819,6 +820,7 @@ export const ClubValuesPage: React.FC = () => {
                                 userId={user?.id}
                                 fixtures={fixtures}
                                 teams={memoizedTeams}
+                                teamsMarketCapInDollars
                                 launchPrice={club.launchValue}
                                 currentPrice={club.currentValue}
                                 currentPercentChange={club.percentChange}

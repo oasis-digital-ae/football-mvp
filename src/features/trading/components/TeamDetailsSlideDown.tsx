@@ -15,6 +15,17 @@ import {
 } from '@/shared/lib/utils/calculations';
 import { toDecimal, roundForDisplay, fromCents } from '@/shared/lib/utils/decimal';
 
+/** Shape from TeamDetailsModal's matchHistory for pre-loaded data */
+export interface InitialMatchHistoryItem {
+  fixture: { kickoff_at: string };
+  description: string;
+  postMatchCap: number;
+  priceImpact: number;
+  priceImpactPercent: number;
+  result: 'win' | 'loss' | 'draw';
+  postMatchSharePrice: number;
+}
+
 interface TeamDetailsSlideDownProps {
   isOpen: boolean;
   teamId: number;
@@ -22,6 +33,11 @@ interface TeamDetailsSlideDownProps {
   userId: string;
   fixtures?: DatabaseFixture[];
   teams?: DatabaseTeam[];
+  /** When true, team.market_cap is already in dollars (e.g. from clubs); when false, it's in cents (raw DB). Default false. */
+  teamsMarketCapInDollars?: boolean;
+  /** When provided, match history is shown immediately without a second load */
+  initialMatchHistory?: InitialMatchHistoryItem[];
+  initialUserPosition?: DatabasePositionWithTeam | null;
   launchPrice?: number; // Launch price from club data for consistent Change calculation
   currentPrice?: number; // Current price from club data for consistent Change calculation
   currentPercentChange?: number; // Current percent change from club data for consistent display
@@ -76,6 +92,20 @@ const processChartData = (events: any[], launchPrice?: number): ChartDataPoint[]
   return chartPoints;
 };
 
+function mapInitialMatchHistory(initial: InitialMatchHistoryItem[]): any[] {
+  return initial.map(item => ({
+    date: item.fixture.kickoff_at,
+    description: item.description,
+    marketCapAfter: item.postMatchCap,
+    priceImpact: item.priceImpact,
+    priceImpactPercent: item.priceImpactPercent,
+    matchResult: item.result,
+    sharePriceAfter: item.postMatchSharePrice,
+    isMatch: true,
+    isPurchase: false
+  }));
+}
+
 const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
   isOpen,
   teamId,
@@ -83,18 +113,24 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
   userId,
   fixtures: parentFixtures,
   teams: parentTeams,
+  teamsMarketCapInDollars = false,
+  initialMatchHistory,
+  initialUserPosition,
   launchPrice,
   currentPrice,
   currentPercentChange
 }) => {  const [activeTab, setActiveTab] = useState<'matches' | 'upcoming' | 'chart'>('matches');
-  const [matchHistory, setMatchHistory] = useState<any[]>([]);
+  const [matchHistory, setMatchHistory] = useState<any[]>(() =>
+    initialMatchHistory?.length ? mapInitialMatchHistory(initialMatchHistory) : []
+  );
   const [upcomingMatches, setUpcomingMatches] = useState<any[]>([]);
-  const [userPosition, setUserPosition] = useState<DatabasePositionWithTeam | null>(null);
+  const [userPosition, setUserPosition] = useState<DatabasePositionWithTeam | null>(initialUserPosition ?? null);
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [loading, setLoading] = useState({ matches: false, upcoming: false, chart: false });
 
   const fixtures = parentFixtures || [];
   const teams = parentTeams || [];
+  const hasInitialMatchHistory = (initialMatchHistory?.length ?? 0) > 0;
 
 
   const loadChartData = useCallback(async () => {
@@ -325,6 +361,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
         if (isOpen) {
           await loadMatchesData();
           await loadUpcomingMatches();
+          await loadUpcomingMatches();
           await loadChartData();
         }
       };
@@ -332,6 +369,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
         delete (window as any)[refreshKey];
       };
     }
+  }, [teamId, isOpen, loadMatchesData, loadUpcomingMatches, loadChartData]);
   }, [teamId, isOpen, loadMatchesData, loadUpcomingMatches, loadChartData]);
   // Listen for global refresh signal
   useEffect(() => {
