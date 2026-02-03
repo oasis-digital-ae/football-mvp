@@ -327,9 +327,13 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
         const opponentId = isHome ? fixture.away_team_id : fixture.home_team_id;
         const opponentTeam = teamsMap.get(opponentId);
         
-        // Convert market cap from cents to dollars
-        const teamMarketCapDollars = roundForDisplay(fromCents(selectedTeam?.market_cap || 0));
-        const opponentMarketCapDollars = roundForDisplay(fromCents(opponentTeam?.market_cap || 0));
+        // Convert market cap from cents to dollars (only if not already in dollars)
+        const teamMarketCapDollars = teamsMarketCapInDollars 
+          ? roundForDisplay(selectedTeam?.market_cap || 0)
+          : roundForDisplay(fromCents(selectedTeam?.market_cap || 0));
+        const opponentMarketCapDollars = teamsMarketCapInDollars
+          ? roundForDisplay(opponentTeam?.market_cap || 0)
+          : roundForDisplay(fromCents(opponentTeam?.market_cap || 0));
         
         // Calculate share prices (market cap in dollars / total shares)
         const TOTAL_SHARES = 1000;
@@ -349,16 +353,14 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
           homeScore: fixture.home_score,
           awayScore: fixture.away_score
         };
-      });
-
-      setUpcomingMatches(processedUpcoming);
+      });      setUpcomingMatches(processedUpcoming);
     } catch (error) {
       if (process.env.NODE_ENV === 'development') console.error('Error loading upcoming matches:', error);
       setUpcomingMatches([]);
     } finally {
       setLoading(prev => ({ ...prev, upcoming: false }));
     }
-  }, [isOpen, teamId, fixtures, teams]);
+  }, [isOpen, teamId, fixtures, teams, teamsMarketCapInDollars]);
 
   // Load match data when opened
   useEffect(() => {

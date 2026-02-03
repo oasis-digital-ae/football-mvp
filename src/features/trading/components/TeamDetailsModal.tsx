@@ -31,6 +31,7 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
   const [teams, setTeams] = useState<DatabaseTeam[]>([]);
   const [userPosition, setUserPosition] = useState<DatabasePositionWithTeam | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(false); // Guard to prevent multiple simultaneous loads
+  const [launchPrice, setLaunchPrice] = useState<number | undefined>(undefined); // Store launch price from team data
 
   useEffect(() => {
     if (isOpen && teamId && !isLoadingData) {
@@ -56,14 +57,17 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
     
     try {
       console.log('Loading team data for teamId:', teamId, 'teamName:', teamName);
-      
-      // First, get all teams to find the external ID for this team
+        // First, get all teams to find the external ID for this team
       const allTeams = await teamsService.getAll();
       const team = allTeams.find(t => t.id === teamId);
       
       if (!team) {
         throw new Error(`Team with ID ${teamId} not found`);
       }
+      
+      // Store launch price from team data (convert from cents to dollars)
+      const launchPriceDollars = roundForDisplay(fromCents(team.launch_price || 0));
+      setLaunchPrice(launchPriceDollars);
       
       const externalTeamId = team.external_id;
       console.log('Using external team ID:', externalTeamId, 'for team:', team.name);
@@ -472,9 +476,7 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
               Retry
             </Button>
           </div>
-        )}
-
-        {/* Main content: only render after loading finishes so we never show spinner + table at once */}
+        )}        {/* Main content: only render after loading finishes so we never show spinner + table at once */}
         {!loading && !error && (
           <div className="flex-1 flex flex-col min-h-0 w-full overflow-y-auto px-0 sm:px-1 md:px-2">
             <TeamDetailsSlideDown
@@ -486,6 +488,7 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
               teams={teams}
               initialMatchHistory={matchHistory as InitialMatchHistoryItem[]}
               initialUserPosition={userPosition}
+              launchPrice={launchPrice}
             />
           </div>
         )}
