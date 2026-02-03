@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
 import { footballApiService } from '@/shared/lib/football-api';
-import { fixturesService, teamsService, positionsService } from '@/shared/lib/database';
+import { fixturesService, teamsService, positionsService, convertTeamToClub } from '@/shared/lib/database';
 import { supabase } from '@/shared/lib/supabase';
 import type { TeamDetails, FootballMatch, Standing } from '@/shared/lib/football-api';
 import type { DatabaseFixture, DatabaseTeam } from '@/shared/lib/database';
@@ -32,6 +32,8 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
   const [userPosition, setUserPosition] = useState<DatabasePositionWithTeam | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(false); // Guard to prevent multiple simultaneous loads
   const [launchPrice, setLaunchPrice] = useState<number | undefined>(undefined); // Store launch price from team data
+  const [currentPrice, setCurrentPrice] = useState<number | undefined>(undefined); // Store current price from team data
+  const [currentPercentChange, setCurrentPercentChange] = useState<number | undefined>(undefined); // Store percent change from team data
 
   useEffect(() => {
     if (isOpen && teamId && !isLoadingData) {
@@ -56,8 +58,7 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
     setError(null);
     
     try {
-      console.log('Loading team data for teamId:', teamId, 'teamName:', teamName);
-        // First, get all teams to find the external ID for this team
+      console.log('Loading team data for teamId:', teamId, 'teamName:', teamName);      // First, get all teams to find the external ID for this team
       const allTeams = await teamsService.getAll();
       const team = allTeams.find(t => t.id === teamId);
       
@@ -65,9 +66,13 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
         throw new Error(`Team with ID ${teamId} not found`);
       }
       
-      // Store launch price from team data (convert from cents to dollars)
-      const launchPriceDollars = roundForDisplay(fromCents(team.launch_price || 0));
-      setLaunchPrice(launchPriceDollars);
+      // Convert team to club format to get consistent values (same as marketplace)
+      const clubData = convertTeamToClub(team);
+      
+      // Store values from club conversion (already properly calculated and rounded)
+      setLaunchPrice(clubData.launchValue);
+      setCurrentPrice(clubData.currentValue);
+      setCurrentPercentChange(clubData.percentChange);
       
       const externalTeamId = team.external_id;
       console.log('Using external team ID:', externalTeamId, 'for team:', team.name);
@@ -489,6 +494,8 @@ const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ isOpen, onClose, te
               initialMatchHistory={matchHistory as InitialMatchHistoryItem[]}
               initialUserPosition={userPosition}
               launchPrice={launchPrice}
+              currentPrice={currentPrice}
+              currentPercentChange={currentPercentChange}
             />
           </div>
         )}
