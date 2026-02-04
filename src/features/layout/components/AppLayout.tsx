@@ -8,6 +8,7 @@ import MatchResultsPage from '../../trading/components/MatchResultsPage';
 import StandingsPage from '../../trading/components/StandingsPage';
 import SeasonSimulation from '../../trading/components/SeasonSimulation';
 import { AdminDashboard } from '../../admin/components/AdminDashboard';
+import LeaderboardPage from '../../leaderboard/components/LeaderboardPage';
 
 const AppLayout: React.FC = () => {
   const { currentPage, setCurrentPage } = useAppContext();
@@ -24,14 +25,14 @@ const AppLayout: React.FC = () => {
     // Block admin and simulation access if user is not admin
     if ((currentPage === 'admin' || currentPage === 'season-simulation') && !isAdmin) {
       return <ClubValuesPage />;
-    }
-
-    switch (currentPage) {
+    }    switch (currentPage) {
       case 'marketplace':
       case 'club-values':
         return <ClubValuesPage />;
       case 'portfolio':
         return <PortfolioPage />;
+      case 'leaderboard':
+        return <LeaderboardPage />;
       case 'match-results':
         return <MatchResultsPage />;
       case 'standings':

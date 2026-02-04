@@ -48,15 +48,14 @@ interface NavigationProps {
   onPageChange: (page: string) => void;
 }
 
-const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) => {
-  const { signOut, profile, walletBalance, refreshWalletBalance, isAdmin, user } = useAuth();
+const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) => {  const { signOut, profile, walletBalance, refreshWalletBalance, isAdmin, user } = useAuth();
   const [depositModalOpen, setDepositModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
-  
-  const allPages = [
+    const allPages = [
     { id: 'marketplace', label: 'Marketplace', icon: TrendingUp },
     { id: 'portfolio', label: 'Portfolio', icon: Briefcase },
+    { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
     { id: 'match-results', label: 'Fixtures', icon: Calendar },
     { id: 'standings', label: 'League Table', icon: BarChart3 },
     { id: 'season-simulation', label: 'Simulation', icon: Settings },
@@ -179,23 +178,23 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
                             </span>
                             <span className="text-xs text-gray-400 truncate flex items-center gap-1">
                               <Mail className="w-3 h-3 flex-shrink-0" />
-                              {profile.email || user?.email || 'No email'}
-                            </span>
-                          </div>
-                        </div>
+                              {profile.email || user?.email || 'No email'}                        </span>
                       </div>
-                      <DropdownMenuItem
-                        onClick={handleSignOutClick}
-                        className="text-red-400 hover:text-red-300 hover:bg-red-900/20 cursor-pointer focus:text-red-300 focus:bg-red-900/20"
-                      >
-                        <LogOut className="w-4 h-4 mr-2" />
-                        Sign Out
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-                <Button
-                  onClick={() => setDepositModalOpen(true)}
+                    </div>
+                  </div>
+                  
+                  <DropdownMenuItem
+                    onClick={handleSignOutClick}
+                    className="text-red-400 hover:text-red-300 hover:bg-red-900/20 cursor-pointer focus:text-red-300 focus:bg-red-900/20"
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <Button
+              onClick={() => setDepositModalOpen(true)}
                   className="flex items-center space-x-1 bg-trading-primary hover:bg-trading-primary/80 text-white px-1.5 lg:px-2.5 py-1 flex-shrink-0"
                   size="sm"
                 >
@@ -252,24 +251,24 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
                           {profile.first_name || (profile.full_name ? profile.full_name.split(' ')[0] : 'User')}
                         </span>
                         <span className="text-xs text-gray-400 truncate flex items-center gap-1">
-                          <Mail className="w-3 h-3 flex-shrink-0" />
-                          {profile.email || user?.email || 'No email'}
-                        </span>
-                      </div>
+                          <Mail className="w-3 h-3 flex-shrink-0" />                        {profile.email || user?.email || 'No email'}
+                      </span>
                     </div>
                   </div>
-                  <DropdownMenuItem
-                    onClick={handleSignOutClick}
-                    className="text-red-400 hover:text-red-300 hover:bg-red-900/20 cursor-pointer focus:text-red-300 focus:bg-red-900/20"
-                  >
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Sign Out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          )}
-        </div>
+                </div>
+                
+                <DropdownMenuItem
+                  onClick={handleSignOutClick}
+                  className="text-red-400 hover:text-red-300 hover:bg-red-900/20 cursor-pointer focus:text-red-300 focus:bg-red-900/20"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+      </div>
 
         {/* Mobile Menu Dropdown */}
         {mobileMenuOpen && (
