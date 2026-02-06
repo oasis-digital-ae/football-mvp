@@ -29,25 +29,32 @@ const LeaderboardPage: React.FC = () => {
   const loadLeaderboardData = async () => {
     try {
       setLoading(true);
-        // Try to fetch real data from weekly_leaderboard table
-      const { data: leaderboardRecords, error: leaderboardError } = await supabase
-        .from('weekly_leaderboard')
-        .select('rank, user_id, weekly_return')
-        .eq('is_latest', true)
-        .order('rank', { ascending: true });
+      
+      // Fetch leaderboard via RPC (returns full_name, bypasses join RLS)
+      const { data: leaderboardRecords, error: leaderboardError } = await supabase.rpc(
+        'get_weekly_leaderboard_current'
+      );
 
       if (leaderboardError) {
         console.error('Error fetching leaderboard:', leaderboardError);
         throw leaderboardError;
-      }      // If we have real data, use it
+      }
+
+      // If we have real data, use it
       if (leaderboardRecords && leaderboardRecords.length > 0) {
-        const transformedData: LeaderboardEntry[] = leaderboardRecords.map((record: any) => ({
+        const transformedData: LeaderboardEntry[] = leaderboardRecords.map((record: { user_id: string; full_name: string | null; rank: number; weekly_return: number }) => {
+          const rawName = record.full_name?.trim() ?? (record as { fullName?: string }).fullName?.trim();
+          const userName = rawName && !/^User [0-9a-fA-F]{8}$/.test(rawName)
+            ? rawName
+            : 'Unknown User';
+          return {
           rank: record.rank,
           userId: record.user_id,
-          userName: `User ${record.user_id.substring(0, 8)}`, // Temporary until profiles table exists
-          weeklyReturn: parseFloat(record.weekly_return) * 100, // Convert to percentage
+          userName,
+          weeklyReturn: parseFloat(String(record.weekly_return)) * 100, // Convert to percentage
           isCurrentUser: user?.id === record.user_id
-        }));
+        };
+        });
 
         setLeaderboardData(transformedData);
       } else {
