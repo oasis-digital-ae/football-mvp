@@ -105,7 +105,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
                 <Trophy className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
               </div>
               <h1 className="text-base lg:text-lg xl:text-xl font-bold text-white whitespace-nowrap">
-                <span className="hidden lg:inline">Arena Club Exchange (ACE)</span>
+                <span className="hidden lg:inline">ACE</span>
                 <span className="lg:hidden">ACE</span>
               </h1>
             </div>
