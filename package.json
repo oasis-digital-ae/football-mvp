@@ -17,13 +17,9 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
-<<<<<<< HEAD
-    "test:e2e:headed": "playwright test --headed",    "reset-and-backfill": "tsx scripts/reset-and-backfill.ts",
-=======
-    "test:e2e:headed": "playwright test --headed",
-    "reset-and-backfill": "tsx scripts/reset-and-backfill.ts",
-    "backfill-weekly-leaderboard": "tsx scripts/calculate-weekly-leaderboard.ts",
->>>>>>> c415090a793ded11ac2c6e28162d111746a9df34
+"test:e2e:headed": "playwright test --headed",
+"reset-and-backfill": "tsx scripts/reset-and-backfill.ts",
+"backfill-weekly-leaderboard": "tsx scripts/calculate-weekly-leaderboard.ts",
     "sync-fixtures": "tsx scripts/sync-and-process-matches.ts",
     "sync-and-process-all": "tsx scripts/sync-and-process-all-matches.ts",
     "trigger-leaderboard": "tsx trigger-leaderboard.ts"
