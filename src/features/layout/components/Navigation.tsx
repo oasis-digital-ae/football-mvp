@@ -112,7 +112,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
 
           {/* Desktop Navigation - Horizontal Scrollable */}
           <div className="hidden md:flex items-center flex-1 justify-center min-w-0 px-2">
-            <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide max-w-full">
+            <div className="flex items-center gap-0.25 overflow-x-auto scrollbar-hide max-w-full">
               <TooltipProvider>
                 {pages.map((page) => {
                   const Icon = page.icon;
@@ -251,7 +251,8 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
                           {profile.first_name || (profile.full_name ? profile.full_name.split(' ')[0] : 'User')}
                         </span>
                         <span className="text-xs text-gray-400 truncate flex items-center gap-1">
-                          <Mail className="w-3 h-3 flex-shrink-0" />                        {profile.email || user?.email || 'No email'}
+                          <Mail className="w-3 h-3 flex-shrink-0" />                        
+                          {profile.email || user?.email || 'No email'}
                       </span>
                     </div>
                   </div>
