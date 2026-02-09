@@ -41,9 +41,8 @@ export const ClubValuesPage: React.FC = () => {
     pricePerShare: number;
   } | null>(null);
   const [isPurchasing, setIsPurchasing] = useState(false);
-  const [purchasingClubId, setPurchasingClubId] = useState<string | null>(null);
-  const [buyWindowStatuses, setBuyWindowStatuses] = useState<Map<string, any>>(new Map());
-  const [sortField, setSortField] = useState<'name' | 'price' | 'change' | 'marketCap'>('price');
+  const [purchasingClubId, setPurchasingClubId] = useState<string | null>(null);  const [buyWindowStatuses, setBuyWindowStatuses] = useState<Map<string, any>>(new Map());
+  const [sortField, setSortField] = useState<'name' | 'price' | 'change' | 'marketCap'>('change');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [matchdayChanges, setMatchdayChanges] = useState<Map<string, { change: number; percentChange: number }>>(new Map());
 

@@ -8,6 +8,9 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 5173,
     strictPort: true,
+    allowedHosts: [
+      "devserver-staging-test--ace-mvp.netlify.app"
+    ],
     proxy: {
       // Proxy Netlify functions to Netlify dev server when running Vite dev
       '/.netlify/functions': {

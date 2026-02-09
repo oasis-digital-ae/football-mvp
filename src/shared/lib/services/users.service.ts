@@ -11,6 +11,7 @@ export interface UserListItem {
   last_name?: string;
   email?: string;
   wallet_balance: number;
+  total_deposits: number; // Total deposits made by user
   total_invested: number;
   portfolio_value: number;
   unrealized_pnl: number;
@@ -115,7 +116,20 @@ export const usersService = {
         .in('order_type', ['BUY', 'SELL'])
         .order('executed_at', { ascending: true }); // Oldest first for cost basis tracking
 
-      if (ordersError) throw ordersError;
+      if (ordersError) throw ordersError;      // Get wallet transactions for deposits
+      const { data: walletTransactions, error: walletError } = await supabase
+        .from('wallet_transactions')
+        .select('user_id, amount_cents, type')
+        .eq('type', 'deposit');
+
+      if (walletError) throw walletError;
+
+      // Calculate total deposits per user
+      const totalDepositsMap = new Map<string, number>();
+      (walletTransactions || []).forEach(tx => {
+        const current = totalDepositsMap.get(tx.user_id) || 0;
+        totalDepositsMap.set(tx.user_id, current + fromCents(tx.amount_cents || 0).toNumber());
+      });
 
       // Group orders by user to find last activity
       const lastActivityMap = new Map<string, string>();
@@ -211,9 +225,7 @@ export const usersService = {
         existing.positionsCount += 1;
 
         userMetrics.set(position.user_id, existing);
-      });
-
-      // Combine profiles with metrics
+      });      // Combine profiles with metrics
       const userList: UserListItem[] = (profiles || []).map(profile => {
         const metrics = userMetrics.get(profile.id) || {
           totalInvested: 0,
@@ -231,6 +243,7 @@ export const usersService = {
           last_name: profile.last_name,
           email: profile.email,
           wallet_balance: fromCents(profile.wallet_balance || 0).toNumber(),
+          total_deposits: totalDepositsMap.get(profile.id) || 0,
           total_invested: metrics.totalInvested,
           portfolio_value: metrics.portfolioValue,
           unrealized_pnl: metrics.unrealizedPnl,
@@ -563,9 +576,7 @@ export const usersService = {
           market_cap: marketCapDollars,
           percent_change_from_purchase: percentChangeFromPurchase
         };
-      });
-
-      const ordersList = (orders || []).map(order => ({
+      });      const ordersList = (orders || []).map(order => ({
         id: order.id,
         team_name: (order.teams as any)?.name || 'Unknown',
         order_type: order.order_type as 'BUY' | 'SELL',
@@ -575,6 +586,17 @@ export const usersService = {
         executed_at: order.executed_at || order.created_at,
         status: order.status
       }));
+
+      // Get total deposits for this user
+      const { data: walletTransactions } = await supabase
+        .from('wallet_transactions')
+        .select('amount_cents')
+        .eq('user_id', userId)
+        .eq('type', 'deposit');
+
+      const totalDeposits = (walletTransactions || []).reduce((sum, tx) => {
+        return sum + fromCents(tx.amount_cents || 0).toNumber();
+      }, 0);
 
       return {
         id: profile.id,
@@ -586,6 +608,7 @@ export const usersService = {
         country: profile.country,
         phone: profile.phone,
         wallet_balance: fromCents(profile.wallet_balance || 0).toNumber(),
+        total_deposits: totalDeposits,
         total_invested: totalInvested,
         portfolio_value: portfolioValue,
         unrealized_pnl: unrealizedPnl,

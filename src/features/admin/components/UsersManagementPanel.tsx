@@ -33,7 +33,7 @@ import {
   calculateAverageCost
 } from '@/shared/lib/utils/calculations';
 
-type SortField = 'username' | 'wallet_balance' | 'total_invested' | 'portfolio_value' | 'profit_loss' | 'positions_count' | 'last_activity' | 'created_at';
+type SortField = 'username' | 'wallet_balance' | 'total_deposits' | 'total_invested' | 'portfolio_value' | 'profit_loss' | 'positions_count' | 'last_activity' | 'created_at';
 type SortDirection = 'asc' | 'desc';
 
 export const UsersManagementPanel: React.FC = () => {
@@ -148,9 +148,7 @@ export const UsersManagementPanel: React.FC = () => {
 
     filtered.sort((a, b) => {
       let aValue: any;
-      let bValue: any;
-
-      switch (sortField) {
+      let bValue: any;      switch (sortField) {
         case 'username':
           aValue = a.username.toLowerCase();
           bValue = b.username.toLowerCase();
@@ -158,6 +156,10 @@ export const UsersManagementPanel: React.FC = () => {
         case 'wallet_balance':
           aValue = a.wallet_balance;
           bValue = b.wallet_balance;
+          break;
+        case 'total_deposits':
+          aValue = a.total_deposits;
+          bValue = b.total_deposits;
           break;
         case 'total_invested':
           aValue = a.total_invested;
@@ -195,13 +197,13 @@ export const UsersManagementPanel: React.FC = () => {
     return filtered;
   }, [users, searchTerm, sortField, sortDirection]);
 
-  const handleExportCSV = () => {
-    const headers = [
+  const handleExportCSV = () => {    const headers = [
       'Username',
       'Name',
       'Email',
       'Wallet Balance',
-      'Total Invested',
+      'Total Deposits',
+      'Cost',
       'Portfolio Value',
       'P&L',
       'Positions',
@@ -214,6 +216,7 @@ export const UsersManagementPanel: React.FC = () => {
       `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'N/A',
       user.email || 'N/A',
       user.wallet_balance,
+      user.total_deposits,
       user.total_invested,
       user.portfolio_value,
       user.profit_loss,
@@ -312,20 +315,23 @@ export const UsersManagementPanel: React.FC = () => {
                     <Button variant="ghost" onClick={() => handleSort('username')} className="h-auto p-0 font-medium">
                       User <SortIcon field="username" />
                     </Button>
-                  </TableHead>
-                  <TableHead className="text-center">
+                  </TableHead>                  <TableHead className="text-center">
                     <Button variant="ghost" onClick={() => handleSort('wallet_balance')} className="h-auto p-0 font-medium">
                       Wallet <SortIcon field="wallet_balance" />
                     </Button>
                   </TableHead>
                   <TableHead className="text-center">
-                    <Button variant="ghost" onClick={() => handleSort('total_invested')} className="h-auto p-0 font-medium">
-                      Invested <SortIcon field="total_invested" />
+                    <Button variant="ghost" onClick={() => handleSort('portfolio_value')} className="h-auto p-0 font-medium">
+                      Portfolio Value <SortIcon field="portfolio_value" />
                     </Button>
                   </TableHead>
                   <TableHead className="text-center">
-                    <Button variant="ghost" onClick={() => handleSort('portfolio_value')} className="h-auto p-0 font-medium">
-                      Portfolio Value <SortIcon field="portfolio_value" />
+                    <Button variant="ghost" onClick={() => handleSort('total_deposits')} className="h-auto p-0 font-medium">
+                      Total Deposits <SortIcon field="total_deposits" />
+                    </Button>
+                  </TableHead>                  <TableHead className="text-center">
+                    <Button variant="ghost" onClick={() => handleSort('total_invested')} className="h-auto p-0 font-medium">
+                      Cost <SortIcon field="total_invested" />
                     </Button>
                   </TableHead>
                   <TableHead className="text-center">
@@ -367,15 +373,17 @@ export const UsersManagementPanel: React.FC = () => {
                           <p className="text-xs text-muted-foreground">{user.email}</p>
                         )}
                       </div>
-                    </TableCell>
-                    <TableCell className="text-center">
+                    </TableCell>                    <TableCell className="text-center">
                       <div className="font-medium font-mono">{formatCurrency(user.wallet_balance)}</div>
                     </TableCell>
                     <TableCell className="text-center">
-                      <div className="font-medium font-mono">{formatCurrency(user.total_invested)}</div>
+                      <div className="font-medium font-mono">{formatCurrency(user.portfolio_value)}</div>
                     </TableCell>
                     <TableCell className="text-center">
-                      <div className="font-medium font-mono">{formatCurrency(user.portfolio_value)}</div>
+                      <div className="font-medium font-mono">{formatCurrency(user.total_deposits)}</div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="font-medium font-mono">{formatCurrency(user.total_invested)}</div>
                     </TableCell>
                     <TableCell className="text-center">
                       <span className={`font-mono text-sm ${(user.unrealized_pnl ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>

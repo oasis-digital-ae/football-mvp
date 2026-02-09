@@ -27,3 +27,8 @@
 # This ensures Netlify recognizes the scheduled function
 [functions."update-matches"]
   schedule = "*/30 * * * *"  # Every 30 minutes
+
+# Scheduled function configuration
+# This ensures Netlify recognizes the scheduled function for Weekly Leaderboard
+[functions."update-weeklyleaderboard"]
+  schedule = "0 20 * * 0" # Every Sunday at 20:00 (8:00 PM) UTC which is 12:00 AM (midnight) in UAE

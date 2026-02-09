@@ -217,7 +217,6 @@ export const TeamsManagementPanel: React.FC = () => {
 
     return filtered;
   }, [teams, searchTerm, sortField, sortDirection]);
-
   const handleExportCSV = () => {
     const headers = [
       'Team Name',
@@ -225,7 +224,7 @@ export const TeamsManagementPanel: React.FC = () => {
       'Share Price',
       'Available Shares',
       'Total Shares',
-      'Total Invested',
+      'Cost',
       'Lifetime Change',
       'Lifetime Change %'
     ];
@@ -358,11 +357,10 @@ export const TeamsManagementPanel: React.FC = () => {
                   <TableHead className="text-center">
                     <Button variant="ghost" onClick={() => handleSort('available_shares')} className="h-auto p-0 font-medium">
                       Available <SortIcon field="available_shares" />
-                    </Button>
-                  </TableHead>
+                    </Button>                  </TableHead>
                   <TableHead className="text-center">
                     <Button variant="ghost" onClick={() => handleSort('total_invested')} className="h-auto p-0 font-medium">
-                      Total Invested <SortIcon field="total_invested" />
+                      Cost <SortIcon field="total_invested" />
                     </Button>
                   </TableHead>
                   <TableHead className="text-center">
@@ -519,10 +517,9 @@ export const TeamsManagementPanel: React.FC = () => {
                         <span className="text-sm text-muted-foreground">Available Shares:</span>
                         <span className="font-medium">
                           {teams.find(t => t.id === selectedTeam.team_id)?.available_shares || 0} / 1000
-                        </span>
-                      </div>
+                        </span>                      </div>
                       <div className="flex justify-between">
-                        <span className="text-sm text-muted-foreground">Total Invested:</span>
+                        <span className="text-sm text-muted-foreground">Cost:</span>
                         <span className="font-medium">{formatCurrency(
                           teams.find(t => t.id === selectedTeam.team_id)?.total_invested || 0
                         )}</span>
