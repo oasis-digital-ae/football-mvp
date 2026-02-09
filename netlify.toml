@@ -31,4 +31,4 @@
 # Scheduled function configuration
 # This ensures Netlify recognizes the scheduled function for Weekly Leaderboard
 [functions."update-weeklyleaderboard"]
-  schedule = "1 20 * * 0" # Every Sunday at 20:01 (8:01 PM) UTC which is 12:01 AM (midnight) in UAE
+  schedule = "0 20 * * 0" # Every Sunday at 20:00 (8:00 PM) UTC which is 12:00 AM (midnight) in UAE
