@@ -298,7 +298,7 @@ const LeaderboardPage: React.FC = () => {
                   }`}>
                     
                     {/* Rank */}
-                    <div className="text-center flex justify-center">
+                    <div className="text-center flex justify-center text-[10px] font-medium">
                       {getRankDisplay(entry.rank)}
                     </div>                    
                     
