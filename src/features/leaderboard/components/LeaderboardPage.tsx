@@ -58,51 +58,12 @@ const LeaderboardPage: React.FC = () => {
 
         setLeaderboardData(transformedData);
       } else {
-        // Fallback to mock data if no real data exists yet
-        console.log('No leaderboard data found, using mock data');
-        const mockData: LeaderboardEntry[] = [
-          { rank: 1, userId: '1', userName: 'Alex Johnson', weeklyReturn: 12.45, isCurrentUser: false },
-          { rank: 2, userId: '2', userName: 'Sam Williams', weeklyReturn: 8.21, isCurrentUser: false },
-          { rank: 3, userId: '3', userName: 'Jordan Lee', weeklyReturn: 5.02, isCurrentUser: false },
-          { rank: 4, userId: '4', userName: 'Chris Patel', weeklyReturn: 3.11, isCurrentUser: false },
-          { rank: 5, userId: '5', userName: 'Pat Morgan', weeklyReturn: 1.04, isCurrentUser: false },
-          { rank: 6, userId: '6', userName: 'Taylor Swift', weeklyReturn: 0.00, isCurrentUser: false },
-          { rank: 7, userId: '7', userName: 'Morgan Freeman', weeklyReturn: 0.00, isCurrentUser: false },
-          { rank: 8, userId: '8', userName: 'Casey Brown', weeklyReturn: -1.23, isCurrentUser: false },
-          { rank: 9, userId: '9', userName: 'Drew Davis', weeklyReturn: -2.45, isCurrentUser: false },
-          { rank: 10, userId: '10', userName: 'Jamie Wilson', weeklyReturn: -4.67, isCurrentUser: false },
-        ];
-
-        const dataWithCurrentUser = mockData.map(entry => ({
-          ...entry,
-          isCurrentUser: user?.id === entry.userId
-        }));
-
-        setLeaderboardData(dataWithCurrentUser);
+        // No leaderboard data found
+        setLeaderboardData([]);
       }
     } catch (error) {
-      console.error('Error loading leaderboard data:', error);
-      
-      // Fallback to mock data on error
-      const mockData: LeaderboardEntry[] = [
-        { rank: 1, userId: '1', userName: 'Alex Johnson', weeklyReturn: 12.45, isCurrentUser: false },
-        { rank: 2, userId: '2', userName: 'Sam Williams', weeklyReturn: 8.21, isCurrentUser: false },
-        { rank: 3, userId: '3', userName: 'Jordan Lee', weeklyReturn: 5.02, isCurrentUser: false },
-        { rank: 4, userId: '4', userName: 'Chris Patel', weeklyReturn: 3.11, isCurrentUser: false },
-        { rank: 5, userId: '5', userName: 'Pat Morgan', weeklyReturn: 1.04, isCurrentUser: false },
-        { rank: 6, userId: '6', userName: 'Taylor Swift', weeklyReturn: 0.00, isCurrentUser: false },
-        { rank: 7, userId: '7', userName: 'Morgan Freeman', weeklyReturn: 0.00, isCurrentUser: false },
-        { rank: 8, userId: '8', userName: 'Casey Brown', weeklyReturn: -1.23, isCurrentUser: false },
-        { rank: 9, userId: '9', userName: 'Drew Davis', weeklyReturn: -2.45, isCurrentUser: false },
-        { rank: 10, userId: '10', userName: 'Jamie Wilson', weeklyReturn: -4.67, isCurrentUser: false },
-      ];
-
-      const dataWithCurrentUser = mockData.map(entry => ({
-        ...entry,
-        isCurrentUser: user?.id === entry.userId
-      }));
-
-      setLeaderboardData(dataWithCurrentUser);
+      console.error('Error loading leaderboard data:', error);      
+      setLeaderboardData([]);
     } finally {
       setLoading(false);
     }
@@ -158,15 +119,18 @@ const LeaderboardPage: React.FC = () => {
           </h1>
           <p className="text-sm text-gray-400 mt-1">Top performers this week</p>
         </div>
-      </div>      {/* Main Leaderboard Table */}
-      <Card className="trading-card border-0 md:rounded-lg">
+      </div>      
+      
+      {/* Main Leaderboard Table */}
+      <Card className="trading-card border-0 md:rounded-lg max-w-3xl mx-auto">
         <CardContent className="p-0">
+          
           {/* Desktop/Tablet Table */}
-          <div className="hidden md:block overflow-x-auto w-full max-w-full">
-            <table className="trading-table w-full">
+          <div className="hidden md:block overflow-x-auto w-auto min-w-[700px] max-w-full">
+            <table className="trading-table table-fixed border-collapse w-auto min-w-[700px]">
               <thead>
                 <tr>
-                  <th className="text-center w-20 px-3">
+                  <th className="text-center w-[60px] px-1">
                     <button
                       onClick={() => {
                         if (sortField === 'rank') {
@@ -186,7 +150,7 @@ const LeaderboardPage: React.FC = () => {
                       )}
                     </button>
                   </th>
-                  <th className="text-left px-3">
+                  <th className="text-left w-[45%] px-2">
                     <button
                       onClick={() => {
                         if (sortField === 'userName') {
@@ -205,7 +169,8 @@ const LeaderboardPage: React.FC = () => {
                         <ArrowUpDown className="h-3 w-3 opacity-20" />
                       )}
                     </button>
-                  </th>                  <th className="text-right px-3">
+                  </th>                  
+                  <th className="text-center w-[25%] px-2">
                     <button
                       onClick={() => {
                         if (sortField === 'weeklyReturn') {
@@ -228,20 +193,30 @@ const LeaderboardPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
+                {/* If no data, show a friendly message */}
+                {sortedData.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="text-center py-10 text-gray-400">
+                      No Rankings Displayed Yet.
+                    </td>
+                  </tr>
+                )}
+
                 {sortedData.map((entry) => (
                   <tr
                     key={entry.userId}
                     className={`group ${entry.isCurrentUser ? 'bg-trading-primary/10' : ''}`}
                   >
-                    <td className="px-3 text-center">
+                    <td className="px-2 text-center">
                       {getRankDisplay(entry.rank)}
-                    </td>                    <td className="px-3">
+                    </td>
+                    <td className="px-2">
                       <span className={`font-medium ${entry.isCurrentUser ? 'text-trading-primary' : ''}`}>
                         {entry.userName}
                         {entry.isCurrentUser && <span className="ml-2 text-xs font-medium" style={{ color: 'hsl(var(--muted-foreground))' }}>(You)</span>}
                       </span>
                     </td>
-                    <td className={`px-3 text-right font-mono font-semibold ${
+                    <td className={`px-2 text-right font-mono font-semibold ${
                       entry.weeklyReturn === 0 
                         ? 'price-neutral' 
                         : entry.weeklyReturn > 0 
@@ -254,11 +229,14 @@ const LeaderboardPage: React.FC = () => {
                 ))}
               </tbody>
             </table>
-          </div>          {/* Mobile Table Layout - Matching Marketplace Style */}
+          </div>          
+          
+          {/* Mobile Table Layout - Matching Marketplace Style */}
           <div className="md:hidden -mx-3 sm:-mx-4">
+            
             {/* Mobile Table Header */}
             <div className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur-sm border-b border-gray-700/50">
-              <div className="grid grid-cols-[70px_1fr_110px] gap-2 px-4 py-2 text-[10px] font-semibold text-gray-400 items-center">
+              <div className="grid grid-cols-[70px_0.9fr_80px] gap-2 px-3 py-2 text-[10px] font-semibold text-gray-400 items-center">
                 <button
                   onClick={() => {
                     if (sortField === 'rank') {
@@ -313,19 +291,24 @@ const LeaderboardPage: React.FC = () => {
                   )}
                 </button>
               </div>
-            </div>            {/* Mobile Table Rows */}
+            </div>            
+            
+            {/* Mobile Table Rows */}
             <div className="space-y-0">
               {sortedData.map((entry) => (
                 <div key={entry.userId} className="border-b border-gray-700/30 last:border-b-0">
-                  <div className={`grid grid-cols-[70px_1fr_110px] gap-2 px-4 py-2.5 items-center active:bg-gray-700/30 transition-colors touch-manipulation ${
+                  <div className={`grid grid-cols-[70px_0.9fr_80px] gap-2 px-3 py-2 items-center active:bg-gray-700/30 transition-colors touch-manipulation ${
                     entry.isCurrentUser ? 'bg-trading-primary/10' : ''
                   }`}>
+                    
                     {/* Rank */}
                     <div className="text-center flex justify-center">
                       {getRankDisplay(entry.rank)}
-                    </div>                    {/* User */}
+                    </div>                    
+                    
+                    {/* User */}
                     <div className="flex items-center min-w-0 flex-1">
-                      <span className={`text-[11px] font-medium truncate block ${
+                      <span className={`text-[10px] font-medium truncate block ${
                         entry.isCurrentUser ? 'text-trading-primary' : 'text-white'
                       }`}>
                         {entry.userName}
@@ -333,8 +316,10 @@ const LeaderboardPage: React.FC = () => {
                           <span className="ml-1 text-[9px] text-gray-400">(You)</span>
                         )}
                       </span>
-                    </div>                    {/* Return */}
-                    <div className={`text-right font-mono font-semibold text-[11px] ${
+                    </div>                    
+                    
+                    {/* Return */}
+                    <div className={`text-right font-mono font-semibold text-[10px] ${
                       entry.weeklyReturn === 0 
                         ? 'text-gray-400' 
                         : entry.weeklyReturn > 0 
@@ -346,11 +331,12 @@ const LeaderboardPage: React.FC = () => {
                   </div>
                 </div>
               ))}
-            </div>          </div>
+            </div>          
+          </div>
         </CardContent>
       </Card>
 
-      {/* Info Widget - Can be easily removed via LEADERBOARD_WIDGET_CONFIG */}
+      {/* Info Widget for Leaderboard */}
       {LEADERBOARD_WIDGET_CONFIG.enabled && (
         LEADERBOARD_WIDGET_CONFIG.variant === 'full' ? (
           <LeaderboardInfoWidget position={LEADERBOARD_WIDGET_CONFIG.position} />

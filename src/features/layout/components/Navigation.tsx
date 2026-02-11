@@ -50,12 +50,12 @@ interface NavigationProps {
 }
 
 const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) => {
-  const { signOut, profile, walletBalance, refreshWalletBalance, isAdmin, user } = useAuth();
+  const { signOut, profile, walletBalance, refreshWalletBalance, isAdmin, user, totalDeposits } = useAuth();
   const [depositModalOpen, setDepositModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const [netWorthDialogOpen, setNetWorthDialogOpen] = useState(false);
-  const { totalMarketValue = 0, totalDeposits = 0 } = useContext(AppContext) || {};
+  const { totalMarketValue = 0 } = useContext(AppContext) || {};
 
   const allPages = [
     { id: 'marketplace', label: 'Marketplace', icon: TrendingUp },
@@ -412,7 +412,9 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
 
               <div className="flex justify-between">
                 <span className="text-gray-400">Total Deposited</span>
-                <span className="text-white">{formatCurrency(totalDeposits)}</span>
+                <span className={totalDeposits !== 0 ? 'text-red-400' : 'text-white'}>
+                  {formatCurrency(totalDeposits)}
+                </span>
               </div>
 
               <div className="border-t border-gray-700 pt-3 flex justify-between font-semibold">
