@@ -170,8 +170,9 @@ export const UsersManagementPanel: React.FC = () => {
           bValue = b.portfolio_value;
           break;
         case 'profit_loss':
-          aValue = a.profit_loss;
-          bValue = b.profit_loss;
+          // Calculate Total P&L the same way as in the table display
+          aValue = (a.wallet_balance + a.portfolio_value) - a.total_deposits;
+          bValue = (b.wallet_balance + b.portfolio_value) - b.total_deposits;
           break;
         case 'return_percent':
           aValue = a.total_deposits !== 0 ? ((a.wallet_balance + a.portfolio_value - a.total_deposits) / a.total_deposits) * 100 : 0;
