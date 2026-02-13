@@ -2,25 +2,52 @@ import { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
 
 /**
+ * Helper function to get environment variables with fallbacks
+ * Supports multiple naming conventions used across different platforms
+ */
+function getEnvVar(...names: string[]): string | undefined {
+  for (const name of names) {
+    const value = process.env[name];
+    if (value) return value;
+  }
+  return undefined;
+}
+
+// Support multiple environment variable naming conventions
+const SUPABASE_URL = getEnvVar(
+  'VITE_SUPABASE_URL',
+  'SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_URL'
+);
+const SUPABASE_SERVICE_KEY = getEnvVar(
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'SUPABASE_SERVICE_KEY',
+  'VITE_SUPABASE_SERVICE_ROLE_KEY'
+);
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+  throw new Error(
+    'Missing required environment variables: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY'
+  );
+}
+
+/**
  * Supabase admin client
  * Uses service role key because this is a trusted backend job
  * and must bypass RLS.
  */
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 /**
  * Compute the COMPLETED leaderboard week (UAE time)
  *
  * IMPORTANT:
- * - This job runs on Monday 00:01 UAE time
+ * - This job runs on Monday 03:00 UAE time
  * - At that point, the previous week is fully complete
- * - So we ALWAYS compute the PREVIOUS Monday → Sunday window
+ * - So we ALWAYS compute the PREVIOUS Monday 03:00 → Monday 02:59 window
  *
  * Week definition:
- *   Monday 00:00 UAE → next Monday 00:00 UAE
+ *   Monday 03:00 UAE → next Monday 02:59 UAE (exactly 7 days)
  *
  * Returned values are converted back to UTC
  * because Supabase stores timestamps in UTC.
@@ -37,14 +64,15 @@ function getCompletedUAEWeekBounds() {
   const day = nowUAE.getUTCDay(); // 0 = Sunday
   const diffToMonday = (day === 0 ? -6 : 1) - day;
 
-  // Monday 00:00 UAE
+  // Monday 03:00 UAE
   const weekStartUAE = new Date(nowUAE);
   weekStartUAE.setUTCDate(nowUAE.getUTCDate() + diffToMonday);
-  weekStartUAE.setUTCHours(0, 0, 0, 0);
+  weekStartUAE.setUTCHours(3, 0, 0, 0);
 
-  // Next Monday 00:00 UAE
+  // Next Monday 02:59 UAE (exactly 7 days minus 1 minute)
   const weekEndUAE = new Date(weekStartUAE);
   weekEndUAE.setUTCDate(weekStartUAE.getUTCDate() + 7);
+  weekEndUAE.setUTCHours(2, 59, 0, 0);
 
   // Convert back to UTC before saving to DB
   return {

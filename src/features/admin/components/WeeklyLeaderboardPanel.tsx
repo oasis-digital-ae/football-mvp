@@ -43,13 +43,13 @@ export const AdminWeeklyLeaderboardPanel: React.FC = () => {
   useEffect(() => {
     const loadWeeks = async () => {
       try {
-        // Get distinct weeks from weekly_leaderboard table
         const { data: weeksData, error } = await supabase
           .from('weekly_leaderboard')
           .select('week_start, week_end')
           .order('week_start', { ascending: false });
 
-        if (error) throw error;        // Remove duplicates and format
+        if (error) throw error;
+
         const uniqueWeeks = Array.from(
           new Map(weeksData.map(w => [`${w.week_start}_${w.week_end}`, w])).values()
         );
@@ -57,16 +57,18 @@ export const AdminWeeklyLeaderboardPanel: React.FC = () => {
         const formatted = uniqueWeeks.map((w, i) => {
           const startDate = new Date(w.week_start);
           const endDate = new Date(w.week_end);
-          
-          // Format: "2nd Feb 2026"
+
           const formatDate = (date: Date) => {
             const day = date.getDate();
-            const suffix = day === 1 || day === 21 || day === 31 ? 'st' 
+            const suffix =
+              day === 1 || day === 21 || day === 31 ? 'st'
               : day === 2 || day === 22 ? 'nd'
               : day === 3 || day === 23 ? 'rd'
               : 'th';
+
             const month = date.toLocaleDateString('en-GB', { month: 'short' });
             const year = date.getFullYear();
+
             return `${day}${suffix} ${month} ${year}`;
           };
 
@@ -79,9 +81,9 @@ export const AdminWeeklyLeaderboardPanel: React.FC = () => {
         });
 
         setWeeks(formatted);
-        setSelectedWeek(formatted[0]); // always latest
+        setSelectedWeek(formatted[0]);
       } catch (error) {
-        console.error('Error loading weeks:', error);
+        console.error(error);
         toast({
           title: 'Error',
           description: 'Failed to load weekly leaderboard weeks',
@@ -100,18 +102,20 @@ export const AdminWeeklyLeaderboardPanel: React.FC = () => {
     const loadLeaderboard = async () => {
       setLoading(true);
 
-      try {        // Read directly from weekly_leaderboard table
-        const { data: leaderboardData, error: leaderboardError } = await supabase
+      try {
+        const { data: leaderboardData, error } = await supabase
           .from('weekly_leaderboard')
-          .select('user_id, rank, start_wallet_value, start_portfolio_value, start_account_value, end_wallet_value, end_portfolio_value, end_account_value, deposits_week, weekly_return, week_start, week_end')
+          .select(
+            'user_id, rank, start_wallet_value, start_portfolio_value, start_account_value, end_wallet_value, end_portfolio_value, end_account_value, deposits_week, weekly_return, week_start, week_end'
+          )
           .eq('week_start', selectedWeek.weekStart)
           .eq('week_end', selectedWeek.weekEnd)
           .order('rank', { ascending: true });
 
-        if (leaderboardError) throw leaderboardError;
+        if (error) throw error;
 
-        // Get user profiles for usernames
         const userIds = leaderboardData.map(row => row.user_id);
+
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
           .select('id, full_name, first_name, last_name, username')
@@ -119,15 +123,17 @@ export const AdminWeeklyLeaderboardPanel: React.FC = () => {
 
         if (profilesError) throw profilesError;
 
-        // Create a map of userId to username
         const userMap = new Map(
           profiles.map(p => [
             p.id,
             p.full_name?.trim() && !/^User [0-9a-fA-F]{8}$/.test(p.full_name)
               ? p.full_name.trim()
-              : [p.first_name, p.last_name].filter(Boolean).join(' ').trim() || p.username || 'Unknown User'
+              : [p.first_name, p.last_name].filter(Boolean).join(' ').trim() ||
+                p.username ||
+                'Unknown User'
           ])
-        );        // Map the data
+        );
+
         const mappedData = leaderboardData.map(row => ({
           rank: row.rank,
           userId: row.user_id,
@@ -144,7 +150,7 @@ export const AdminWeeklyLeaderboardPanel: React.FC = () => {
 
         setData(mappedData);
       } catch (error) {
-        console.error('Error loading leaderboard:', error);
+        console.error(error);
         toast({
           title: 'Error',
           description: 'Failed to load weekly leaderboard data',
@@ -173,7 +179,6 @@ export const AdminWeeklyLeaderboardPanel: React.FC = () => {
           aVal = a.weeklyReturn;
           bVal = b.weeklyReturn;
           break;
-        case 'rank':
         default:
           aVal = a.rank;
           bVal = b.rank;
@@ -190,7 +195,9 @@ export const AdminWeeklyLeaderboardPanel: React.FC = () => {
     return sortDirection === 'asc'
       ? <ArrowUp className="h-3 w-3" />
       : <ArrowDown className="h-3 w-3" />;
-  };  /* -------------------- UI -------------------- */
+  };
+
+  /* -------------------- UI -------------------- */
   return (
     <Card>
       <CardHeader>
@@ -200,26 +207,49 @@ export const AdminWeeklyLeaderboardPanel: React.FC = () => {
               <Trophy className="h-5 w-5 text-yellow-400" />
               <span className="text-base md:text-lg">Admin Weekly Leaderboard</span>
             </div>
+
             {selectedWeek && (
-              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-[10px] md:text-xs w-fit">
+              <Badge
+                variant="secondary"
+                className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-[10px] md:text-xs w-fit"
+              >
                 {(() => {
-                  const startDate = new Date(selectedWeek.weekStart);
-                  const endDate = new Date(selectedWeek.weekEnd);
-                  
+                  const start = new Date(selectedWeek.weekStart);
+                  const end = new Date(selectedWeek.weekEnd);
+
+                  // Force UAE display cycle
+                  start.setHours(3, 0, 0, 0);
+                  end.setHours(2, 59, 0, 0);
+
                   const formatDateTime = (date: Date) => {
-                    const day = date.getDate().toString().padStart(2, '0');
+                    const day = date.getDate();
+                    const suffix =
+                      day === 1 || day === 21 || day === 31 ? 'st'
+                      : day === 2 || day === 22 ? 'nd'
+                      : day === 3 || day === 23 ? 'rd'
+                      : 'th';
+
                     const month = date.toLocaleDateString('en-GB', { month: 'short' });
                     const year = date.getFullYear();
-                    // Show UAE time (3:00 AM) - hardcoded for client display
-                    const time = '3:00 AM (UAE)';
-                    return `${day}/${month}/${year} ${time}`;
+                    const weekday = date.toLocaleDateString('en-GB', { weekday: 'long' });
+
+                    const time = date.toLocaleTimeString('en-GB', {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true,
+                      timeZone: 'Asia/Dubai'
+                    });
+
+                    return `${day}${suffix} ${month} ${year} ${weekday} ${time}`;
                   };
 
-                  return `${formatDateTime(startDate)} to ${formatDateTime(endDate)}`;
+                  return `${formatDateTime(start)} to ${formatDateTime(end)} (UAE)`;
                 })()}
               </Badge>
             )}
-          </div><Select
+          </div>
+
+          <Select
             value={selectedWeek?.id}
             onValueChange={(id) => {
               const week = weeks.find(w => w.id === id);
@@ -231,7 +261,9 @@ export const AdminWeeklyLeaderboardPanel: React.FC = () => {
             </SelectTrigger>
             <SelectContent>
               {weeks.map(w => (
-                <SelectItem key={w.id} value={w.id}>{w.label}</SelectItem>
+                <SelectItem key={w.id} value={w.id}>
+                  {w.label}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -243,18 +275,11 @@ export const AdminWeeklyLeaderboardPanel: React.FC = () => {
           <Skeleton className="h-48 w-full" />
         ) : (
           <div className="rounded-md border">
-            <Table>              <TableHeader>
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableHead>
-                    <button onClick={() => setSortField('rank')} className="flex items-center gap-1">
-                      Rank <SortIcon field="rank" />
-                    </button>
-                  </TableHead>
-                  <TableHead>
-                    <button onClick={() => setSortField('username')} className="flex items-center gap-1">
-                      User <SortIcon field="username" />
-                    </button>
-                  </TableHead>
+                  <TableHead>Rank</TableHead>
+                  <TableHead>User</TableHead>
                   <TableHead className="text-center">Start Wallet Value</TableHead>
                   <TableHead className="text-center">Start Portfolio Value</TableHead>
                   <TableHead className="text-center">Start Account Value</TableHead>
@@ -262,41 +287,27 @@ export const AdminWeeklyLeaderboardPanel: React.FC = () => {
                   <TableHead className="text-center">End Portfolio Value</TableHead>
                   <TableHead className="text-center">End Account Value</TableHead>
                   <TableHead className="text-center">Total Deposits</TableHead>
-                  <TableHead className="text-center">
-                    <button onClick={() => setSortField('weeklyReturn')} className="flex items-center gap-1 ml-auto">
-                      % Weekly Return <SortIcon field="weeklyReturn" />
-                    </button>
-                  </TableHead>
+                  <TableHead className="text-center">% Weekly Return</TableHead>
                 </TableRow>
-              </TableHeader>              <TableBody>
+              </TableHeader>
+
+              <TableBody>
                 {sortedData.map(row => (
                   <TableRow key={row.userId}>
                     <TableCell>{row.rank}</TableCell>
-                    <TableCell className="font-medium">{row.username}</TableCell>
-                    <TableCell className="text-center font-mono">
-                      {formatCurrency(row.startWalletValue / 100)}
-                    </TableCell>
-                    <TableCell className="text-center font-mono">
-                      {formatCurrency(row.startPortfolioValue / 100)}
-                    </TableCell>
-                    <TableCell className="text-center font-mono">
-                      {formatCurrency(row.startAccountValue / 100)}
-                    </TableCell>
-                    <TableCell className="text-center font-mono">
-                      {formatCurrency(row.endWalletValue / 100)}
-                    </TableCell>
-                    <TableCell className="text-center font-mono">
-                      {formatCurrency(row.endPortfolioValue / 100)}
-                    </TableCell>
-                    <TableCell className="text-center font-mono">
-                      {formatCurrency(row.endAccountValue / 100)}
-                    </TableCell>
-                    <TableCell className="text-center font-mono">
-                      {formatCurrency(row.totalDeposits / 100)}
-                    </TableCell>
-                    <TableCell className={`text-center font-mono font-semibold ${
-                      row.weeklyReturn >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
+                    <TableCell>{row.username}</TableCell>
+                    <TableCell className="text-center font-mono">{formatCurrency(row.startWalletValue / 100)}</TableCell>
+                    <TableCell className="text-center font-mono">{formatCurrency(row.startPortfolioValue / 100)}</TableCell>
+                    <TableCell className="text-center font-mono">{formatCurrency(row.startAccountValue / 100)}</TableCell>
+                    <TableCell className="text-center font-mono">{formatCurrency(row.endWalletValue / 100)}</TableCell>
+                    <TableCell className="text-center font-mono">{formatCurrency(row.endPortfolioValue / 100)}</TableCell>
+                    <TableCell className="text-center font-mono">{formatCurrency(row.endAccountValue / 100)}</TableCell>
+                    <TableCell className="text-center font-mono">{formatCurrency(row.totalDeposits / 100)}</TableCell>
+                    <TableCell
+                      className={`text-center font-mono font-semibold ${
+                        row.weeklyReturn >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}
+                    >
                       {row.weeklyReturn >= 0 ? '+' : ''}
                       {(row.weeklyReturn * 100).toFixed(2)}%
                     </TableCell>
