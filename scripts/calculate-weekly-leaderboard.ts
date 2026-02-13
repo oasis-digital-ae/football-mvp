@@ -53,7 +53,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 });
 
 /**
- * UAE week boundaries: Monday 00:00 → next Monday 00:00
+ * UAE week boundaries: Monday 03:00 → next Monday 02:59
  * @param weeksAgo 0 = current week, 1 = last week, etc.
  */
 function getUAEWeekBounds(weeksAgo = 0) {
@@ -65,7 +65,7 @@ function getUAEWeekBounds(weeksAgo = 0) {
 
   let weekStartUAE = new Date(nowUAE);
   weekStartUAE.setUTCDate(nowUAE.getUTCDate() + diffToMonday);
-  weekStartUAE.setUTCHours(0, 0, 0, 0);
+  weekStartUAE.setUTCHours(3, 0, 0, 0);
 
   if (weeksAgo > 0) {
     weekStartUAE.setUTCDate(weekStartUAE.getUTCDate() - 7 * weeksAgo);
@@ -73,6 +73,7 @@ function getUAEWeekBounds(weeksAgo = 0) {
 
   const weekEndUAE = new Date(weekStartUAE);
   weekEndUAE.setUTCDate(weekStartUAE.getUTCDate() + 7);
+  weekEndUAE.setUTCHours(2, 59, 0, 0);
 
   return {
     week_start: new Date(weekStartUAE.getTime() - 4 * 60 * 60 * 1000),
