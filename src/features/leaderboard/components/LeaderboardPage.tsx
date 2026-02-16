@@ -13,6 +13,7 @@ interface LeaderboardEntry {
   userId: string;
   userName: string;
   weeklyReturn: number;
+  previousWeeklyReturn: number | null;
   isCurrentUser: boolean;
 }
 
@@ -22,27 +23,55 @@ const LeaderboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [sortField, setSortField] = useState<'rank' | 'userName' | 'weeklyReturn'>('rank');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  
+  // Hardcoded week numbers for now - TODO: Make this dynamic later
+  const currentWeekNumber = 26;
+  const previousWeekNumber = 25;
 
   useEffect(() => {
     loadLeaderboardData();
-  }, [user]);
-  const loadLeaderboardData = async () => {
+  }, [user]);  const loadLeaderboardData = async () => {
     try {
       setLoading(true);
       
-      // Fetch leaderboard via RPC (returns full_name, bypasses join RLS)
-      const { data: leaderboardRecords, error: leaderboardError } = await supabase.rpc(
+      // Fetch current week's leaderboard
+      const { data: currentLeaderboard, error: currentError } = await supabase.rpc(
         'get_weekly_leaderboard_current'
       );
 
-      if (leaderboardError) {
-        console.error('Error fetching leaderboard:', leaderboardError);
-        throw leaderboardError;
+      if (currentError) {
+        console.error('Error fetching leaderboard:', currentError);
+        throw currentError;
+      }
+
+      // Fetch previous week's data for each user
+      const { data: previousWeekData, error: prevError } = await supabase
+        .from('weekly_leaderboard')
+        .select('user_id, weekly_return')
+        .eq('is_latest', false)
+        .order('week_start', { ascending: false });
+
+      if (prevError) {
+        console.error('Error fetching previous week data:', prevError);
+      }
+
+      // Create a map of user_id -> previous weekly return
+      const previousReturnsMap = new Map<string, number>();
+      if (previousWeekData && previousWeekData.length > 0) {
+        // Group by user_id and get the most recent non-latest entry
+        const userPreviousWeeks = new Map<string, number>();
+        previousWeekData.forEach((record: { user_id: string; weekly_return: number }) => {
+          if (!userPreviousWeeks.has(record.user_id)) {
+            userPreviousWeeks.set(record.user_id, parseFloat(String(record.weekly_return)) * 100);
+          }
+        });
+        previousReturnsMap.clear();
+        userPreviousWeeks.forEach((value, key) => previousReturnsMap.set(key, value));
       }
 
       // If we have real data, use it
-      if (leaderboardRecords && leaderboardRecords.length > 0) {
-        const transformedData: LeaderboardEntry[] = leaderboardRecords.map((record: { user_id: string; full_name: string | null; rank: number; weekly_return: number }) => {
+      if (currentLeaderboard && currentLeaderboard.length > 0) {
+        const transformedData: LeaderboardEntry[] = currentLeaderboard.map((record: { user_id: string; full_name: string | null; rank: number; weekly_return: number }) => {
           const rawName = record.full_name?.trim() ?? (record as { fullName?: string }).fullName?.trim();
           const userName = rawName && !/^User [0-9a-fA-F]{8}$/.test(rawName)
             ? rawName
@@ -52,6 +81,7 @@ const LeaderboardPage: React.FC = () => {
           userId: record.user_id,
           userName,
           weeklyReturn: parseFloat(String(record.weekly_return)) * 100, // Convert to percentage
+          previousWeeklyReturn: previousReturnsMap.get(record.user_id) ?? null,
           isCurrentUser: user?.id === record.user_id
         };
         });
@@ -115,18 +145,15 @@ const LeaderboardPage: React.FC = () => {
           </h1>
           <p className="text-sm text-gray-400 mt-1">Top performers this week</p>
         </div>
-      </div>      
-      
-      {/* Main Leaderboard Table */}
-      <Card className="trading-card border-0 md:rounded-lg max-w-3xl mx-auto">
+      </div>      {/* Main Leaderboard Table */}
+      <Card className="trading-card border-0 md:rounded-lg max-w-6xl mx-auto">
         <CardContent className="p-0">
-          
           {/* Desktop/Tablet Table */}
-          <div className="hidden md:block overflow-x-auto w-auto min-w-[700px] max-w-full">
-            <table className="trading-table table-fixed border-collapse w-auto min-w-[700px]">
+          <div className="hidden md:block overflow-x-auto">
+            <table className="trading-table w-full">
               <thead>
                 <tr>
-                  <th className="text-center w-[60px] px-1">
+                  <th className="text-center w-[10%] px-4">
                     <button
                       onClick={() => {
                         if (sortField === 'rank') {
@@ -136,17 +163,17 @@ const LeaderboardPage: React.FC = () => {
                           setSortDirection('asc');
                         }
                       }}
-                      className="flex items-center justify-center gap-1.5 hover:text-foreground transition-colors mx-auto"
+                      className="flex items-center justify-center gap-2 hover:text-foreground transition-colors mx-auto text-base"
                     >
                       <span>Rank</span>
                       {sortField === 'rank' ? (
-                        sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                        sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
                       ) : (
-                        <ArrowUpDown className="h-3 w-3 opacity-20" />
+                        <ArrowUpDown className="h-4 w-4 opacity-20" />
                       )}
                     </button>
                   </th>
-                  <th className="text-left w-[45%] px-2">
+                  <th className="text-left w-[28%] px-4">
                     <button
                       onClick={() => {
                         if (sortField === 'userName') {
@@ -156,17 +183,22 @@ const LeaderboardPage: React.FC = () => {
                           setSortDirection('asc');
                         }
                       }}
-                      className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+                      className="flex items-center gap-2 hover:text-foreground transition-colors text-base"
                     >
                       <span>User</span>
                       {sortField === 'userName' ? (
-                        sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                        sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
                       ) : (
-                        <ArrowUpDown className="h-3 w-3 opacity-20" />
+                        <ArrowUpDown className="h-4 w-4 opacity-20" />
                       )}
                     </button>
-                  </th>                  
-                  <th className="text-center w-[25%] px-2">
+                  </th>
+                  <th className="text-right w-[31%] px-4">
+                    <div className="flex items-center justify-end gap-2 ml-auto text-base">
+                      <span>Previous Week (Week {previousWeekNumber})</span>
+                    </div>
+                  </th>
+                  <th className="text-right w-[31%] px-4">
                     <button
                       onClick={() => {
                         if (sortField === 'weeklyReturn') {
@@ -176,43 +208,54 @@ const LeaderboardPage: React.FC = () => {
                           setSortDirection('desc');
                         }
                       }}
-                      className="flex items-center justify-end gap-1.5 hover:text-foreground transition-colors ml-auto"
+                      className="flex items-center justify-end gap-2 hover:text-foreground transition-colors ml-auto text-base"
                     >
-                      <span>Weekly Return</span>
+                      <span>Current Week (Week {currentWeekNumber})</span>
                       {sortField === 'weeklyReturn' ? (
-                        sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                        sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
                       ) : (
-                        <ArrowUpDown className="h-3 w-3 opacity-20" />
+                        <ArrowUpDown className="h-4 w-4 opacity-20" />
                       )}
                     </button>
                   </th>
                 </tr>
-              </thead>
-              <tbody>
+              </thead><tbody>
                 {/* If no data, show a friendly message */}
                 {sortedData.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="text-center py-10 text-gray-400">
+                    <td colSpan={4} className="text-center py-12 text-gray-400 text-base">
                       No Rankings Displayed Yet.
                     </td>
                   </tr>
-                )}
-
-                {sortedData.map((entry) => (
+                )}                {sortedData.map((entry) => (
                   <tr
                     key={entry.userId}
                     className={`group ${entry.isCurrentUser ? 'bg-trading-primary/10' : ''}`}
                   >
-                    <td className="px-2 text-center">
-                      {getRankDisplay(entry.rank)}
+                    <td className="px-4 text-center">
+                      <span className="text-gray-400 font-medium text-base">{entry.rank}</span>
                     </td>
-                    <td className="px-2">
-                      <span className={`font-medium ${entry.isCurrentUser ? 'text-trading-primary' : ''}`}>
+                    <td className="px-4">
+                      <span className={`font-medium text-base ${entry.isCurrentUser ? 'text-trading-primary' : ''}`}>
                         {entry.userName}
-                        {entry.isCurrentUser && <span className="ml-2 text-xs font-medium" style={{ color: 'hsl(var(--muted-foreground))' }}>(You)</span>}
+                        {entry.isCurrentUser && <span className="ml-2 text-sm font-medium" style={{ color: 'hsl(var(--muted-foreground))' }}>(You)</span>}
                       </span>
                     </td>
-                    <td className={`px-2 text-right font-mono font-semibold ${
+                    <td className={`px-4 text-right font-mono text-base ${
+                      entry.previousWeeklyReturn === null
+                        ? 'text-gray-500'
+                        : entry.previousWeeklyReturn === 0
+                        ? 'price-neutral'
+                        : entry.previousWeeklyReturn > 0
+                        ? 'price-positive'
+                        : 'price-negative'
+                    }`}>
+                      {entry.previousWeeklyReturn === null 
+                        ? 'N/A' 
+                        : `${entry.previousWeeklyReturn > 0 ? '+' : ''}${formatPercent(entry.previousWeeklyReturn)}`
+                      }
+                    </td>
+                    <td className={`px-4 text-right font-mono font-semibold text-base ${
                       entry.weeklyReturn === 0 
                         ? 'price-neutral' 
                         : entry.weeklyReturn > 0 
@@ -225,14 +268,12 @@ const LeaderboardPage: React.FC = () => {
                 ))}
               </tbody>
             </table>
-          </div>          
-          
-          {/* Mobile Table Layout - Matching Marketplace Style */}
+          </div>
+            {/* Mobile Table Layout - Matching Marketplace Style */}
           <div className="md:hidden -mx-3 sm:-mx-4">
-            
             {/* Mobile Table Header */}
             <div className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur-sm border-b border-gray-700/50">
-              <div className="grid grid-cols-[70px_0.9fr_80px] gap-2 px-3 py-2 text-[10px] font-semibold text-gray-400 items-center">
+              <div className="grid grid-cols-[55px_0.85fr_80px_80px] gap-2 px-3 py-2.5 text-[10px] font-semibold text-gray-400 items-center">
                 <button
                   onClick={() => {
                     if (sortField === 'rank') {
@@ -242,7 +283,7 @@ const LeaderboardPage: React.FC = () => {
                       setSortDirection('asc');
                     }
                   }}
-                  className="flex items-center justify-center gap-1 hover:text-white transition-colors"
+                  className="flex items-center justify-center gap-0.5 hover:text-white transition-colors"
                 >
                   <span>Rank</span>
                   {sortField === 'rank' ? (
@@ -260,7 +301,7 @@ const LeaderboardPage: React.FC = () => {
                       setSortDirection('asc');
                     }
                   }}
-                  className="flex items-center gap-1 hover:text-white transition-colors text-left"
+                  className="flex items-center gap-0.5 hover:text-white transition-colors text-left"
                 >
                   <span>User</span>
                   {sortField === 'userName' ? (
@@ -268,7 +309,11 @@ const LeaderboardPage: React.FC = () => {
                   ) : (
                     <ArrowUpDown className="h-2.5 w-2.5 opacity-20" />
                   )}
-                </button>                <button
+                </button>
+                <div className="flex items-center justify-end">
+                  <span className="text-right leading-tight">Prev<br />Week</span>
+                </div>
+                <button
                   onClick={() => {
                     if (sortField === 'weeklyReturn') {
                       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -277,9 +322,9 @@ const LeaderboardPage: React.FC = () => {
                       setSortDirection('desc');
                     }
                   }}
-                  className="flex items-center justify-end gap-1 hover:text-white transition-colors ml-auto"
+                  className="flex items-center justify-end gap-0.5 hover:text-white transition-colors ml-auto"
                 >
-                  <span>Return</span>
+                  <span className="text-right leading-tight">Current<br />Week</span>
                   {sortField === 'weeklyReturn' ? (
                     sortDirection === 'asc' ? <ArrowUp className="h-2.5 w-2.5" /> : <ArrowDown className="h-2.5 w-2.5" />
                   ) : (
@@ -287,13 +332,13 @@ const LeaderboardPage: React.FC = () => {
                   )}
                 </button>
               </div>
-            </div>            
+            </div>
             
             {/* Mobile Table Rows */}
             <div className="space-y-0">
               {sortedData.map((entry) => (
                 <div key={entry.userId} className="border-b border-gray-700/30 last:border-b-0">
-                  <div className={`grid grid-cols-[70px_0.9fr_80px] gap-2 px-3 py-2 items-center active:bg-gray-700/30 transition-colors touch-manipulation ${
+                  <div className={`grid grid-cols-[55px_0.85fr_80px_80px] gap-2 px-3 py-2.5 items-center active:bg-gray-700/30 transition-colors touch-manipulation ${
                     entry.isCurrentUser ? 'bg-trading-primary/10' : ''
                   }`}>
                     
@@ -312,9 +357,25 @@ const LeaderboardPage: React.FC = () => {
                           <span className="ml-1 text-[9px] text-gray-400">(You)</span>
                         )}
                       </span>
-                    </div>                    
+                    </div>
                     
-                    {/* Return */}
+                    {/* Previous Week Return */}
+                    <div className={`text-right font-mono text-[10px] ${
+                      entry.previousWeeklyReturn === null
+                        ? 'text-gray-500'
+                        : entry.previousWeeklyReturn === 0 
+                        ? 'text-gray-400' 
+                        : entry.previousWeeklyReturn > 0 
+                        ? 'text-green-400' 
+                        : 'text-red-400'
+                    }`}>
+                      {entry.previousWeeklyReturn === null 
+                        ? 'N/A' 
+                        : `${entry.previousWeeklyReturn > 0 ? '+' : ''}${formatPercent(entry.previousWeeklyReturn)}`
+                      }
+                    </div>
+                    
+                    {/* Current Week Return */}
                     <div className={`text-right font-mono font-semibold text-[10px] ${
                       entry.weeklyReturn === 0 
                         ? 'text-gray-400' 
@@ -327,7 +388,7 @@ const LeaderboardPage: React.FC = () => {
                   </div>
                 </div>
               ))}
-            </div>          
+            </div>
           </div>
         </CardContent>
       </Card>
