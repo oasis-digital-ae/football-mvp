@@ -909,20 +909,7 @@ export const footballIntegrationService = {
         .from('fixtures')
         .upsert(fixtureInsertData, {
           onConflict: 'external_id',
-          ignoreDuplicates: false,
-          updateColumns: [
-            'home_team_id',
-            'away_team_id', 
-            'kickoff_at',  // CRITICAL: Update dates
-            'buy_close_at',
-            'status',
-            'result',
-            'home_score',
-            'away_score',
-            'matchday',
-            'season',
-            'updated_at'
-          ]
+          ignoreDuplicates: false
         })
         .select('id, external_id');
 
