@@ -58,11 +58,10 @@ class MatchSchedulerService {
 
       logger.debug(`Checking ${fixtures.length} fixtures for updates...`);
 
-      for (const fixture of fixtures) {
-        try {
+      for (const fixture of fixtures) {        try {
           const kickoffTime = new Date(fixture.kickoff_at);
           const matchEndTime = new Date(kickoffTime.getTime() + 120 * 60 * 1000); // 2 hours
-          const buyCloseTime = new Date(kickoffTime.getTime() - 30 * 60 * 1000); // 30 min before
+          const buyCloseTime = new Date(kickoffTime.getTime() - 15 * 60 * 1000); // 15 min before
 
           // Track if any match is currently live
           if (now >= kickoffTime && now <= matchEndTime) {
