@@ -191,14 +191,12 @@ async function processUpdate() {
           continue;
         }
 
-        results.checked++;
-
-                const kickoffTime = new Date(fixture.kickoff_at);
+        results.checked++;                const kickoffTime = new Date(fixture.kickoff_at);
                 const matchEndTime = new Date(kickoffTime.getTime() + 90 * 60 * 1000); // 90 minutes after kickoff
-                const buyCloseTime = new Date(kickoffTime.getTime() - 30 * 60 * 1000);
+                const buyCloseTime = new Date(kickoffTime.getTime() - 15 * 60 * 1000);
         const timeToBuyClose = buyCloseTime.getTime() - now.getTime();
 
-        // Capture snapshots 30 min before kickoff
+        // Capture snapshots 15 min before kickoff
         if (fixture.status === 'scheduled' && (fixture.snapshot_home_cap === null || fixture.snapshot_away_cap === null)) {
           if (timeToBuyClose <= 5 * 60 * 1000 && timeToBuyClose >= -5 * 60 * 1000) {
             console.log(`📸 Capturing snapshots for fixture ${fixture.id}`);
@@ -399,11 +397,10 @@ async function syncFixturesFromAPI(supabase: any): Promise<number> {
     if (!homeTeamId || !awayTeamId) {
       console.warn(`⚠️ Skipping match: teams not found for ${match.homeTeam.name} vs ${match.awayTeam.name}`);
       skippedCount++;
-      continue;
-    }
+      continue;    }
 
     const kickoffTime = new Date(match.utcDate);
-    const buyCloseTime = new Date(kickoffTime.getTime() - 30 * 60 * 1000);
+    const buyCloseTime = new Date(kickoffTime.getTime() - 15 * 60 * 1000);
 
     fixtureData.push({
       external_id: match.id.toString(),

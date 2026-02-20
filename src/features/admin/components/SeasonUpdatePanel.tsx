@@ -197,16 +197,14 @@ export const SeasonUpdatePanel: React.FC = () => {
               </div>
             </AlertDescription>
           </Alert>
-        )}
-
-        {/* Buy Window Info */}
+        )}        {/* Buy Window Info */}
         <div className="bg-gray-700/50 rounded-lg p-3 border border-gray-600">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="h-4 w-4 text-yellow-400" />
             <span className="text-sm font-medium text-gray-300">Buy Window Configuration</span>
           </div>
           <p className="text-xs text-gray-400">
-            Trading closes 30 minutes before match kickoff. This applies to all teams and is automatically enforced.
+            Trading closes 15 minutes before match kickoff. This applies to all teams and is automatically enforced.
           </p>
         </div>
 

@@ -148,12 +148,10 @@ export const matchMonitorService = {
       const fixtures = await this.getMatchesToMonitor();
       const now = new Date();
 
-      logger.debug(`Monitoring ${fixtures.length} fixtures...`);
-
-      for (const fixture of fixtures) {
+      logger.debug(`Monitoring ${fixtures.length} fixtures...`);      for (const fixture of fixtures) {
         try {
           const kickoffTime = new Date(fixture.kickoff_at);
-          const buyCloseTime = new Date(kickoffTime.getTime() - 30 * 60 * 1000); // 30 min before kickoff
+          const buyCloseTime = new Date(kickoffTime.getTime() - 15 * 60 * 1000); // 15 min before kickoff
           const matchEndTime = new Date(kickoffTime.getTime() + 120 * 60 * 1000); // 2 hours after kickoff
 
           // Capture snapshots at buy-close time (within 5-minute window)
