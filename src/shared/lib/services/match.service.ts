@@ -28,13 +28,12 @@ export const matchService = {
     try {
       const now = new Date();
       const twoDaysLater = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-      
-      const { data, error } = await supabase
+        const { data, error } = await supabase
         .from('fixtures')
         .select('id, external_id, home_team_id, away_team_id, kickoff_at, status, result, home_score, away_score')
         .gte('kickoff_at', now.toISOString())
         .lte('kickoff_at', twoDaysLater.toISOString())
-        .in('status', ['scheduled', 'closed'])
+        .in('status', ['scheduled', 'live', 'closed']) // Include 'closed' for backward compatibility
         .order('kickoff_at', { ascending: true });
 
       if (error) {

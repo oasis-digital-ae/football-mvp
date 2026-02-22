@@ -45,14 +45,13 @@ export const buyWindowService = {
         .filter(f => {
           const kickoff = this.parseUTCDate(f.kickoff_at);
           const isPastKickoff = now >= kickoff;
-          
-          // Match is potentially live if:
+            // Match is potentially live if:
           // 1. Result is 'pending' (match not finished yet)
-          // 2. AND status is 'closed' (confirmed live from API) OR 'scheduled' with kickoff passed
+          // 2. AND status is 'live' (confirmed live from API) OR 'closed' (legacy) OR 'scheduled' with kickoff passed
           // 3. AND status is not 'applied' or 'postponed'
           const hasResult = f.result && f.result !== 'pending';
           return !hasResult && // Match doesn't have a final result yet
-                 (f.status === 'closed' || (f.status === 'scheduled' && isPastKickoff)) && 
+                 (f.status === 'live' || f.status === 'closed' || (f.status === 'scheduled' && isPastKickoff)) && 
                  f.status !== 'applied' && 
                  f.status !== 'postponed';
         })
@@ -61,8 +60,8 @@ export const buyWindowService = {
       if (potentiallyLiveMatch) {
         const matchKickoff = this.parseUTCDate(potentiallyLiveMatch.kickoff_at);
         
-        // If status is 'closed' and result is 'pending', match is definitely live (from API, handles extra time)
-        if (potentiallyLiveMatch.status === 'closed' && (!potentiallyLiveMatch.result || potentiallyLiveMatch.result === 'pending')) {
+        // If status is 'live' or 'closed' (legacy) and result is 'pending', match is definitely live (from API, handles extra time)
+        if ((potentiallyLiveMatch.status === 'live' || potentiallyLiveMatch.status === 'closed') && (!potentiallyLiveMatch.result || potentiallyLiveMatch.result === 'pending')) {
           return {
             isOpen: false,
             nextCloseTime: undefined,
@@ -167,12 +166,11 @@ export const buyWindowService = {
         const hasFinalResult = match.result && 
                               match.result !== 'pending' && 
                               (match.result === 'home_win' || match.result === 'away_win' || match.result === 'draw');
-        
-        // If match has a final result, it's finished - trading should be OPEN
+          // If match has a final result, it's finished - trading should be OPEN
         if (hasFinalResult) {
           // Match is finished, continue to check upcoming fixtures
-        } else if (match.status === 'closed') {
-          // Status is 'closed' and result is still 'pending' - match is live
+        } else if (match.status === 'live' || match.status === 'closed') {
+          // Status is 'live' or 'closed' (legacy) and result is still 'pending' - match is live
           return {
             isOpen: false,
             nextCloseTime: undefined,

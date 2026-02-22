@@ -53,11 +53,12 @@ const MatchResultsPage: React.FC = () => {
       setLoading(false);
     }
   };
-
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'scheduled':
         return <Badge variant="outline" className="text-blue-400 border-blue-400/50 text-xs px-2 py-0.5">Scheduled</Badge>;
+      case 'live':
+        return <Badge variant="outline" className="text-yellow-400 border-yellow-400/50 text-xs px-2 py-0.5 animate-pulse">Live</Badge>;
       case 'closed':
         return <Badge variant="outline" className="text-yellow-400 border-yellow-400/50 text-xs px-2 py-0.5 animate-pulse">Live</Badge>;
       case 'applied':
@@ -67,7 +68,7 @@ const MatchResultsPage: React.FC = () => {
       default:
         return <Badge variant="outline" className="text-xs px-2 py-0.5">{status}</Badge>;
     }
-  };  const filteredFixtures = fixtures.filter(fixture => {
+  };const filteredFixtures = fixtures.filter(fixture => {
     if (filter === 'finished') {
       // Include applied matches and postponed matches that are past their date
       if (fixture.status === 'applied') return true;
@@ -95,11 +96,10 @@ const MatchResultsPage: React.FC = () => {
   const groupedFixtures = useMemo(() => {
     const groups: Record<string, DatabaseFixtureWithTeams[]> = {};
     const liveMatchesGroup: DatabaseFixtureWithTeams[] = [];
-    
-    // Separate live matches and group other fixtures by date
+      // Separate live matches and group other fixtures by date
     filteredFixtures.forEach(fixture => {
-      if (fixture.status === 'closed') {
-        // Add to live matches group
+      if (fixture.status === 'live' || fixture.status === 'closed') {
+        // Add to live matches group ('closed' for backward compatibility)
         liveMatchesGroup.push(fixture);
       } else {
         // Group by date for non-live matches
@@ -409,7 +409,7 @@ const MatchResultsPage: React.FC = () => {
                     // For live matches group, all are live
                     // For other groups, separate live and non-live (shouldn't have live in other groups now)
                     const isLiveGroup = dateKey === '__LIVE__';
-                    const liveMatches = isLiveGroup ? dateFixtures : dateFixtures.filter(f => f.status === 'closed');
+                    const liveMatches = isLiveGroup ? dateFixtures : dateFixtures.filter(f => f.status === 'live' || f.status === 'closed');
                     const otherMatches = isLiveGroup ? [] : dateFixtures.filter(f => f.status !== 'closed');
                     
                     const renderFixture = (fixture: DatabaseFixtureWithTeams, idx: number) => (
@@ -420,10 +420,9 @@ const MatchResultsPage: React.FC = () => {
                         {/* Mobile Layout */}
                         <div className="md:hidden space-y-3">
                           {/* Header: Matchday & Status */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-between">                            <div className="flex items-center gap-2">
                               <div className={`text-xs font-mono font-bold ${
-                                fixture.status === 'closed' ? 'text-yellow-500' : 'text-gray-500'
+                                (fixture.status === 'live' || fixture.status === 'closed') ? 'text-yellow-500' : 'text-gray-500'
                               }`}>
                                 MD{fixture.matchday}
                               </div>
@@ -568,10 +567,9 @@ const MatchResultsPage: React.FC = () => {
                           </div>
                         </div>{/* Desktop/Tablet Layout */}
                         <div className="hidden md:grid grid-cols-[140px_50px_60px_1fr_32px_80px_32px_1fr_60px_50px_120px] items-center gap-2">
-                          {/* Left: Matchday & Status */}
-                          <div className="flex items-center gap-3">
+                          {/* Left: Matchday & Status */}                          <div className="flex items-center gap-3">
                             <div className={`text-xs font-mono font-bold ${
-                              fixture.status === 'closed' ? 'text-yellow-500' : 'text-gray-500'
+                              (fixture.status === 'live' || fixture.status === 'closed') ? 'text-yellow-500' : 'text-gray-500'
                             }`}>
                               MD{fixture.matchday}
                             </div>
@@ -580,7 +578,7 @@ const MatchResultsPage: React.FC = () => {
 
                           {/* Home Buy Button */}
                           <div className="flex justify-center">
-                            {fixture.home_team_id && fixture.status !== 'applied' && fixture.status !== 'closed' && (
+                            {fixture.home_team_id && fixture.status !== 'applied' && fixture.status !== 'live' && fixture.status !== 'closed' && (
                               <Button
                                 onClick={() => handlePurchaseClick(
                                   fixture.home_team_id,
