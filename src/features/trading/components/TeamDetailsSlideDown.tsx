@@ -825,12 +825,10 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                 day: 'numeric',
                                 year: 'numeric',
                                 timeZone: 'Asia/Dubai'
-                              });
-
-                              return (                                <div
+                              });                              return (                                <div
                                   key={index}
                                   className={`rounded-lg p-2.5 sm:p-3 touch-manipulation ${
-                                    match.status === 'closed' 
+                                    (match.status === 'live' || match.status === 'closed') 
                                       ? 'bg-red-500/5 border-2 border-red-500' 
                                       : 'bg-gray-800/40 border border-gray-700/30'
                                   }`}
@@ -839,26 +837,26 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                   <div className="flex items-start justify-between gap-2 mb-2">
                                     <div className="flex items-center gap-2 flex-1 min-w-0">
                                       <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
-                                        match.status === 'closed'
+                                        (match.status === 'live' || match.status === 'closed')
                                           ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/30'
                                           : match.isHome 
                                             ? 'bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30' 
                                             : 'bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30'
                                       }`}>
-                                        {match.status === 'closed' ? match.matchday : (match.isHome ? 'H' : 'A')}
+                                        {(match.status === 'live' || match.status === 'closed') ? match.matchday : (match.isHome ? 'H' : 'A')}
                                       </div>
                                       <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2">
                                           <p className="text-[11px] sm:text-xs font-semibold text-white truncate">
                                             vs {match.opponent}
                                           </p>
-                                          {match.status === 'closed' && (
+                                          {(match.status === 'live' || match.status === 'closed') && (
                                             <Badge variant="outline" className="text-yellow-400 border-yellow-400/50 text-[9px] px-1 py-0 animate-pulse">
                                               LIVE
                                             </Badge>
                                           )}
                                         </div>
-                                        {match.status === 'closed' && match.homeScore !== null && match.awayScore !== null ? (
+                                        {(match.status === 'live' || match.status === 'closed') && match.homeScore !== null && match.awayScore !== null ? (
                                           <div className="flex items-center gap-2 mt-1">
                                             <p className="text-[9px] sm:text-[10px] font-mono" style={{ color: '#C9A961' }}>
                                               {formattedDate}
