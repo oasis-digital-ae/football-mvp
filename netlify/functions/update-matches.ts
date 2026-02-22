@@ -62,13 +62,13 @@ function convertMatchStatus(status: string, score: any): 'home_win' | 'away_win'
   return 'draw';
 }
 
-function convertMatchStatusToFixtureStatus(status: string): 'scheduled' | 'closed' | 'applied' | 'postponed' {
+function convertMatchStatusToFixtureStatus(status: string): 'scheduled' | 'live' | 'applied' | 'postponed' {
   switch (status) {
     case 'SCHEDULED':
     case 'TIMED': return 'scheduled';
     case 'LIVE':
     case 'IN_PLAY':
-    case 'PAUSED': return 'closed';
+    case 'PAUSED': return 'live';
     case 'FINISHED': return 'applied';
     case 'POSTPONED':
     case 'SUSPENDED':
@@ -161,13 +161,11 @@ async function processUpdate() {
     // - Kickoff within last 2 hours or next 48 hours
     const now = new Date();
     const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
-    const twoDaysLater = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-
-    // Get fixtures that need updating
+    const twoDaysLater = new Date(now.getTime() + 48 * 60 * 60 * 1000);    // Get fixtures that need updating (scheduled, live, or recently finished)
     const { data: fixtures, error: fetchError } = await supabase
       .from('fixtures')
       .select('*')
-      .in('status', ['scheduled', 'closed'])
+      .in('status', ['scheduled', 'live', 'closed']) // Include 'closed' for backward compatibility
       .gte('kickoff_at', twoHoursAgo.toISOString())
       .lte('kickoff_at', twoDaysLater.toISOString());
 
@@ -189,11 +187,10 @@ async function processUpdate() {
         // Skip fixtures without external_id
         if (!fixture.external_id) {
           continue;
-        }
+        }        results.checked++;
 
-        results.checked++;                const kickoffTime = new Date(fixture.kickoff_at);
-                const matchEndTime = new Date(kickoffTime.getTime() + 90 * 60 * 1000); // 90 minutes after kickoff
-                const buyCloseTime = new Date(kickoffTime.getTime() - 15 * 60 * 1000);
+        const kickoffTime = new Date(fixture.kickoff_at);
+        const buyCloseTime = new Date(kickoffTime.getTime() - 15 * 60 * 1000);
         const timeToBuyClose = buyCloseTime.getTime() - now.getTime();
 
         // Capture snapshots 15 min before kickoff
@@ -225,11 +222,14 @@ async function processUpdate() {
 
             results.snapshots++;
           }
-        }
-
-        // Update live match data
-        if (now >= kickoffTime && now <= matchEndTime) {
-          console.log(`🔥 Updating live match fixture ${fixture.id}`);
+        }        // Update match data for fixtures that are potentially live or recently finished
+        // Check matches from 30 min before kickoff until 3 hours after kickoff
+        // This ensures we catch matches that start late or go into extra time
+        const thirtyMinBeforeKickoff = new Date(kickoffTime.getTime() - 30 * 60 * 1000);
+        const threeHoursAfterKickoff = new Date(kickoffTime.getTime() + 3 * 60 * 60 * 1000);
+        
+        if (now >= thirtyMinBeforeKickoff && now <= threeHoursAfterKickoff) {
+          console.log(`🔥 Updating match fixture ${fixture.id} (${fixture.status})`);
 
           // Fetch from Football API
           const response = await fetch(`${FOOTBALL_API_BASE_URL}/matches/${fixture.external_id}`, {
@@ -260,13 +260,14 @@ async function processUpdate() {
               if (homeScore > awayScore) newResult = 'home_win';
               else if (awayScore > homeScore) newResult = 'away_win';
               else newResult = 'draw';
-            }
-          } else if (matchData.status === 'IN_PLAY' || matchData.status === 'LIVE') {
-            newStatus = 'closed';
+            }          } else if (matchData.status === 'IN_PLAY' || matchData.status === 'LIVE' || matchData.status === 'PAUSED') {
+            newStatus = 'live';
           }
 
           // Update fixture if changed
-          if (newStatus !== fixture.status || newResult !== fixture.result) {
+          if (newStatus !== fixture.status || newResult !== fixture.result || 
+              matchData.score.fullTime.home !== fixture.home_score || 
+              matchData.score.fullTime.away !== fixture.away_score) {
             await supabase
               .from('fixtures')
               .update({
@@ -278,7 +279,7 @@ async function processUpdate() {
               })
               .eq('id', fixture.id);
 
-            console.log(`✅ Updated fixture ${fixture.id}: ${newStatus} - ${newResult}`);
+            console.log(`✅ Updated fixture ${fixture.id}: ${fixture.status} -> ${newStatus}, ${fixture.result} -> ${newResult}, Score: ${matchData.score.fullTime.home}-${matchData.score.fullTime.away}`);
             results.updated++;
           }
         }
@@ -372,7 +373,6 @@ async function syncFixturesFromAPI(supabase: any): Promise<number> {
   teams.forEach((team: any) => {
     teamMapping.set(team.name, team.id);
   });
-
   // Prepare fixture data for upsert
   const fixtureData: Array<{
     external_id: string;
@@ -380,7 +380,7 @@ async function syncFixturesFromAPI(supabase: any): Promise<number> {
     away_team_id: number;
     kickoff_at: string;
     buy_close_at: string;
-    status: 'scheduled' | 'closed' | 'applied' | 'postponed';
+    status: 'scheduled' | 'live' | 'applied' | 'postponed';
     result: 'home_win' | 'away_win' | 'draw' | 'pending';
     home_score: number;
     away_score: number;

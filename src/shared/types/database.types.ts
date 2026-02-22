@@ -48,7 +48,7 @@ export interface FixtureData {
   kickoff_at: string;
   buy_close_at: string;
   result: 'home_win' | 'away_win' | 'draw' | 'pending';
-  status: 'scheduled' | 'closed' | 'applied' | 'postponed';
+  status: 'scheduled' | 'live' | 'closed' | 'applied' | 'postponed'; // 'closed' kept for backward compatibility
 }
 
 // Type-safe user profile data

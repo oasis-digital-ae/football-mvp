@@ -17,6 +17,7 @@ const MatchResultsPage: React.FC = () => {
   const { refreshWalletBalance, user } = useAuth();  const [fixtures, setFixtures] = useState<DatabaseFixtureWithTeams[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'finished' | 'upcoming'>('upcoming');
+  const [isAutoRefreshing, setIsAutoRefreshing] = useState(false);
   const [confirmationData, setConfirmationData] = useState<{
     clubId: string;
     clubName: string;
@@ -24,14 +25,41 @@ const MatchResultsPage: React.FC = () => {
     pricePerShare: number;
   } | null>(null);
   const [isPurchasing, setIsPurchasing] = useState(false);
-  const [purchasingClubId, setPurchasingClubId] = useState<string | null>(null);
-
-  useEffect(() => {
+  const [purchasingClubId, setPurchasingClubId] = useState<string | null>(null);  useEffect(() => {
     loadFixtures();
   }, []);
+  
+  // Separate effect for auto-refresh that only runs when there are live matches
+  useEffect(() => {
+    // Check if there are any live matches
+    const hasLiveMatches = fixtures.some(f => f.status === 'live' || f.status === 'closed');
+    
+    if (!hasLiveMatches) {
+      return; // Don't set up interval if no live matches
+    }
+    
+    // Set up auto-refresh every 2 minutes to update live match scores
+    console.log('⚡ Setting up auto-refresh for live matches...');
+    const refreshInterval = setInterval(() => {
+      console.log('🔄 Auto-refreshing fixtures (live matches detected)...');
+      loadFixtures();
+    }, 2 * 60 * 1000); // 2 minutes
+    
+    // Cleanup interval on unmount or when live matches end
+    return () => {
+      console.log('🛑 Clearing auto-refresh interval');
+      clearInterval(refreshInterval);
+    };
+  }, [fixtures]); // Re-run when fixtures change
+  
   const loadFixtures = async () => {
     try {
-      setLoading(true);
+      if (!loading) {
+        setIsAutoRefreshing(true); // Show subtle indicator for auto-refresh
+      } else {
+        setLoading(true); // Show full loading for initial load
+      }
+      
       const fixturesData = await fixturesService.getAll();
       setFixtures(fixturesData);
         // Log postponed matches for debugging
@@ -51,13 +79,15 @@ const MatchResultsPage: React.FC = () => {
       console.error('Error loading fixtures:', error);
     } finally {
       setLoading(false);
+      setIsAutoRefreshing(false);
     }
   };
-
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'scheduled':
         return <Badge variant="outline" className="text-blue-400 border-blue-400/50 text-xs px-2 py-0.5">Scheduled</Badge>;
+      case 'live':
+        return <Badge variant="outline" className="text-yellow-400 border-yellow-400/50 text-xs px-2 py-0.5 animate-pulse">Live</Badge>;
       case 'closed':
         return <Badge variant="outline" className="text-yellow-400 border-yellow-400/50 text-xs px-2 py-0.5 animate-pulse">Live</Badge>;
       case 'applied':
@@ -79,8 +109,9 @@ const MatchResultsPage: React.FC = () => {
       return false;
     }
     if (filter === 'upcoming') {
-      // Include scheduled matches and postponed matches that haven't passed yet
+      // Include scheduled matches, live matches, and postponed matches that haven't passed yet
       if (fixture.status === 'scheduled') return true;
+      if (fixture.status === 'live' || fixture.status === 'closed') return true; // Include live matches
       if (fixture.status === 'postponed') {
         const kickoffDate = new Date(fixture.kickoff_at);
         const now = new Date();
@@ -95,11 +126,10 @@ const MatchResultsPage: React.FC = () => {
   const groupedFixtures = useMemo(() => {
     const groups: Record<string, DatabaseFixtureWithTeams[]> = {};
     const liveMatchesGroup: DatabaseFixtureWithTeams[] = [];
-    
-    // Separate live matches and group other fixtures by date
+      // Separate live matches and group other fixtures by date
     filteredFixtures.forEach(fixture => {
-      if (fixture.status === 'closed') {
-        // Add to live matches group
+      if (fixture.status === 'live' || fixture.status === 'closed') {
+        // Add to live matches group ('closed' for backward compatibility)
         liveMatchesGroup.push(fixture);
       } else {
         // Group by date for non-live matches
@@ -297,12 +327,17 @@ const MatchResultsPage: React.FC = () => {
         <div>
           <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white">Fixtures</h1>
           <p className="text-gray-400 mt-1 text-xs sm:text-sm">All matches and results</p>
-        </div>
-        <div className="flex items-center gap-2 sm:gap-3">
+        </div>        <div className="flex items-center gap-2 sm:gap-3">
           <div className="flex items-center space-x-2 text-xs text-gray-400">
             <div className="w-2 h-2 bg-trading-primary rounded-full animate-pulse"></div>
             <span>Live</span>
           </div>
+          {isAutoRefreshing && (
+            <div className="flex items-center space-x-2 text-xs text-blue-400">
+              <div className="w-2 h-2 bg-blue-400 rounded-full animate-spin"></div>
+              <span>Updating...</span>
+            </div>
+          )}
           <Button 
             onClick={loadFixtures} 
             variant="outline" 
@@ -343,8 +378,7 @@ const MatchResultsPage: React.FC = () => {
             }
             return false;
           }).length})
-        </Button>
-        <Button 
+        </Button>        <Button 
           onClick={() => setFilter('upcoming')} 
           variant={filter === 'upcoming' ? 'default' : 'outline'}
           size="sm"
@@ -355,6 +389,7 @@ const MatchResultsPage: React.FC = () => {
           }`}        >
           Upcoming ({fixtures.filter(f => {
             if (f.status === 'scheduled') return true;
+            if (f.status === 'live' || f.status === 'closed') return true; // Include live matches
             if (f.status === 'postponed') {
               return new Date(f.kickoff_at) >= new Date();
             }
@@ -409,7 +444,7 @@ const MatchResultsPage: React.FC = () => {
                     // For live matches group, all are live
                     // For other groups, separate live and non-live (shouldn't have live in other groups now)
                     const isLiveGroup = dateKey === '__LIVE__';
-                    const liveMatches = isLiveGroup ? dateFixtures : dateFixtures.filter(f => f.status === 'closed');
+                    const liveMatches = isLiveGroup ? dateFixtures : dateFixtures.filter(f => f.status === 'live' || f.status === 'closed');
                     const otherMatches = isLiveGroup ? [] : dateFixtures.filter(f => f.status !== 'closed');
                     
                     const renderFixture = (fixture: DatabaseFixtureWithTeams, idx: number) => (
@@ -420,10 +455,9 @@ const MatchResultsPage: React.FC = () => {
                         {/* Mobile Layout */}
                         <div className="md:hidden space-y-3">
                           {/* Header: Matchday & Status */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-between">                            <div className="flex items-center gap-2">
                               <div className={`text-xs font-mono font-bold ${
-                                fixture.status === 'closed' ? 'text-yellow-500' : 'text-gray-500'
+                                (fixture.status === 'live' || fixture.status === 'closed') ? 'text-yellow-500' : 'text-gray-500'
                               }`}>
                                 MD{fixture.matchday}
                               </div>
@@ -435,8 +469,7 @@ const MatchResultsPage: React.FC = () => {
                               </div>
                             )}
                           </div>                          {/* Match Display */}
-                          <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-700/30">
-                            {/* Home Team Row */}
+                          <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-700/30">                            {/* Home Team Row */}
                             <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                               <TeamLogo 
@@ -453,7 +486,8 @@ const MatchResultsPage: React.FC = () => {
                                 className="text-sm font-semibold text-white hover:text-trading-primary transition-colors truncate text-left"
                               />
                             </div>
-                              {fixture.status !== 'applied' && fixture.status !== 'closed' && (() => {
+                              {/* Show projected return only for scheduled matches (not live, not finished) */}
+                              {fixture.status === 'scheduled' && (() => {
                                 const projectedReturn = calculateProjectedReturn(fixture.home_team_id, fixture.away_team_id);
                                 return projectedReturn !== null && (
                                   <span className="text-[10px] text-green-400 font-medium whitespace-nowrap mx-2">
@@ -469,7 +503,7 @@ const MatchResultsPage: React.FC = () => {
                                   {fixture.home_score}
                                 </span>
                               ) : (
-                                fixture.home_team_id && fixture.status !== 'closed' && (
+                                fixture.home_team_id && fixture.status === 'scheduled' && (
                                   <Button
                                     onClick={() => handlePurchaseClick(
                                       fixture.home_team_id,
@@ -532,7 +566,8 @@ const MatchResultsPage: React.FC = () => {
                                   className="text-sm font-semibold text-white hover:text-trading-primary transition-colors truncate text-left"
                                 />
                               </div>
-                              {fixture.status !== 'applied' && fixture.status !== 'closed' && (() => {
+                              {/* Show projected return only for scheduled matches (not live, not finished) */}
+                              {fixture.status === 'scheduled' && (() => {
                                 const projectedReturn = calculateProjectedReturn(fixture.away_team_id, fixture.home_team_id);
                                 return projectedReturn !== null && (
                                   <span className="text-[10px] text-green-400 font-medium whitespace-nowrap mx-2">
@@ -548,7 +583,7 @@ const MatchResultsPage: React.FC = () => {
                                   {fixture.away_score}
                                 </span>
                               ) : (
-                                fixture.away_team_id && fixture.status !== 'closed' && (
+                                fixture.away_team_id && fixture.status === 'scheduled' && (
                                   <Button
                                     onClick={() => handlePurchaseClick(
                                       fixture.away_team_id,
@@ -568,19 +603,16 @@ const MatchResultsPage: React.FC = () => {
                           </div>
                         </div>{/* Desktop/Tablet Layout */}
                         <div className="hidden md:grid grid-cols-[140px_50px_60px_1fr_32px_80px_32px_1fr_60px_50px_120px] items-center gap-2">
-                          {/* Left: Matchday & Status */}
-                          <div className="flex items-center gap-3">
+                          {/* Left: Matchday & Status */}                          <div className="flex items-center gap-3">
                             <div className={`text-xs font-mono font-bold ${
-                              fixture.status === 'closed' ? 'text-yellow-500' : 'text-gray-500'
+                              (fixture.status === 'live' || fixture.status === 'closed') ? 'text-yellow-500' : 'text-gray-500'
                             }`}>
                               MD{fixture.matchday}
                             </div>
                             {getStatusBadge(fixture.status)}
-                          </div>
-
-                          {/* Home Buy Button */}
+                          </div>                          {/* Home Buy Button */}
                           <div className="flex justify-center">
-                            {fixture.home_team_id && fixture.status !== 'applied' && fixture.status !== 'closed' && (
+                            {fixture.home_team_id && fixture.status === 'scheduled' && (
                               <Button
                                 onClick={() => handlePurchaseClick(
                                   fixture.home_team_id,
@@ -599,7 +631,7 @@ const MatchResultsPage: React.FC = () => {
 
                           {/* Home Projected % Return */}
                           <div className="flex justify-center items-center">
-                            {fixture.status !== 'applied' && fixture.status !== 'closed' && (() => {
+                            {fixture.status === 'scheduled' && (() => {
                               const projectedReturn = calculateProjectedReturn(fixture.home_team_id, fixture.away_team_id);
                               return projectedReturn !== null ? (
                                 <span className="text-xs text-green-400 font-medium whitespace-nowrap">
@@ -670,11 +702,9 @@ const MatchResultsPage: React.FC = () => {
                               variant="default"
                               className="text-sm font-medium text-white hover:text-trading-primary transition-colors text-left truncate"
                             />
-                          </div>
-
-                          {/* Away Projected % Return */}
+                          </div>                          {/* Away Projected % Return */}
                           <div className="flex justify-center items-center">
-                            {fixture.status !== 'applied' && fixture.status !== 'closed' && (() => {
+                            {fixture.status === 'scheduled' && (() => {
                               const projectedReturn = calculateProjectedReturn(fixture.away_team_id, fixture.home_team_id);
                               return projectedReturn !== null ? (
                                 <span className="text-xs text-green-400 font-medium whitespace-nowrap">
@@ -686,7 +716,7 @@ const MatchResultsPage: React.FC = () => {
 
                           {/* Away Buy Button */}
                           <div className="flex justify-center">
-                            {fixture.away_team_id && fixture.status !== 'applied' && fixture.status !== 'closed' && (
+                            {fixture.away_team_id && fixture.status === 'scheduled' && (
                               <Button
                                 onClick={() => handlePurchaseClick(
                                   fixture.away_team_id,
