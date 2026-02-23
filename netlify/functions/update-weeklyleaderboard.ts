@@ -2,12 +2,38 @@ import { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
 
 /**
+ * Helper to get environment variables with fallbacks
+ * Supports multiple naming conventions used across platforms
+ */
+function getEnvVar(...names: string[]): string | undefined {
+  for (const name of names) {
+    const value = process.env[name];
+    if (value) return value;
+  }
+  return undefined;
+}
+
+const SUPABASE_URL = getEnvVar(
+  "VITE_SUPABASE_URL",
+  "SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_URL"
+);
+const SUPABASE_SERVICE_KEY = getEnvVar(
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "SUPABASE_SERVICE_KEY",
+  "VITE_SUPABASE_SERVICE_ROLE_KEY"
+);
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+  throw new Error(
+    "Missing required environment variables: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY"
+  );
+}
+
+/**
  * Supabase admin client
  */
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 /**
  * UAE week boundaries
@@ -34,9 +60,18 @@ function getUAEWeekBounds() {
 }
 
 export const handler: Handler = async (event: any) => {
+  /**
+   * Allow execution via:
+   * - Netlify scheduled cron
+   * - POST with header x-manual-run: true
+   * - POST with query param ?manual=true (works with Netlify Trigger button)
+   */
+  const headers = event.headers || {};
+  const manualHeader = headers["x-manual-run"] ?? headers["X-Manual-Run"];
+  const manualQuery = event.queryStringParameters?.manual === "true";
   const isManual =
     event.httpMethod === "POST" &&
-    event.headers["x-manual-run"] === "true";
+    (manualHeader === "true" || manualQuery);
 
   if (!event?.cron && !isManual) {
     return { statusCode: 403, body: "Forbidden" };
@@ -78,8 +113,8 @@ export const handler: Handler = async (event: any) => {
     }
   );
 
-  if (error) {
-    console.error(error);
+  if (error || !data || data.length === 0) {
+    console.error("Leaderboard computation failed", error);
     return { statusCode: 500, body: "Computation failed" };
   }
 
@@ -88,8 +123,8 @@ export const handler: Handler = async (event: any) => {
    */
   const rows = data.map((r: any) => ({
     ...r,
-    week_start,
-    week_end,
+    week_start: week_start.toISOString(),
+    week_end: week_end.toISOString(),
     is_latest: true,
   }));
 
