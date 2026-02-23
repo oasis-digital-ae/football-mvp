@@ -122,6 +122,33 @@ async function backfillWeeklyLeaderboard(weeksToBackfill: number) {
       continue;
     }
 
+    // Exclude users who joined during the week (no meaningful start/end portfolio)
+    const userIds = data.map((r: { user_id: string }) => r.user_id);
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, created_at')
+      .in('id', userIds);
+
+    const weekStartMs = new Date(week_start.toISOString()).getTime();
+    const eligibleUserIds = new Set(
+      (profiles || [])
+        .filter((p) => p.created_at && new Date(p.created_at).getTime() < weekStartMs)
+        .map((p) => p.id)
+    );
+
+    const filteredData = data
+      .filter((r: { user_id: string }) => eligibleUserIds.has(r.user_id))
+      .map((r: Record<string, unknown>, index: number) => ({ ...r, rank: index + 1 }));
+
+    if (data.length - filteredData.length > 0) {
+      console.log(`   Excluded ${data.length - filteredData.length} user(s) who joined during the week`);
+    }
+
+    if (filteredData.length === 0) {
+      console.log('   ⚠️  No eligible users (all joined during the week), skipping');
+      continue;
+    }
+
     // Get week_number: for backfill, use max - i so oldest week gets lowest number
     const { data: maxWeek } = await supabase
       .from('weekly_leaderboard')
@@ -142,7 +169,7 @@ async function backfillWeeklyLeaderboard(weeksToBackfill: number) {
     }
 
     // Insert (include week_number to match table structure)
-    const rows = data.map((r: Record<string, unknown>) => ({
+    const rows = filteredData.map((r: Record<string, unknown>) => ({
       ...r,
       week_start: week_start.toISOString(),
       week_end: week_end.toISOString(),
