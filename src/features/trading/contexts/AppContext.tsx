@@ -667,7 +667,6 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
       }
     }
   }, 'purchaseClub');
-
   const sellClub = withErrorHandling(async (clubId: string, units: number) => {
     if (!user) {
       throw new AuthenticationError('You must be logged in to sell shares');
@@ -687,6 +686,13 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
       
       if (isNaN(teamIdInt)) {
         throw new ValidationError('Invalid club ID format');
+      }
+      
+      // Validate trading window before attempting sale (same as buy window)
+      try {
+        await buyWindowService.validateBuyWindow(teamIdInt);
+      } catch (error: any) {
+        throw new BusinessLogicError(error.message || 'Trading window is closed');
       }
       
       // Get current team data

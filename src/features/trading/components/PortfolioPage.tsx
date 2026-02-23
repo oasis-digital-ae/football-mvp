@@ -17,11 +17,14 @@ import TeamLogo from '@/shared/components/TeamLogo';
 import ClickableTeamName from '@/shared/components/ClickableTeamName';
 import { supabase } from '@/shared/lib/supabase';
 import { calculatePriceImpactPercent } from '@/shared/lib/utils/calculations';
+import { buyWindowService } from '@/shared/lib/buy-window.service';
+import { fixturesService } from '@/shared/lib/database';
 
 const PortfolioPage: React.FC = () => {
   const { portfolio, getTransactionsByClub, sellClub, clubs } = useContext(AppContext);
   const [matchdayChanges, setMatchdayChanges] = useState<Map<string, number>>(new Map());
   const [currentMarketCaps, setCurrentMarketCaps] = useState<Map<string, Decimal>>(new Map()); // Full-precision market caps in Decimal
+  const [tradingWindowStatus, setTradingWindowStatus] = useState<Map<string, boolean>>(new Map()); // Track if trading window is open for each team
   const [selectedClub, setSelectedClub] = useState<{ id: string; name: string; externalId?: number } | null>(null);
   const [sellModalData, setSellModalData] = useState<{
     clubId: string;
@@ -106,10 +109,38 @@ const PortfolioPage: React.FC = () => {
       } catch (error) {
         console.error('Error loading matchday changes:', error);
       }
+    };    loadMatchdayChanges();
+  }, [clubs]);
+
+  // Check trading window status for all teams in portfolio
+  useEffect(() => {
+    const checkTradingWindows = async () => {
+      if (portfolio.length === 0) return;
+
+      try {
+        // Load all fixtures once
+        const fixtures = await fixturesService.getAll();
+        const statusMap = new Map<string, boolean>();
+
+        // Check each team's trading window status
+        portfolio.forEach((item) => {
+          const teamId = parseInt(item.clubId);
+          const windowStatus = buyWindowService.calculateBuyWindowStatus(teamId, fixtures);
+          statusMap.set(item.clubId, windowStatus.isOpen);
+        });
+
+        setTradingWindowStatus(statusMap);
+      } catch (error) {
+        console.error('Error checking trading windows:', error);
+      }
     };
 
-    loadMatchdayChanges();
-  }, [clubs]);
+    checkTradingWindows();
+    
+    // Refresh trading window status every minute (in case match starts)
+    const interval = setInterval(checkTradingWindows, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [portfolio]);
 
   // Check if purchase prices match pre-match prices (for debugging discrepancy)
   useEffect(() => {
@@ -381,24 +412,29 @@ const PortfolioPage: React.FC = () => {
           {percentChange > 0 ? '+' : ''}{percentChange.toFixed(2)}%
         </td>
         <td className="px-3 text-right font-mono">{formatCurrency(item.totalValue)}</td>
-        <td className="px-3 text-right font-semibold text-trading-primary">{portfolioPercent.toFixed(2)}%</td>
-        {pnlCell(unrealizedPnl)}
+        <td className="px-3 text-right font-semibold text-trading-primary">{portfolioPercent.toFixed(2)}%</td>        {pnlCell(unrealizedPnl)}
         {pnlCell(realizedPnl)}
         {pnlCell(profitLoss)}
-        <td className="px-3 text-center" onClick={(e) => handleSellClick(e, item)}>
-          <Button
-            size="sm"
-            variant="outline"
-            className="bg-gradient-danger hover:bg-gradient-danger/80 text-white border-danger hover:border-danger/80 font-semibold"
-            onClick={(e) => handleSellClick(e, item)}
-          >
-            Sell
-          </Button>
+        <td className="px-3 text-center" onClick={(e) => e.stopPropagation()}>
+          {tradingWindowStatus.get(item.clubId) === false ? (
+            <div className="text-[10px] text-gray-500 text-center">
+              Trading<br/>Closed
+            </div>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              className="bg-gradient-danger hover:bg-gradient-danger/80 text-white border-danger hover:border-danger/80 font-semibold"
+              onClick={(e) => handleSellClick(e, item)}
+            >
+              Sell
+            </Button>
+          )}
         </td>
       </tr>
     );
     });
-  }, [portfolio, clubs, totalMarketValue, handleClubClick, handleSellClick, getTransactionsByClub, matchdayChanges, currentMarketCaps]);
+  }, [portfolio, clubs, totalMarketValue, handleClubClick, handleSellClick, getTransactionsByClub, matchdayChanges, currentMarketCaps, tradingWindowStatus]);
 
   // Realtime portfolio updates
   useEffect(() => {
@@ -734,16 +770,21 @@ const PortfolioPage: React.FC = () => {
                           <div className="text-center font-mono font-semibold text-[11px] text-white flex-shrink-0 whitespace-nowrap">
                             {formatCurrency(item.totalValue)}
                           </div>
-                          
-                          {/* Sell Button */}
+                            {/* Sell Button */}
                           <div className="flex justify-center flex-shrink-0">
-                            <Button
-                              onClick={(e) => handleSellClick(e, item)}
-                              size="sm"
-                              className="bg-red-600 hover:bg-red-700 text-white font-medium px-1.5 py-0.5 text-[8px] rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation h-[18px] w-auto min-w-[32px] flex items-center justify-center"
-                            >
-                              Sell
-                            </Button>
+                            {tradingWindowStatus.get(item.clubId) === false ? (
+                              <div className="text-[8px] text-gray-500 text-center leading-tight">
+                                Trading<br/>Closed
+                              </div>
+                            ) : (
+                              <Button
+                                onClick={(e) => handleSellClick(e, item)}
+                                size="sm"
+                                className="bg-red-600 hover:bg-red-700 text-white font-medium px-1.5 py-0.5 text-[8px] rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation h-[18px] w-auto min-w-[32px] flex items-center justify-center"
+                              >
+                                Sell
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>

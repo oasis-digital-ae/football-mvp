@@ -9,6 +9,8 @@ import { AppValidators, validateAndSanitize } from '@/shared/lib/validation';
 import { ValidationError } from '@/shared/lib/error-handling';
 import { sanitizeInput } from '@/shared/lib/sanitization';
 import { useAuth } from '@/features/auth/contexts/AuthContext';
+import { buyWindowService } from '@/shared/lib/buy-window.service';
+import { fixturesService } from '@/shared/lib/database';
 
 interface SellConfirmationModalProps {
   isOpen: boolean;
@@ -36,6 +38,41 @@ export const SellConfirmationModal: React.FC<SellConfirmationModalProps> = ({
   const { walletBalance, refreshWalletBalance } = useAuth();
   const [shares, setShares] = useState<string>('');
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [tradingWindowStatus, setTradingWindowStatus] = useState<{
+    isOpen: boolean;
+    message: string;
+  }>({ isOpen: true, message: 'Trading is open' });
+  const [checkingWindow, setCheckingWindow] = useState(false);
+
+  // Check trading window status when modal opens
+  useEffect(() => {
+    const checkTradingWindow = async () => {
+      if (!isOpen || !clubId) return;
+      
+      setCheckingWindow(true);
+      try {
+        const teamIdInt = parseInt(clubId);
+        if (isNaN(teamIdInt)) return;
+        
+        // Get fixtures for window calculation
+        const fixtures = await fixturesService.getAll();
+        const status = buyWindowService.calculateBuyWindowStatus(teamIdInt, fixtures);
+        
+        setTradingWindowStatus({
+          isOpen: status.isOpen,
+          message: status.reason || (status.isOpen ? 'Trading is open' : 'Trading is closed')
+        });
+      } catch (error) {
+        console.error('Error checking trading window:', error);
+        // Default to open on error
+        setTradingWindowStatus({ isOpen: true, message: 'Trading is open' });
+      } finally {
+        setCheckingWindow(false);
+      }
+    };
+    
+    checkTradingWindow();
+  }, [isOpen, clubId]);
 
   // Reset shares when modal opens
   useEffect(() => {
@@ -167,8 +204,22 @@ export const SellConfirmationModal: React.FC<SellConfirmationModalProps> = ({
                 <p className="text-red-400 text-sm">
                   {validationErrors.general}
                 </p>
-              )}
-            </div>
+              )}            </div>
+            
+            {/* Trading Window Status */}
+            {!tradingWindowStatus.isOpen && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-semibold text-red-400">Trading Closed</p>
+                    <p className="text-xs text-red-300 mt-1">{tradingWindowStatus.message}</p>
+                  </div>
+                </div>
+              </div>
+            )}
             
             <div className="space-y-4 bg-gradient-card p-6 rounded-lg border border-trading-primary/20">
               <div className="flex justify-between items-center">
@@ -201,25 +252,29 @@ export const SellConfirmationModal: React.FC<SellConfirmationModalProps> = ({
             </div>
           </div>
         </div>
-        
-        <DialogFooter className="flex gap-3">
+          <DialogFooter className="flex gap-3">
           <Button
             onClick={onClose}
             variant="outline"
             className="flex-1 bg-gray-700 hover:bg-gray-600 text-white border-gray-600 hover:border-gray-500 font-semibold"
           >
             Cancel
-          </Button>          <Button
+          </Button>
+          <Button
             onClick={handleConfirm}
-            disabled={!isValid || numericShares <= 0 || isProcessing || numericShares > currentQuantity}
+            disabled={!isValid || numericShares <= 0 || isProcessing || numericShares > currentQuantity || !tradingWindowStatus.isOpen || checkingWindow}
             className="flex-1 bg-gradient-danger hover:bg-gradient-danger/80 disabled:bg-gray-600 text-white font-semibold transition-all duration-200 disabled:hover:scale-100"
             title={
+              !tradingWindowStatus.isOpen ? 'Trading is closed' :
+              checkingWindow ? 'Checking trading window...' :
               numericShares > currentQuantity 
                 ? 'Cannot sell more shares than you own' 
                 : 'Confirm sale'
             }
           >
-            {isProcessing ? 'Processing...' : 
+            {checkingWindow ? 'Checking...' :
+             isProcessing ? 'Processing...' : 
+             !tradingWindowStatus.isOpen ? '🔒 Trading Closed' :
              numericShares > currentQuantity ? '❌ Invalid Quantity' :
              'Confirm Sale'}
           </Button>

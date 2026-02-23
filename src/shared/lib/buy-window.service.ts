@@ -1,5 +1,6 @@
-// Buy Window Enforcement Service
-// Prevents trading during match periods
+// Trading Window Enforcement Service
+// Prevents both BUY and SELL transactions during match periods
+// Trading closes 15 minutes before kickoff and during matches
 
 import { supabase } from './supabase';
 import { logger } from './logger';

@@ -32,6 +32,12 @@ interface MatchData {
       home: number | null;
       away: number | null;
     };
+    halfTime?: {
+      home: number | null;
+      away: number | null;
+    };
+    // For live matches, the API might provide current score in different fields
+    duration?: string;
   };
 }
 
@@ -244,42 +250,53 @@ async function processUpdate() {
             continue;
           }
 
-          const matchData: MatchData = await response.json();
-
-          // Convert API status to database status
+          const matchData: MatchData = await response.json();          // Convert API status to database status
           let newStatus = fixture.status;
           let newResult = fixture.result;
+          let homeScore = fixture.home_score;
+          let awayScore = fixture.away_score;
 
           if (matchData.status === 'FINISHED') {
             newStatus = 'applied';
             // Determine result based on scores
-            if (matchData.score.fullTime.home && matchData.score.fullTime.away) {
-              const homeScore = matchData.score.fullTime.home;
-              const awayScore = matchData.score.fullTime.away;
+            if (matchData.score.fullTime.home !== null && matchData.score.fullTime.away !== null) {
+              homeScore = matchData.score.fullTime.home;
+              awayScore = matchData.score.fullTime.away;
               
               if (homeScore > awayScore) newResult = 'home_win';
               else if (awayScore > homeScore) newResult = 'away_win';
               else newResult = 'draw';
-            }          } else if (matchData.status === 'IN_PLAY' || matchData.status === 'LIVE' || matchData.status === 'PAUSED') {
+            }
+          } else if (matchData.status === 'IN_PLAY' || matchData.status === 'LIVE' || matchData.status === 'PAUSED') {
             newStatus = 'live';
+            // For live matches, use fullTime scores (they contain current score during the match)
+            // The API provides live scores in the fullTime field even though the match isn't finished
+            if (matchData.score.fullTime.home !== null && matchData.score.fullTime.away !== null) {
+              homeScore = matchData.score.fullTime.home;
+              awayScore = matchData.score.fullTime.away;
+            }
+            // Result stays 'pending' during live matches
+            newResult = 'pending';
           }
 
-          // Update fixture if changed
-          if (newStatus !== fixture.status || newResult !== fixture.result || 
-              matchData.score.fullTime.home !== fixture.home_score || 
-              matchData.score.fullTime.away !== fixture.away_score) {
+          // Update fixture if status, result, or scores changed
+          if (newStatus !== fixture.status || 
+              newResult !== fixture.result || 
+              homeScore !== fixture.home_score || 
+              awayScore !== fixture.away_score) {
+            
             await supabase
               .from('fixtures')
               .update({
                 status: newStatus,
                 result: newResult,
-                home_score: matchData.score.fullTime.home,
-                away_score: matchData.score.fullTime.away,
+                home_score: homeScore,
+                away_score: awayScore,
                 updated_at: now.toISOString(),
               })
               .eq('id', fixture.id);
 
-            console.log(`✅ Updated fixture ${fixture.id}: ${fixture.status} -> ${newStatus}, ${fixture.result} -> ${newResult}, Score: ${matchData.score.fullTime.home}-${matchData.score.fullTime.away}`);
+            console.log(`✅ Updated fixture ${fixture.id}: ${fixture.status} -> ${newStatus}, Result: ${newResult}, Score: ${homeScore}-${awayScore}`);
             results.updated++;
           }
         }

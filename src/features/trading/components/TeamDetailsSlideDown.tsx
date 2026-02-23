@@ -366,14 +366,36 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
       setLoading(prev => ({ ...prev, upcoming: false }));
     }
   }, [isOpen, teamId, fixtures, teams, teamsMarketCapInDollars]);
-
   // Load match data when opened
   useEffect(() => {
     if (isOpen && teamId && userId) {
       loadMatchesData();
       loadUpcomingMatches();
     }
-  }, [isOpen, teamId, userId, loadMatchesData, loadUpcomingMatches]);  // Expose refresh function for external components to call
+  }, [isOpen, teamId, userId, loadMatchesData, loadUpcomingMatches]);
+  
+  // Auto-refresh upcoming matches every 2 minutes when there are live matches
+  useEffect(() => {
+    if (!isOpen || !teamId) return;
+    
+    // Check if there are any live matches in upcoming
+    const hasLiveMatches = upcomingMatches.some(m => m.status === 'live' || m.status === 'closed');
+    
+    if (!hasLiveMatches) {
+      return; // No live matches, no need to refresh
+    }
+    
+    console.log('⚡ Setting up auto-refresh for live matches in team details...');
+    const refreshInterval = setInterval(() => {
+      console.log('🔄 Auto-refreshing upcoming matches (live matches detected)...');
+      loadUpcomingMatches();
+    }, 2 * 60 * 1000); // 2 minutes
+    
+    return () => {
+      console.log('🛑 Clearing auto-refresh interval for team details');
+      clearInterval(refreshInterval);
+    };
+  }, [isOpen, teamId, upcomingMatches, loadUpcomingMatches]);// Expose refresh function for external components to call
   useEffect(() => {
     if (teamId) {
       const refreshKey = `refreshTeamDetails_${teamId}`;
@@ -776,8 +798,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                             {(match.status === 'live' || match.status === 'closed') ? match.matchday : (match.isHome ? 'H' : 'A')}
                                           </div>
                                         </div>
-                                      </td>
-                                      <td className="px-3 py-2.5 whitespace-nowrap">
+                                      </td>                                      <td className="px-3 py-2.5 whitespace-nowrap">
                                         <div className="flex items-center justify-start gap-2">
                                           {(match.status === 'live' || match.status === 'closed') && (
                                             <Badge variant="outline" className="ml-1 text-yellow-400 border-yellow-400/50 text-[9px] px-1 py-0 animate-pulse flex-shrink-0">
@@ -786,7 +807,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                           )}
                                           <div className="flex items-center gap-2">
                                             <span>{formattedDate}</span>
-                                            {match.status === 'closed' && match.homeScore !== null && match.awayScore !== null && (
+                                            {(match.status === 'live' || match.status === 'closed') && match.homeScore !== null && match.awayScore !== null && (
                                               <div className="flex items-center gap-1">
                                                 <span className="text-xs font-bold text-white">
                                                   {match.isHome ? match.homeScore : match.awayScore}
@@ -817,7 +838,10 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                 })}
                               </tbody>
                             </table>
-                          </div>                          {/* Mobile/Tablet Card View */}                          <div className="md:hidden space-y-2">
+                          </div>                          
+                          
+                          {/* Mobile/Tablet Card View */}                         
+                           <div className="md:hidden space-y-2">
                             {upcomingMatches.map((match, index) => {
                               const dateObj = new Date(match.date);
                               const formattedDate = dateObj.toLocaleDateString('en-US', {
@@ -825,7 +849,9 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                 day: 'numeric',
                                 year: 'numeric',
                                 timeZone: 'Asia/Dubai'
-                              });                              return (                                <div
+                              });
+                              return (
+                                <div
                                   key={index}
                                   className={`rounded-lg p-2.5 sm:p-3 touch-manipulation ${
                                     (match.status === 'live' || match.status === 'closed') 
