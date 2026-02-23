@@ -3,7 +3,7 @@
   publish = "dist"
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "20"
 
 [[redirects]]
   from = "/api/football-api-cache/*"
@@ -31,4 +31,4 @@
 # Scheduled function configuration
 # This ensures Netlify recognizes the scheduled function for Weekly Leaderboard
 [functions."update-weeklyleaderboard"]
-  schedule = "0 20 * * 0" # Every Sunday at 20:00 (8 PM) UTC which is 12:00 AM (midnight) in UAE
+  schedule = "0 23 * * 0" # Every Sunday at 23:00 (11:00 PM) UTC which is 03:00 AM Monday in UAE

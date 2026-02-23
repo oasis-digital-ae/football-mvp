@@ -8,11 +8,10 @@ export interface DatabaseFixture {
   home_team_id: number;
   away_team_id: number;
   kickoff_at: string;
-  buy_close_at: string;
-  snapshot_home_cap?: number;
+  buy_close_at: string;  snapshot_home_cap?: number;
   snapshot_away_cap?: number;
   result: 'home_win' | 'away_win' | 'draw' | 'pending';
-  status: 'scheduled' | 'closed' | 'applied' | 'postponed';
+  status: 'scheduled' | 'live' | 'closed' | 'applied' | 'postponed'; // 'closed' kept for backward compatibility
   home_score?: number;
   away_score?: number;
   matchday?: number;

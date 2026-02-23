@@ -25,13 +25,12 @@ export const matchMonitorService = {
     try {
       const now = new Date();
       const twoDaysLater = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-      
-      const { data, error } = await supabase
+        const { data, error } = await supabase
         .from('fixtures')
         .select('id, external_id, home_team_id, away_team_id, kickoff_at, status, result, home_score, away_score')
         .gte('kickoff_at', now.toISOString())
         .lte('kickoff_at', twoDaysLater.toISOString())
-        .in('status', ['scheduled', 'closed'])
+        .in('status', ['scheduled', 'live', 'closed']) // Include 'closed' for backward compatibility
         .order('kickoff_at', { ascending: true });
 
       if (error) {
@@ -148,12 +147,10 @@ export const matchMonitorService = {
       const fixtures = await this.getMatchesToMonitor();
       const now = new Date();
 
-      logger.debug(`Monitoring ${fixtures.length} fixtures...`);
-
-      for (const fixture of fixtures) {
+      logger.debug(`Monitoring ${fixtures.length} fixtures...`);      for (const fixture of fixtures) {
         try {
           const kickoffTime = new Date(fixture.kickoff_at);
-          const buyCloseTime = new Date(kickoffTime.getTime() - 30 * 60 * 1000); // 30 min before kickoff
+          const buyCloseTime = new Date(kickoffTime.getTime() - 15 * 60 * 1000); // 15 min before kickoff
           const matchEndTime = new Date(kickoffTime.getTime() + 120 * 60 * 1000); // 2 hours after kickoff
 
           // Capture snapshots at buy-close time (within 5-minute window)

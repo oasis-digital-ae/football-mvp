@@ -66,13 +66,11 @@ export const FinancialOverviewPanel: React.FC = () => {
     const headers = [
       'Metric',
       'Value'
-    ];
-
-    const csvData = [
+    ];    const csvData = [
       ['Total Platform Value', overview.totalPlatformValue],
       ['Total User Deposits', overview.totalUserDeposits],
       ['Total User Wallets', overview.totalUserWallets],
-      ['Total Invested', overview.totalInvested],
+      ['Cost', overview.totalInvested],
       ['Platform Revenue', overview.platformRevenue]
     ];
 
@@ -150,10 +148,9 @@ export const FinancialOverviewPanel: React.FC = () => {
       title: 'User Wallets',
       value: formatCurrency(overview.totalUserWallets),
       icon: Wallet,
-      description: 'Total balances'
-    },
+      description: 'Total balances'    },
     {
-      title: 'Total Invested',
+      title: 'Cost',
       value: formatCurrency(overview.totalInvested),
       icon: BarChart3,
       description: 'In positions'

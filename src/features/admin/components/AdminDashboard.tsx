@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
-import { Shield, AlertTriangle, RefreshCw, Users, TrendingUp, BarChart3, Calendar, DollarSign, Database } from 'lucide-react';
+import { Shield, AlertTriangle, RefreshCw, Users, TrendingUp, BarChart3, Calendar, DollarSign, Database, Trophy } from 'lucide-react';
 import { DashboardOverview } from './DashboardOverview';
 import { UsersManagementPanel } from './UsersManagementPanel';
 import { TradingActivityTable } from './TradingActivityTable';
@@ -12,6 +12,7 @@ import { TeamsManagementPanel } from './TeamsManagementPanel';
 import { MatchesManagementPanel } from './MatchesManagementPanel';
 import { FinancialOverviewPanel } from './FinancialOverviewPanel';
 import { AuditLogViewer } from './AuditLogViewer';
+import { AdminWeeklyLeaderboardPanel } from './WeeklyLeaderboardPanel';
 import { AdminErrorBoundary } from './AdminErrorBoundary';
 import { adminService } from '@/shared/lib/services/admin.service';
 import { useAuth } from '@/features/auth/contexts/AuthContext';
@@ -90,41 +91,44 @@ export const AdminDashboard: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Tabs defaultValue="dashboard" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-7">
-              <TabsTrigger value="dashboard" className="flex items-center gap-2">
-                <Shield className="h-4 w-4" />
-                <span className="hidden sm:inline">Dashboard</span>
-              </TabsTrigger>
-              <TabsTrigger value="users" className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                <span className="hidden sm:inline">Users & Wallets</span>
-              </TabsTrigger>
-              <TabsTrigger value="trading" className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" />
-                <span className="hidden sm:inline">Trading Activity</span>
-              </TabsTrigger>
-              <TabsTrigger value="teams" className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4" />
-                <span className="hidden sm:inline">Teams & Market</span>
-              </TabsTrigger>
-              <TabsTrigger value="matches" className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                <span className="hidden sm:inline">Matches & Fixtures</span>
-              </TabsTrigger>
-              <TabsTrigger value="financial" className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                <span className="hidden sm:inline">Financial Overview</span>
-              </TabsTrigger>
-              <TabsTrigger value="audit" className="flex items-center gap-2">
-                <Database className="h-4 w-4" />
-                <span className="hidden sm:inline">System & Audit</span>
-              </TabsTrigger>
-            </TabsList>
+        </div>        {/* Main Content */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">          <Tabs defaultValue="dashboard" className="space-y-6">
+            <div className="overflow-x-auto scrollbar-hide">
+              <TabsList className="inline-flex w-auto min-w-full">
+                <TabsTrigger value="dashboard" className="flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  <span className="hidden sm:inline">Dashboard</span>
+                </TabsTrigger>
+                <TabsTrigger value="users" className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  <span className="hidden sm:inline">Users & Wallets</span>
+                </TabsTrigger>
+                <TabsTrigger value="trading" className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  <span className="hidden sm:inline">Trading Activity</span>
+                </TabsTrigger>
+                <TabsTrigger value="leaderboard" className="flex items-center gap-2">
+                  <Trophy className="h-4 w-4" />
+                  <span className="hidden sm:inline">Weekly Leaderboard</span>
+                </TabsTrigger>
+                <TabsTrigger value="teams" className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Teams & Market</span>
+                </TabsTrigger>
+                <TabsTrigger value="matches" className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  <span className="hidden sm:inline">Matches & Fixtures</span>
+                </TabsTrigger>
+                <TabsTrigger value="financial" className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  <span className="hidden sm:inline">Financial Overview</span>
+                </TabsTrigger>
+                <TabsTrigger value="audit" className="flex items-center gap-2">
+                  <Database className="h-4 w-4" />
+                  <span className="hidden sm:inline">System & Audit</span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
             <TabsContent value="dashboard" className="space-y-6">
               <DashboardOverview />
@@ -132,10 +136,12 @@ export const AdminDashboard: React.FC = () => {
 
             <TabsContent value="users" className="space-y-6">
               <UsersManagementPanel />
+            </TabsContent>            <TabsContent value="trading" className="space-y-6">
+              <TradingActivityTable />
             </TabsContent>
 
-            <TabsContent value="trading" className="space-y-6">
-              <TradingActivityTable />
+            <TabsContent value="leaderboard" className="space-y-6">
+              <AdminWeeklyLeaderboardPanel />
             </TabsContent>
 
             <TabsContent value="teams" className="space-y-6">

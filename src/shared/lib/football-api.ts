@@ -352,17 +352,16 @@ export const footballApiService = {
     });
     
     return match;
-  },
-  convertMatchToFixture(match: FootballMatch) {
+  },  convertMatchToFixture(match: FootballMatch) {
     const kickoffTime = new Date(match.utcDate);
-    const buyCloseTime = new Date(kickoffTime.getTime() - 30 * 60 * 1000); // 30 minutes before
+    const buyCloseTime = new Date(kickoffTime.getTime() - 15 * 60 * 1000); // 15 minutes before
     
     return {
       external_id: match.id.toString(),
       home_team_id: null, // Will be mapped to our team ID
       away_team_id: null, // Will be mapped to our team ID
       kickoff_at: kickoffTime.toISOString(),
-      buy_close_at: buyCloseTime.toISOString(), // 30 min before kickoff
+      buy_close_at: buyCloseTime.toISOString(), // 15 min before kickoff
       result: this.convertMatchStatus(match.status, match.score),
       status: this.convertMatchStatusToFixtureStatus(match.status),
       home_score: match.score.fullTime.home,
@@ -877,7 +876,7 @@ export const footballIntegrationService = {
         }
 
         const kickoffTime = new Date(match.utcDate);
-        const buyCloseTime = new Date(kickoffTime.getTime() - 30 * 60 * 1000);
+        const buyCloseTime = new Date(kickoffTime.getTime() - 15 * 60 * 1000);
         
         // Log first few fixtures to debug dates
         if (fixtureInsertData.length < 3) {
@@ -909,20 +908,7 @@ export const footballIntegrationService = {
         .from('fixtures')
         .upsert(fixtureInsertData, {
           onConflict: 'external_id',
-          ignoreDuplicates: false,
-          updateColumns: [
-            'home_team_id',
-            'away_team_id', 
-            'kickoff_at',  // CRITICAL: Update dates
-            'buy_close_at',
-            'status',
-            'result',
-            'home_score',
-            'away_score',
-            'matchday',
-            'season',
-            'updated_at'
-          ]
+          ignoreDuplicates: false
         })
         .select('id, external_id');
 

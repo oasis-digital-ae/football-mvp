@@ -429,15 +429,14 @@ const PortfolioPage: React.FC = () => {
           <h1 className="text-lg sm:text-xl md:text-2xl font-bold">Welcome, {profile.first_name || (profile.full_name ? profile.full_name.split(' ')[0] : 'User')}</h1>
         </div>
       )}
-      
-      {/* Portfolio Overview Cards - Mobile Optimized */}
+        {/* Portfolio Overview Cards - Mobile Optimized */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-3 lg:gap-4">
-        {/* Total Invested */}
+        {/* Cost */}
         <Card className="trading-card group">
           <CardContent className="p-3 sm:p-4 lg:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-xs sm:text-sm font-medium mb-1 sm:mb-2">Total Invested</p>
+                <p className="text-gray-400 text-xs sm:text-sm font-medium mb-1 sm:mb-2">Cost</p>
                 <p className="text-lg sm:text-xl lg:text-2xl font-bold text-white">{formatCurrency(totalInvested)}</p>
               </div>
               <div className="w-12 h-12 bg-gradient-success rounded-full flex items-center justify-center group-hover:animate-bounce-gentle">

@@ -33,7 +33,7 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
               <p className="text-lg font-bold">{formatNumber(totalUnits)}</p>
             </div>
             <div>
-              <p className="text-gray-400 text-sm">Total Invested</p>
+              <p className="text-gray-400 text-sm">Cost</p>
               <p className="text-lg font-bold">{formatCurrency(totalValue)}</p>
             </div>
           </div>

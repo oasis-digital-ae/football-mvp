@@ -9,7 +9,7 @@ import { toast } from '@/shared/components/ui/use-toast';
 import { AppValidators, validateForm, validateAndSanitize } from '@/shared/lib/validation';
 import { ValidationError } from '@/shared/lib/error-handling';
 import { sanitizeInput } from '@/shared/lib/sanitization';
-import { CheckCircle2, XCircle, Eye, EyeOff, Calendar, Globe, Phone, Mail, User, Lock } from 'lucide-react';
+import { CheckCircle2, XCircle, Eye, EyeOff, Calendar, Globe, Phone, Mail, User, Lock, Users } from 'lucide-react';
 
 interface SignUpFormProps {
   onSwitchToLogin: () => void;
@@ -45,7 +45,8 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSwitchToLogin }) => {
     lastName: '',
     birthday: '',
     country: '',
-    phone: ''
+    phone: '',
+    referredBy: ''
   });
   const [loading, setLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -54,12 +55,12 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSwitchToLogin }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    try {
-      // Sanitize firstName and lastName with name type to preserve spaces properly
+    try {      // Sanitize firstName and lastName with name type to preserve spaces properly
       const sanitizedFormData = {
         ...formData,
         firstName: sanitizeInput(formData.firstName, 'name'),
-        lastName: sanitizeInput(formData.lastName, 'name')
+        lastName: sanitizeInput(formData.lastName, 'name'),
+        referredBy: sanitizeInput(formData.referredBy, 'name')
       };
 
       // Validate and sanitize form data
@@ -70,7 +71,8 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSwitchToLogin }) => {
         lastName: 'text',
         birthday: 'text',
         country: 'text',
-        phone: 'text'
+        phone: 'text',
+        referredBy: 'text'
       });
       
       if (!validation.isValid) {
@@ -108,13 +110,13 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSwitchToLogin }) => {
       
       setLoading(true);
       setValidationErrors({});
-      
-      await signUp(validation.data.email, validation.data.password, {
+        await signUp(validation.data.email, validation.data.password, {
         first_name: validation.data.firstName,
         last_name: validation.data.lastName,
         birthday: validation.data.birthday,
         country: validation.data.country,
-        phone: validation.data.phone
+        phone: validation.data.phone,
+        reffered_by: validation.data.referredBy
       });
       
       toast({
@@ -122,8 +124,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSwitchToLogin }) => {
         description: "Please check your email to verify your account. You can sign in after verification.",
         duration: 5000,
       });
-      
-      // Clear form after successful signup
+        // Clear form after successful signup
       setFormData({
         email: '',
         password: '',
@@ -132,7 +133,8 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSwitchToLogin }) => {
         lastName: '',
         birthday: '',
         country: '',
-        phone: ''
+        phone: '',
+        referredBy: ''
       });
       setValidationErrors({});
     } catch (error: any) {
@@ -215,10 +217,13 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSwitchToLogin }) => {
       country: {
         isValid: formData.country.length > 0,
         message: ''
-      },
-      phone: {
+      },      phone: {
         isValid: formData.phone.length >= 5,
         message: formData.phone.length > 0 && formData.phone.length < 5 ? 'Must be at least 5 characters' : ''
+      },
+      referredBy: {
+        isValid: formData.referredBy.trim().length >= 2,
+        message: formData.referredBy.length > 0 && formData.referredBy.trim().length < 2 ? 'Must be at least 2 characters' : ''
       }
     };
   }, [formData]);
@@ -532,9 +537,55 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSwitchToLogin }) => {
                 <XCircle className="h-3 w-3" />
                 {validationErrors.phone}
               </p>
-            )}
-            {!validationErrors.phone && validationChecks.phone.message && (
+            )}            {!validationErrors.phone && validationChecks.phone.message && (
               <p className="text-xs text-red-400">{validationChecks.phone.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="referredBy" className="text-sm font-medium flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Who Referred You?
+            </Label>
+            <div className="relative">
+              <Input
+                id="referredBy"
+                type="text"
+                value={formData.referredBy}
+                onChange={(e) => {
+                  setFormData(prev => ({ ...prev, referredBy: e.target.value }));
+                  if (validationErrors.referredBy) {
+                    setValidationErrors(prev => ({ ...prev, referredBy: '' }));
+                  }
+                }}
+                onBlur={(e) => {
+                  const sanitized = sanitizeInput(e.target.value, 'name');
+                  if (sanitized !== e.target.value) {
+                    setFormData(prev => ({ ...prev, referredBy: sanitized }));
+                  }
+                }}
+                placeholder="Please type a name"
+                required
+                className={`pr-10 ${validationErrors.referredBy ? 'border-red-500 focus:border-red-500' : validationChecks.referredBy.isValid && formData.referredBy.length > 0 ? 'border-green-500/50' : ''}`}
+              />
+              {formData.referredBy.length > 0 && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  {validationChecks.referredBy.isValid ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <XCircle className="h-4 w-4 text-red-500" />
+                  )}
+                </div>
+              )}
+            </div>
+            {validationErrors.referredBy && (
+              <p className="text-xs text-red-400 flex items-center gap-1">
+                <XCircle className="h-3 w-3" />
+                {validationErrors.referredBy}
+              </p>
+            )}
+            {!validationErrors.referredBy && validationChecks.referredBy.message && (
+              <p className="text-xs text-red-400">{validationChecks.referredBy.message}</p>
             )}
           </div>
 

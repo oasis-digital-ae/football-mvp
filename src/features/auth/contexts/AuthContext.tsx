@@ -16,12 +16,14 @@ interface UserProfile {
   country: string;
   phone: string;
   is_admin?: boolean;
+  reffered_by?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   walletBalance: number;
+  totalDeposits: number;
   loading: boolean;
   isAdmin: boolean;
   signUp: (email: string, password: string, userData: Omit<UserProfile, 'id' | 'email'>) => Promise<void>;
@@ -44,6 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [totalDeposits, setTotalDeposits] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
   const ensureProfile = async (authUser: User) => {
@@ -274,17 +277,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           logger.error('Error fetching profile:', error);
           throw error;
         }
-        
-        logger.debug('Profile fetched successfully:', { userId, isAdmin: data?.is_admin, hasData: !!data });
+          logger.debug('Profile fetched successfully:', { userId, isAdmin: data?.is_admin, hasData: !!data });
         setProfile(data);
         
-        // Fetch wallet balance - don't let errors block profile fetch
+        // Fetch wallet balance and total deposits - don't let errors block profile fetch
         try {
           const balance = await walletService.getBalance(userId);
           setWalletBalance(balance);
         } catch (balanceError) {
           logger.warn('Error fetching wallet balance:', balanceError);
           setWalletBalance(0);
+        }
+
+        try {
+          const deposits = await walletService.getTotalDeposits(userId);
+          setTotalDeposits(deposits);
+        } catch (depositsError) {
+          logger.warn('Error fetching total deposits:', depositsError);
+          setTotalDeposits(0);
         }
         
         // Success - exit retry loop
@@ -304,7 +314,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
   };
-
   const refreshWalletBalance = async () => {
     if (user) {
       try {
@@ -312,6 +321,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setWalletBalance(balance);
       } catch (error) {
         console.error('Error refreshing wallet balance:', error);
+      }
+
+      try {
+        const deposits = await walletService.getTotalDeposits(user.id);
+        setTotalDeposits(deposits);
+      } catch (error) {
+        console.error('Error refreshing total deposits:', error);
       }
     }
   };
@@ -335,8 +351,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         // Convert birthday string to date if provided
         const birthdayDate = userData.birthday ? new Date(userData.birthday).toISOString().split('T')[0] : null;
-        
-        // Use atomic RPC function to create/update profile
+          // Use atomic RPC function to create/update profile
         // This ensures all fields are set atomically in a single transaction
         const { error: profileError } = await supabase.rpc(
           'create_or_update_profile_atomic',
@@ -348,7 +363,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             p_email: email,
             p_birthday: birthdayDate,
             p_country: userData.country || null,
-            p_phone: userData.phone || null
+            p_phone: userData.phone || null,
+            p_reffered_by: userData.reffered_by || null
           }
         );
 
@@ -395,12 +411,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   };
-
   return (
     <AuthContext.Provider value={{
       user,
       profile,
       walletBalance,
+      totalDeposits,
       loading,
       isAdmin: profile?.is_admin ?? false,
       signUp,

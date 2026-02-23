@@ -29,7 +29,6 @@ export const walletService = {
 
     return 0;
   },
-
   async getWalletTransactions(userId: string, limit = 50) {
     const { data, error } = await supabase
       .from('wallet_transactions')
@@ -40,6 +39,23 @@ export const walletService = {
 
     if (error) throw error;
     return data || [];
+  },
+
+  async getTotalDeposits(userId: string): Promise<number> {
+    // Get total deposits for a user (sum of all deposit transactions)
+    const { data, error } = await supabase
+      .from('wallet_transactions')
+      .select('amount_cents')
+      .eq('user_id', userId)
+      .eq('type', 'deposit');
+
+    if (error) {
+      throw error;
+    }
+
+    // Sum up all deposits and convert from cents to dollars
+    const total = (data || []).reduce((sum, tx) => sum + fromCents(tx.amount_cents || 0).toNumber(), 0);
+    return total;
   },
 };
 

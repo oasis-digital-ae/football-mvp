@@ -64,7 +64,7 @@ export const LeaderboardInfoWidget: React.FC<LeaderboardInfoWidgetProps> = ({
             <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700/50">
               <h4 className="font-semibold text-trading-primary mb-2">Weekly Return Formula</h4>
               <div className="space-y-1 font-mono text-[10px]">
-                <p>Return = (End Value - Start Value - Deposits) / Start Value</p>
+                <p>Return = (End Value - Start Value - Net Deposits) / Start Value + Net Deposits</p>
               </div>
             </div>
 
@@ -110,7 +110,7 @@ export const LeaderboardInfoWidget: React.FC<LeaderboardInfoWidgetProps> = ({
             </div>
 
             <div className="text-[10px] text-gray-500 pt-1 border-t border-gray-700/50">
-              Rankings are calculated weekly from Monday 00:00 to Sunday 23:59 and updated every Monday at 00:00 (UAE time).
+              Rankings are calculated weekly from Monday 03:00 to Monday 02:59 and updated every Monday at 03:00 (UAE time).
             </div>
           </div>
         </Card>

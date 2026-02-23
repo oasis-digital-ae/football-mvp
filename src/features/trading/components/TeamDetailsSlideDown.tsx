@@ -298,8 +298,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
     try {
       const fixturesData = fixtures.length > 0 ? fixtures : await fixturesService.getAll();
       const teamsMap = new Map((teams || []).map(t => [t.id, t]));
-      
-      // Get the selected team's info
+        // Get the selected team's info
       const selectedTeam = teamsMap.get(teamId);      // Filter upcoming and live matches for this team
       const now = new Date();
       const upcomingFixtures = (fixturesData || [])
@@ -307,19 +306,25 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
           const kickoffDate = new Date(fixture.kickoff_at);
           const isTeamInFixture = fixture.home_team_id === teamId || fixture.away_team_id === teamId;
           
-          // Include:
+          // Calculate time windows
+          const threeHoursAfterKickoff = new Date(kickoffDate.getTime() + 3 * 60 * 60 * 1000);
+          const hasRecentlyKickedOff = kickoffDate <= now && now <= threeHoursAfterKickoff;
+            // Include:
           // 1. Scheduled matches that haven't kicked off yet
-          // 2. Live matches (status = 'closed') regardless of kickoff time
+          // 2. Live matches (status = 'live' or 'closed' for backward compatibility)
+          // 3. Scheduled matches that kicked off recently (within 3 hours) - catches matches during status transition
           // Exclude finished matches (status = 'applied')
           const isRelevant = 
-            (fixture.status === 'scheduled' && kickoffDate > now) || 
-            (fixture.status === 'closed');
+            (fixture.status === 'scheduled' && (kickoffDate > now || hasRecentlyKickedOff)) || 
+            (fixture.status === 'live') ||
+            (fixture.status === 'closed'); // Backward compatibility
             return isRelevant && isTeamInFixture;
-        })
-        .sort((a, b) => {
+        })        .sort((a, b) => {
           // Sort live matches first, then upcoming by kickoff time
-          if (a.status === 'closed' && b.status !== 'closed') return -1;
-          if (a.status !== 'closed' && b.status === 'closed') return 1;
+          const aIsLive = (a.status === 'live' || a.status === 'closed');
+          const bIsLive = (b.status === 'live' || b.status === 'closed');
+          if (aIsLive && !bIsLive) return -1;
+          if (!aIsLive && bIsLive) return 1;
           return new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime();
         });// Process upcoming fixtures
       const processedUpcoming = upcomingFixtures.map(fixture => {
@@ -723,9 +728,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                         </>
                       )}
                     </div>
-                  )}
-
-                  {activeTab === 'upcoming' && (
+                  )}                  {activeTab === 'upcoming' && (
                     <div className="space-y-2 sm:space-y-3">
                       {upcomingMatches.length === 0 ? (
                         <div className="text-center py-8">
@@ -738,78 +741,75 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                               <thead>
                                 <tr>
                                   <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'left' }}>Match</th>
-                                  <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>Date & Time</th>
+                                  <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>Date</th>
                                   <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>{teamName} Price</th>
                                   <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>{teamName} Market Cap</th>
                                   <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>Opponent Price</th>
                                   <th className="px-3 py-2 text-xs font-semibold" style={{ textAlign: 'center' }}>Opponent Market Cap</th>
                                 </tr>
-                              </thead>                              
-                              <tbody>                                
+                              </thead>                              <tbody>                                
                                 {upcomingMatches.map((match, index) => {
                                   const matchDate = new Date(match.date);
-                                  const datePart = matchDate.toLocaleDateString('en-US', {
+                                  const formattedDate = matchDate.toLocaleDateString('en-US', {
                                     month: 'short',
                                     day: 'numeric',
+                                    year: 'numeric',
                                     timeZone: 'Asia/Dubai'
                                   });
-                                  const timePart = matchDate.toLocaleTimeString('en-US', {
-                                    hour: 'numeric',
-                                    minute: '2-digit',
-                                    hour12: true,
-                                    timeZone: 'Asia/Dubai'
-                                  });                                  const formattedDateTime = `${datePart}, ${timePart}`;                                  
+                                  
                                   return (
-                                    <tr key={index} className={`border-b border-gray-800/30 ${
-                                      match.status === 'closed' ? 'bg-red-500/5 border-2 border-red-500' : ''
-                                    }`}>
-                                      <td className="px-3 py-2.5" style={{ textAlign: 'left' }}>
-                                        <div className="flex items-center gap-2">
-                                          <div className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
-                                            match.status === 'closed' 
-                                              ? 'bg-yellow-500/20 text-yellow-500' 
+                                    <tr
+                                      key={index}
+                                      className={`hover:bg-gray-700/30 transition-colors ${
+                                        (match.status === 'live' || match.status === 'closed') ? 'bg-red-500/5 border-2 border-red-500' : ''
+                                      }`}
+                                    >
+                                      <td className="px-3 py-2.5 whitespace-nowrap">
+                                        <div className="flex items-center justify-center">
+                                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                                            (match.status === 'live' || match.status === 'closed')
+                                              ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/30'
                                               : match.isHome 
-                                                ? 'bg-[#10B981]/20 text-[#10B981]' 
-                                                : 'bg-[#F59E0B]/20 text-[#F59E0B]'
+                                                ? 'bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30' 
+                                                : 'bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30'
                                           }`}>
-                                            {match.status === 'closed' ? match.matchday : (match.isHome ? 'H' : 'A')}
+                                            {(match.status === 'live' || match.status === 'closed') ? match.matchday : (match.isHome ? 'H' : 'A')}
                                           </div>
-                                          <span className="text-xs font-medium">Match vs {match.opponent}</span>
-                                          {match.status === 'closed' && (
-                                            <Badge variant="outline" className="ml-2 text-yellow-400 border-yellow-400/50 text-[10px] px-1.5 py-0 animate-pulse">
+                                        </div>
+                                      </td>
+                                      <td className="px-3 py-2.5 whitespace-nowrap">
+                                        <div className="flex items-center justify-start gap-2">
+                                          {(match.status === 'live' || match.status === 'closed') && (
+                                            <Badge variant="outline" className="ml-1 text-yellow-400 border-yellow-400/50 text-[9px] px-1 py-0 animate-pulse flex-shrink-0">
                                               LIVE
                                             </Badge>
                                           )}
+                                          <div className="flex items-center gap-2">
+                                            <span>{formattedDate}</span>
+                                            {match.status === 'closed' && match.homeScore !== null && match.awayScore !== null && (
+                                              <div className="flex items-center gap-1">
+                                                <span className="text-xs font-bold text-white">
+                                                  {match.isHome ? match.homeScore : match.awayScore}
+                                                </span>
+                                                <span className="text-gray-500">-</span>
+                                                <span className="text-xs font-bold text-white">
+                                                  {match.isHome ? match.awayScore : match.homeScore}
+                                                </span>
+                                              </div>
+                                            )}
+                                          </div>
                                         </div>
                                       </td>
-                                      <td className="px-3 py-2.5 text-xs font-mono" style={{ textAlign: 'center', color: '#C9A961' }}>
-                                        {match.status === 'closed' && match.homeScore !== null && match.awayScore !== null ? (
-                                          <div className="flex flex-col items-center gap-1">
-                                            <span className="text-[10px]">{formattedDateTime}</span>
-                                            <div className="flex items-center gap-1.5">
-                                              <span className="text-sm font-bold text-white">
-                                                {match.isHome ? match.homeScore : match.awayScore}
-                                              </span>
-                                              <span className="text-gray-500">-</span>
-                                              <span className="text-sm font-bold text-white">
-                                                {match.isHome ? match.awayScore : match.homeScore}
-                                              </span>
-                                            </div>
-                                          </div>
-                                        ) : (
-                                          formattedDateTime
-                                        )}
-                                      </td>
-                                      <td className="px-3 py-2.5 text-xs font-mono font-semibold text-white" style={{ textAlign: 'center' }}>
+                                      <td className="px-3 py-2.5 text-[10px] font-mono whitespace-nowrap" style={{ color: 'hsl(var(--muted-foreground))', textAlign: 'center' }}>
                                         {formatCurrency(match.teamSharePrice)}
                                       </td>
-                                      <td className="px-3 py-2.5 text-xs font-mono font-semibold text-white" style={{ textAlign: 'center' }}>
+                                      <td className="px-3 py-2.5 text-[10px] font-mono whitespace-nowrap" style={{ color: 'hsl(var(--muted-foreground))', textAlign: 'center' }}>
                                         {formatCurrency(match.teamMarketCap)}
                                       </td>
-                                      <td className="px-3 py-2.5 text-xs font-mono font-semibold text-white" style={{ textAlign: 'center' }}>
+                                      <td className="px-3 py-2.5 text-[10px] font-mono whitespace-nowrap" style={{ color: 'hsl(var(--muted-foreground))', textAlign: 'center' }}>
                                         {formatCurrency(match.opponentSharePrice)}
                                       </td>
-                                      <td className="px-3 py-2.5 text-xs font-mono font-semibold text-white" style={{ textAlign: 'center' }}>
+                                      <td className="px-3 py-2.5 text-[10px] font-mono whitespace-nowrap" style={{ color: 'hsl(var(--muted-foreground))', textAlign: 'center' }}>
                                         {formatCurrency(match.opponentMarketCap)}
                                       </td>
                                     </tr>
@@ -820,51 +820,46 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                           </div>                          {/* Mobile/Tablet Card View */}                          <div className="md:hidden space-y-2">
                             {upcomingMatches.map((match, index) => {
                               const dateObj = new Date(match.date);
-                              const datePart = dateObj.toLocaleDateString('en-US', {
+                              const formattedDate = dateObj.toLocaleDateString('en-US', {
                                 month: 'short',
                                 day: 'numeric',
+                                year: 'numeric',
                                 timeZone: 'Asia/Dubai'
-                              });
-                              const timePart = dateObj.toLocaleTimeString('en-US', {
-                                hour: 'numeric',
-                                minute: '2-digit',
-                                hour12: true,
-                                timeZone: 'Asia/Dubai'
-                              });
-                              const formattedDateTime = `${datePart}, ${timePart}`;                              return (                                <div
+                              });                              return (                                <div
                                   key={index}
                                   className={`rounded-lg p-2.5 sm:p-3 touch-manipulation ${
-                                    match.status === 'closed' 
+                                    (match.status === 'live' || match.status === 'closed') 
                                       ? 'bg-red-500/5 border-2 border-red-500' 
                                       : 'bg-gray-800/40 border border-gray-700/30'
                                   }`}
-                                >{/* Header Row: Badge + Opponent + Date */}
+                                >
+                                  {/* Header Row: Badge + Opponent + Date */}
                                   <div className="flex items-start justify-between gap-2 mb-2">
                                     <div className="flex items-center gap-2 flex-1 min-w-0">
                                       <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
-                                        match.status === 'closed'
+                                        (match.status === 'live' || match.status === 'closed')
                                           ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/30'
                                           : match.isHome 
                                             ? 'bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30' 
                                             : 'bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30'
                                       }`}>
-                                        {match.status === 'closed' ? match.matchday : (match.isHome ? 'H' : 'A')}
+                                        {(match.status === 'live' || match.status === 'closed') ? match.matchday : (match.isHome ? 'H' : 'A')}
                                       </div>
                                       <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2">
                                           <p className="text-[11px] sm:text-xs font-semibold text-white truncate">
-                                            Match vs {match.opponent}
+                                            vs {match.opponent}
                                           </p>
-                                          {match.status === 'closed' && (
+                                          {(match.status === 'live' || match.status === 'closed') && (
                                             <Badge variant="outline" className="text-yellow-400 border-yellow-400/50 text-[9px] px-1 py-0 animate-pulse">
                                               LIVE
                                             </Badge>
                                           )}
                                         </div>
-                                        {match.status === 'closed' && match.homeScore !== null && match.awayScore !== null ? (
+                                        {(match.status === 'live' || match.status === 'closed') && match.homeScore !== null && match.awayScore !== null ? (
                                           <div className="flex items-center gap-2 mt-1">
                                             <p className="text-[9px] sm:text-[10px] font-mono" style={{ color: '#C9A961' }}>
-                                              {formattedDateTime}
+                                              {formattedDate}
                                             </p>
                                             <div className="flex items-center gap-1">
                                               <span className="text-sm font-bold text-white">
@@ -878,7 +873,7 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
                                           </div>
                                         ) : (
                                           <p className="text-[9px] sm:text-[10px] font-mono mt-0.5" style={{ color: '#C9A961' }}>
-                                            {formattedDateTime}
+                                            {formattedDate}
                                           </p>
                                         )}
                                       </div>

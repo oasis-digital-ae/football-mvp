@@ -41,9 +41,8 @@ export const ClubValuesPage: React.FC = () => {
     pricePerShare: number;
   } | null>(null);
   const [isPurchasing, setIsPurchasing] = useState(false);
-  const [purchasingClubId, setPurchasingClubId] = useState<string | null>(null);
-  const [buyWindowStatuses, setBuyWindowStatuses] = useState<Map<string, any>>(new Map());
-  const [sortField, setSortField] = useState<'name' | 'price' | 'change' | 'marketCap'>('price');
+  const [purchasingClubId, setPurchasingClubId] = useState<string | null>(null);  const [buyWindowStatuses, setBuyWindowStatuses] = useState<Map<string, any>>(new Map());
+  const [sortField, setSortField] = useState<'name' | 'price' | 'change' | 'marketCap'>('change');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [matchdayChanges, setMatchdayChanges] = useState<Map<string, { change: number; percentChange: number }>>(new Map());
 
@@ -57,14 +56,18 @@ export const ClubValuesPage: React.FC = () => {
     loadFixtures();
     loadMatchdayChanges();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only load once on mount
-
-  // Reload matchday changes when clubs change
+  }, []); // Only load once on mount  // Reload matchday changes when clubs change or market caps update
   useEffect(() => {
     if (clubs.length > 0) {
-      loadMatchdayChanges();
+      // Add a small delay to ensure database writes have completed after match results
+      const timeoutId = setTimeout(() => {
+        loadMatchdayChanges();
+      }, 500); // 500ms delay to allow database updates to propagate
+      
+      return () => clearTimeout(timeoutId);
     }
-  }, [clubs.length]); // Only reload when clubs count changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clubs]); // Reload when clubs array changes (including market cap updates)
 
   // Show toast when market updates
   useEffect(() => {
@@ -97,42 +100,51 @@ export const ClubValuesPage: React.FC = () => {
       console.error('Error loading fixtures:', error);
     }
   };
-
   const loadMatchdayChanges = async () => {
     try {
-      if (clubs.length === 0) return;
-
-      const teamIds = clubs.map(c => parseInt(c.id));
-      const changesMap = new Map<string, { change: number; percentChange: number }>();
-
-      // Get latest match result for all teams
+      if (clubs.length === 0) return;      const teamIds = clubs.map(c => parseInt(c.id));
+      const changesMap = new Map<string, { change: number; percentChange: number }>();      // CRITICAL FIX: Get latest match result for all teams
+      // Order by event_date DESC, then id DESC to ensure we get the truly latest match
+      // ROOT CAUSE: Some teams have multiple ledger entries and we must pick by date + id
       const { data: ledgerData, error } = await supabase
         .from('total_ledger')
-        .select('team_id, market_cap_before, market_cap_after, event_date')
+        .select('team_id, market_cap_before, market_cap_after, event_date, ledger_type, id, created_at')
         .in('team_id', teamIds)
         .in('ledger_type', ['match_win', 'match_loss', 'match_draw'])
-        .order('event_date', { ascending: false });
+        .order('event_date', { ascending: false }) // Primary: Most recent date first
+        .order('id', { ascending: false }); // Secondary: Highest ID (latest entry) for same date
 
       if (error) {
         console.error('Error loading matchday changes:', error);
         return;
       }
 
-      // Group by team_id and get the latest match only
+      console.log('📊 Loaded matchday changes - Total entries:', ledgerData?.length);
+      if (ledgerData && ledgerData.length > 0) {
+        console.log('📅 Sample entries (first 5 by date+id):');
+        ledgerData.slice(0, 5).forEach(entry => {
+          console.log(`  ID: ${entry.id}, Team: ${entry.team_id}, Type: ${entry.ledger_type}, Date: ${entry.event_date}`);
+        });
+      }
+
+      // Group by team_id and get the ABSOLUTE latest match (first occurrence with proper date+id sorting)
       // Calculate percentage from full-precision values (matching backend 4-decimal precision)
-      const latestMatches = new Map<number, { marketCapBefore: Decimal; marketCapAfter: Decimal; date: string }>();
+      const latestMatches = new Map<number, { marketCapBefore: Decimal; marketCapAfter: Decimal; date: string; ledgerType: string; id: number }>();
       
       (ledgerData || []).forEach(entry => {
         const teamId = entry.team_id;
-        // Only store the first (latest) match for each team
+        // Only store the first (latest by event_date DESC, id DESC) match for each team
+        // IMPORTANT: This includes draws (match_draw) - they show as 0.00% which is correct
         if (!latestMatches.has(teamId) && entry.market_cap_before && entry.market_cap_after) {
           latestMatches.set(teamId, {
             marketCapBefore: toDecimal(fromCents(entry.market_cap_before || 0)),
             marketCapAfter: toDecimal(fromCents(entry.market_cap_after || 0)),
-            date: entry.event_date
+            date: entry.event_date,
+            ledgerType: entry.ledger_type,
+            id: entry.id
           });
         }
-      });
+      });      console.log('📈 Latest matches per team:', latestMatches.size, 'teams');
 
       // Calculate latest match's price impact percentage for each team
       // Calculate from full-precision values, then round only the final result (matching backend)
@@ -144,9 +156,14 @@ export const ClubValuesPage: React.FC = () => {
         );
         const change = roundForDisplay(match.marketCapAfter.minus(match.marketCapBefore).toNumber());
         
+        // Enhanced logging to debug Burnley and other teams
+        const teamName = clubs.find(c => parseInt(c.id) === teamId)?.name || `Team ${teamId}`;
+        console.log(`✓ ${teamName} (ID: ${match.id}): ${match.ledgerType}, ${match.marketCapBefore.toFixed(2)} → ${match.marketCapAfter.toFixed(2)} = ${percentChange.toFixed(2)}%, Date: ${match.date}`);
+        
         changesMap.set(teamId.toString(), { change, percentChange });
       });
 
+      console.log('✅ Matchday changes map size:', changesMap.size);
       setMatchdayChanges(changesMap);
     } catch (error) {
       console.error('Error calculating matchday changes:', error);
@@ -467,8 +484,7 @@ export const ClubValuesPage: React.FC = () => {
                   </th>
                   <th className="text-center px-3 w-24"></th>
                 </tr>
-              </thead>
-              <tbody>
+              </thead>              <tbody>
                 {useMemo(() => {
                   // Sort based on selected field
                   let filtered = [...clubs].sort((a, b) => {
@@ -485,8 +501,15 @@ export const ClubValuesPage: React.FC = () => {
                         return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
                       }
                       case 'change': {
-                        const aValue = matchdayChanges.get(a.id)?.percentChange ?? 0;
-                        const bValue = matchdayChanges.get(b.id)?.percentChange ?? 0;
+                        const aChange = matchdayChanges.get(a.id);
+                        const bChange = matchdayChanges.get(b.id);
+                        // Teams without data go to the end
+                        if (!aChange && !bChange) return 0;
+                        if (!aChange) return 1; // a goes to end
+                        if (!bChange) return -1; // b goes to end
+                        // Sort by percentage change
+                        const aValue = aChange.percentChange;
+                        const bValue = bChange.percentChange;
                         return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
                       }
                       case 'marketCap': {
@@ -665,9 +688,7 @@ export const ClubValuesPage: React.FC = () => {
                   </button>
                   <div className="text-center">Buy</div>
                 </div>
-              </div>
-
-              {/* Mobile Table Rows */}
+              </div>              {/* Mobile Table Rows */}
               <div className="space-y-0">
                 {useMemo(() => {
                   // Sort based on selected field (same logic as desktop)
@@ -685,8 +706,15 @@ export const ClubValuesPage: React.FC = () => {
                         return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
                       }
                       case 'change': {
-                        const aValue = matchdayChanges.get(a.id)?.percentChange ?? 0;
-                        const bValue = matchdayChanges.get(b.id)?.percentChange ?? 0;
+                        const aChange = matchdayChanges.get(a.id);
+                        const bChange = matchdayChanges.get(b.id);
+                        // Teams without data go to the end
+                        if (!aChange && !bChange) return 0;
+                        if (!aChange) return 1; // a goes to end
+                        if (!bChange) return -1; // b goes to end
+                        // Sort by percentage change
+                        const aValue = aChange.percentChange;
+                        const bValue = bChange.percentChange;
                         return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
                       }
                       case 'marketCap': {

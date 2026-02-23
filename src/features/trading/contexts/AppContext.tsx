@@ -27,6 +27,11 @@ interface AppContextType {
   standings: Standing[];
   topScorers: Scorer[];
   liveMatches: FootballMatch[];
+  totalMarketValue: number;
+  totalInvested: number;
+  totalProfitLoss: number;
+  totalDeposits: number;
+  walletBalance: number;
   currentPage: string;
   setCurrentPage: (page: string) => void;
   purchaseClub: (clubId: string, units: number) => Promise<void>;
@@ -51,6 +56,11 @@ const defaultAppContext: AppContextType = {
   standings: [],
   topScorers: [],
   liveMatches: [],
+  totalMarketValue: 0,
+  totalInvested: 0,
+  totalProfitLoss: 0,
+  totalDeposits: 0,
+  walletBalance: 0,
   currentPage: 'marketplace',
   setCurrentPage: () => {},
   purchaseClub: async () => {},
@@ -62,7 +72,7 @@ const defaultAppContext: AppContextType = {
   refreshStandings: async () => {},
   refreshTopScorers: async () => {},
   refreshLiveMatches: async () => {},
-  user: null
+  user: null,
 };
 
 const AppContext = createContext<AppContextType>(defaultAppContext);
@@ -616,9 +626,18 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
         }
         
         throw new BusinessLogicError(friendlyMessage);
-      }
+      }      logger.debug(`Atomic purchase completed successfully:`, result);
 
-      logger.debug(`Atomic purchase completed successfully:`, result);
+      // EVENT-DRIVEN SYNC: Update portfolio_value in database immediately
+      // This ensures admin panel and all views show consistent values
+      try {
+        const { portfolioSyncService } = await import('@/shared/lib/services/portfolio-sync.service');
+        await portfolioSyncService.syncUserPortfolio(profileId, true);
+        logger.debug('Portfolio sync completed after purchase');
+      } catch (syncError) {
+        logger.error('Portfolio sync failed after purchase (non-fatal):', syncError);
+        // Don't throw - sync failure shouldn't break user experience
+      }
 
       // Refresh data immediately after purchase
       logger.debug('Refreshing data after purchase...');
@@ -790,9 +809,18 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
         }
         
         throw new BusinessLogicError(friendlyMessage);
-      }
+      }      logger.debug(`Atomic sale completed successfully:`, result);
 
-      logger.debug(`Atomic sale completed successfully:`, result);
+      // EVENT-DRIVEN SYNC: Update portfolio_value in database immediately
+      // This ensures admin panel and all views show consistent values
+      try {
+        const { portfolioSyncService } = await import('@/shared/lib/services/portfolio-sync.service');
+        await portfolioSyncService.syncUserPortfolio(profileId, true);
+        logger.debug('Portfolio sync completed after sale');
+      } catch (syncError) {
+        logger.error('Portfolio sync failed after sale (non-fatal):', syncError);
+        // Don't throw - sync failure shouldn't break user experience
+      }
 
       // Refresh data immediately after sale
       logger.debug('Refreshing data after sale...');
@@ -883,7 +911,6 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
       throw new ExternalApiError('Failed to refresh top scorers', 'Football API');
     }
   }, 'refreshTopScorers');
-
   const refreshLiveMatches = withErrorHandling(async () => {
     try {
       // Use mock live matches for testing
@@ -894,6 +921,11 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
       throw new ExternalApiError('Failed to refresh live matches', 'Football API');
     }
   }, 'refreshLiveMatches');
+
+  // Calculate derived values from portfolio
+  const totalMarketValue = portfolio.reduce((sum, item) => sum + item.totalValue, 0);
+  const totalInvested = portfolio.reduce((sum, item) => sum + (item.purchasePrice * item.units), 0);
+  const totalProfitLoss = portfolio.reduce((sum, item) => sum + item.profitLoss, 0);
 
   return (
     <AppContext.Provider
@@ -907,6 +939,11 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
         standings,
         topScorers,
         liveMatches,
+        totalMarketValue,
+        totalInvested,
+        totalProfitLoss,
+        totalDeposits: 0, // This is now in AuthContext
+        walletBalance: 0, // This is now in AuthContext
         currentPage,
         setCurrentPage,
         purchaseClub,

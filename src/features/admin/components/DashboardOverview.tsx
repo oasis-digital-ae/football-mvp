@@ -54,15 +54,22 @@ export const DashboardOverview: React.FC = () => {
         adminService.getFinancialOverview(),
         adminService.getRecentActivity(50), // Show more activities including deposits
         adminService.getSystemActivity()
-      ]);
-
-      // Get pending fixtures count
-      const { count: pendingFixturesCount, error: fixturesError } = await supabase
+      ]);      // Get pending fixtures count (matches Fixtures page "Upcoming" count exactly)
+      // Includes: scheduled matches + future postponed matches
+      const { data: allFixtures, error: fixturesError } = await supabase
         .from('fixtures')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'scheduled');
+        .select('status, kickoff_at')
+        .in('status', ['scheduled', 'postponed']);
 
-      const pendingFixtures = fixturesError ? 0 : (pendingFixturesCount || 0);
+      const now = new Date();
+      const pendingFixtures = fixturesError ? 0 : (allFixtures || []).filter(f => {
+        if (f.status === 'scheduled') return true;
+        if (f.status === 'postponed') {
+          const kickoffDate = new Date(f.kickoff_at);
+          return kickoffDate >= now; // Future postponed matches count as upcoming
+        }
+        return false;
+      }).length;
 
       setMetrics({
         totalPlatformValue: financial.totalPlatformValue,

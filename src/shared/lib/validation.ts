@@ -17,9 +17,9 @@ export interface ValidationResult {
 
 // Validator class
 export class Validator<T> {
-  private rules: Array<{ field: string; rule: ValidationRule<T> }> = [];
+  private rules: Array<{ field: string; rule: ValidationRule<any> }> = [];
 
-  addRule(field: string, rule: ValidationRule<T>): Validator<T> {
+  addRule(field: string, rule: ValidationRule<any>): Validator<T> {
     this.rules.push({ field, rule });
     return this;
   }
@@ -117,7 +117,6 @@ export const AppValidators = {
     .addRule('email', ValidationRules.required('Email is required'))
     .addRule('email', ValidationRules.email())
     .addRule('password', ValidationRules.required('Password is required')),
-
   // User registration validation
   userRegistration: new Validator<{
     email: string;
@@ -127,6 +126,7 @@ export const AppValidators = {
     birthday: string;
     country: string;
     phone: string;
+    referredBy: string;
   }>()
     .addRule('email', ValidationRules.required('Email is required'))
     .addRule('email', ValidationRules.email())
@@ -138,7 +138,9 @@ export const AppValidators = {
     .addRule('lastName', ValidationRules.minLength(2, 'Last name must be at least 2 characters'))
     .addRule('birthday', ValidationRules.required('Birthday is required'))
     .addRule('country', ValidationRules.required('Country is required'))
-    .addRule('phone', ValidationRules.required('Phone number is required')),
+    .addRule('phone', ValidationRules.required('Phone number is required'))
+    .addRule('referredBy', ValidationRules.required('Referral information is required'))
+    .addRule('referredBy', ValidationRules.minLength(2, 'Referral name must be at least 2 characters')),
 
   // Share purchase validation (for modal - simplified)
   sharePurchaseModal: new Validator<{
@@ -197,17 +199,12 @@ export const AppValidators = {
     awayTeamId: number;
     kickoffAt: string;
     buyCloseAt: string;
-  }>()
-    .addRule('homeTeamId', ValidationRules.required('Home team is required'))
+  }>()    .addRule('homeTeamId', ValidationRules.required('Home team is required'))
     .addRule('homeTeamId', ValidationRules.positive('Invalid home team'))
     .addRule('awayTeamId', ValidationRules.required('Away team is required'))
     .addRule('awayTeamId', ValidationRules.positive('Invalid away team'))
     .addRule('kickoffAt', ValidationRules.required('Kickoff time is required'))
     .addRule('buyCloseAt', ValidationRules.required('Buy close time is required'))
-    .addRule('homeTeamId', ValidationRules.custom(
-      (value: number, allValues: any) => value !== allValues.awayTeamId,
-      'Home and away teams must be different'
-    ))
 };
 
 // Validation helper functions
