@@ -155,41 +155,7 @@ export const handler = schedule("0 23 * * 0", async (event: HandlerEvent): Promi
   }
 
   /**
-   * Step 2: Exclude users who joined during the week (no meaningful start/end portfolio)
-   * Users must have existed before week_start to have valid weekly return.
-   */
-  const userIds = data.map((r: { user_id: string }) => r.user_id);
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select("id, created_at")
-    .in("id", userIds);
-
-  const weekStartMs = new Date(weekStartStr).getTime();
-  const eligibleUserIds = new Set(
-    (profiles || [])
-      .filter((p) => p.created_at && new Date(p.created_at).getTime() < weekStartMs)
-      .map((p) => p.id)
-  );
-
-  const filteredData = data
-    .filter((r: { user_id: string }) => eligibleUserIds.has(r.user_id))
-    .map((r: Record<string, unknown>, index: number) => ({
-      ...r,
-      rank: index + 1,
-    }));
-
-  const excludedCount = data.length - filteredData.length;
-  if (excludedCount > 0) {
-    console.log(`  Excluded ${excludedCount} user(s) who joined during the week`);
-  }
-
-  if (filteredData.length === 0) {
-    console.log("⚠️ No eligible users (all joined during the week)");
-    return { statusCode: 200, body: "No eligible users for leaderboard" };
-  }
-
-  /**
-   * Step 3: Get next week_number (table has week_number column, RPC does not return it)
+   * Step 2: Get next week_number (table has week_number column, RPC does not return it)
    */
   const { data: maxWeek } = await supabase
     .from("weekly_leaderboard")
@@ -202,10 +168,10 @@ export const handler = schedule("0 23 * * 0", async (event: HandlerEvent): Promi
   console.log("  Week number:", nextWeekNumber);
 
   /**
-   * Step 4: Insert new leaderboard rows
+   * Step 3: Insert new leaderboard rows
    * Table expects: user_id, rank, *values, week_start, week_end, week_number, is_latest
    */
-  const rows = filteredData.map((r: Record<string, unknown>) => ({
+  const rows = data.map((r: Record<string, unknown>) => ({
     ...r,
     week_start: weekStartStr,
     week_end: weekEndStr,
@@ -223,7 +189,7 @@ export const handler = schedule("0 23 * * 0", async (event: HandlerEvent): Promi
   }
 
   /**
-   * Step 5: Demote previous leaderboard entries (set is_latest = false)
+   * Step 4: Demote previous leaderboard entries (set is_latest = false)
    * Use week_start string for consistent comparison with timestamptz
    */
   const { error: demoteError } = await supabase
