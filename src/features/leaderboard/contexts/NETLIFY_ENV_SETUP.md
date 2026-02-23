@@ -113,6 +113,13 @@ Expected response: `200 OK` with message about leaderboard generation
 
 ## 🚨 Common Issues & Solutions
 
+### Issue: Cron never runs / doesn't trigger
+**Solution**: Netlify scheduled functions **only run on PRODUCTION (published) deploys**.
+- They do NOT run on branch deploys (e.g. staging-test, develop)
+- They do NOT run on Deploy Previews
+- **Fix**: Merge to `main` and ensure your production site is the published deploy
+- Use the **"Run now"** button in Netlify Dashboard → Functions → update-weeklyleaderboard to test on branch deploys
+
 ### Issue: "supabaseUrl is required"
 **Solution**: Environment variables not set in Netlify
 - Go to Netlify Dashboard → Environment variables

@@ -1,4 +1,5 @@
-import { Handler } from "@netlify/functions";
+import type { HandlerEvent, HandlerResponse } from "@netlify/functions";
+import { schedule } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
 
 /**
@@ -81,12 +82,17 @@ function getCompletedUAEWeekBounds() {
   };
 }
 
-export const handler: Handler = async (event: any) => {
+/**
+ * Weekly leaderboard scheduled function.
+ * Schedule: Sunday 23:00 UTC = Monday 03:00 UAE
+ * Uses schedule() wrapper so Netlify recognizes it as a scheduled function.
+ * NOTE: Scheduled functions only run on PRODUCTION (published) deploys, not branch deploys.
+ */
+export const handler = schedule("0 23 * * 0", async (event: HandlerEvent): Promise<HandlerResponse> => {
   /**
    * Allow execution via:
-   * - Netlify scheduled cron
-   * - POST with header x-manual-run: true
-   * - POST with query param ?manual=true (works with Netlify Trigger button)
+   * - Netlify scheduled cron (body contains next_run)
+   * - Manual: POST with header x-manual-run: true or query ?manual=true
    */
   const headers = event.headers || {};
   const manualHeader = headers["x-manual-run"] ?? headers["X-Manual-Run"];
@@ -95,7 +101,13 @@ export const handler: Handler = async (event: any) => {
     event.httpMethod === "POST" &&
     (manualHeader === "true" || manualQuery);
 
-  if (!event?.cron && !isManual) {
+  // Scheduled invocations send body: {"next_run":"..."} (per Netlify docs)
+  const isScheduled = Boolean(
+    (event as { cron?: boolean }).cron ||
+    (event.body && typeof event.body === "string" && event.body.includes("next_run"))
+  );
+
+  if (!isScheduled && !isManual) {
     return { statusCode: 403, body: "Forbidden" };
   }
 
@@ -173,4 +185,4 @@ export const handler: Handler = async (event: any) => {
     statusCode: 200,
     body: "Weekly leaderboard generated successfully",
   };
-};
+});
