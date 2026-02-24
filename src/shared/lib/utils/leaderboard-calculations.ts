@@ -20,7 +20,19 @@
  * - weekly_return: numeric(10, 6) (decimal fraction, NOT percentage)
  */
 
-import { Decimal, toDecimal, roundForDisplay, fromCentsToNumber, toCents } from './decimal';
+import { Decimal, toDecimal, roundForDisplay, fromCents, toCents } from './decimal';
+
+/**
+ * Convert cents to number (from database BIGINT values)
+ * Convenience function that returns a number instead of Decimal
+ * LOCAL UTILITY - Kept here to avoid touching decimal.ts
+ * 
+ * @param cents - Number of cents (BIGINT from database)
+ * @returns Amount in dollars as number (rounded to 2 decimal places)
+ */
+function fromCentsToNumber(cents: number | string | null | undefined): number {
+  return roundForDisplay(fromCents(cents));
+}
 
 /**
  * User wallet and portfolio data for leaderboard calculations

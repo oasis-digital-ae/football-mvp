@@ -188,11 +188,12 @@ async function fetchUserLeaderboardData(
           .lte('event_date', weekEnd)
           .order('event_date', { ascending: false })
           .limit(1)
-          .maybeSingle();
-
-        const startPrice = new Decimal(startLedger?.share_price_after ?? 20.0);
+          .maybeSingle();        const startPrice = new Decimal(startLedger?.share_price_after ?? 20.0);
         const endPrice = new Decimal(endLedger?.share_price_after ?? startLedger?.share_price_after ?? 20.0);
-        const quantity = new Decimal(position.quantity ?? 0);
+        
+        // CRITICAL: quantity in database is stored as CENTS (BIGINT)
+        // Must convert from cents to get actual quantity
+        const quantity = new Decimal(fromCents(position.quantity ?? 0));
 
         // Use Decimal multiplication for precision
         startPortfolioValue = startPortfolioValue.plus(startPrice.times(quantity));

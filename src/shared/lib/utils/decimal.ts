@@ -116,17 +116,6 @@ export function fromCents(cents: number | string | null | undefined): Decimal {
 }
 
 /**
- * Convert cents to number (from database BIGINT values)
- * Convenience function that returns a number instead of Decimal
- * 
- * @param cents - Number of cents (BIGINT from database)
- * @returns Amount in dollars as number (rounded to 2 decimal places)
- */
-export function fromCentsToNumber(cents: number | string | null | undefined): number {
-  return roundForDisplay(fromCents(cents));
-}
-
-/**
  * Check if two Decimal values are equal within tolerance
  * Useful for comparing monetary values that might have tiny rounding differences
  * 
