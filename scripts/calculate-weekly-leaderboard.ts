@@ -2,7 +2,7 @@
  * Backfill Weekly Leaderboard
  *
  * Populates weekly_leaderboard for the current week and optionally past weeks.
- * Uses generate_weekly_leaderboard RPC for each week.
+ * Uses generate_weekly_leaderboard_exact_v2 RPC for each week.
  *
  * Usage:
  *   npx tsx scripts/calculate-weekly-leaderboard.ts
@@ -107,7 +107,7 @@ async function backfillWeeklyLeaderboard(weeksToBackfill: number) {
     }
 
     // Compute via RPC
-    const { data, error } = await supabase.rpc('generate_weekly_leaderboard', {
+    const { data, error } = await supabase.rpc('generate_weekly_leaderboard_exact_v2', {
       p_week_start: week_start.toISOString(),
       p_week_end: week_end.toISOString(),
     });

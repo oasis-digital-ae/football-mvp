@@ -142,7 +142,7 @@ export const handler = schedule("0 23 * * 0", async (event: HandlerEvent): Promi
    * Step 1: Compute leaderboard via SQL function
    */
   const { data, error } = await supabase.rpc(
-    "generate_weekly_leaderboard",
+    "generate_weekly_leaderboard_exact_v2",
     {
       p_week_start: weekStartStr,
       p_week_end: weekEndStr,

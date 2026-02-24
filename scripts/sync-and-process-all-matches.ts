@@ -38,7 +38,7 @@ async function syncAndProcessAllMatches() {
     // Check how many fixtures now have scores
     const { data: fixtures, error: fixturesError } = await supabase
       .from('fixtures')
-      .select('id, home_score, away_score, result, kickoff_at, snapshot_home_cap, snapshot_away_cap')
+      .select('id, home_team_id, away_team_id, home_score, away_score, result, kickoff_at, snapshot_home_cap, snapshot_away_cap')
       .not('home_score', 'is', null)
       .not('away_score', 'is', null)
       .neq('result', 'pending');
@@ -55,11 +55,15 @@ async function syncAndProcessAllMatches() {
     }
     
     // Find unprocessed fixtures (those with scores but no snapshots)
-    const unprocessedFixtures = fixtures.filter(f => 
-      !f.snapshot_home_cap || !f.snapshot_away_cap
-    );
+    // CRITICAL: Sort by kickoff_at ascending so we process earliest matches first.
+    // This ensures "current" team market caps already reflect earlier match results
+    // when we use them as snapshots. Processing Chelsea before Crystal Palace would
+    // incorrectly use Burnley's pre-Palace cap (~$1,258) for the Chelsea draw.
+    const unprocessedFixtures = fixtures
+      .filter(f => !f.snapshot_home_cap || !f.snapshot_away_cap)
+      .sort((a, b) => new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime());
     
-    console.log(`📊 Found ${unprocessedFixtures.length} unprocessed fixtures`);
+    console.log(`📊 Found ${unprocessedFixtures.length} unprocessed fixtures (sorted by kickoff)`);
     console.log('');
     
     if (unprocessedFixtures.length === 0) {
