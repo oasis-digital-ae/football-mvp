@@ -107,10 +107,10 @@ export const UsersManagementPanel: React.FC = () => {
 
     setCrediting(true);
     try {
-      await usersService.creditUserWallet(selectedUser.id, amount);
+      await usersService.creditUserWalletLoan(selectedUser.id, amount);
       toast({
         title: 'Success',
-        description: `Credited ${formatCurrency(amount)} to ${selectedUser.username}'s wallet`
+        description: `Extended ${formatCurrency(amount)} credit to ${selectedUser.username}'s wallet`
       });
       setCreditAmount('');
       await loadUsers();
@@ -581,7 +581,7 @@ export const UsersManagementPanel: React.FC = () => {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
-                      <p className="text-sm font-medium mb-2">Credit Wallet</p>
+                      <p className="text-sm font-medium mb-2">Extend Credit (Loan)</p>
                       <div className="flex flex-col sm:flex-row gap-2">
                         <Input
                           type="number"
@@ -607,14 +607,15 @@ export const UsersManagementPanel: React.FC = () => {
                           <p className="text-sm text-muted-foreground">No transactions</p>
                         ) : (
                           userTransactions.map((tx) => {
-                            // Types that add money to wallet (positive/green): deposit, sale, refund
-                            const isPositive = ['deposit', 'sale', 'refund'].includes(tx.type.toLowerCase());
+                            // Types that add money to wallet (positive/green): deposit, sale, refund, credit_loan
+                            const isPositive = ['deposit', 'sale', 'refund', 'credit_loan'].includes(tx.type.toLowerCase());
                             const amount = tx.amount_cents / 100;
+                            const displayType = tx.type === 'credit_loan' ? 'Platform Credit' : tx.type;
                             
                             return (
                               <div key={tx.id} className="flex items-center justify-between p-2 border rounded text-sm">
                                 <div className="min-w-0 flex-1">
-                                  <p className="text-sm font-medium capitalize truncate">{tx.type}</p>
+                                  <p className="text-sm font-medium capitalize truncate">{displayType}</p>
                                   <p className="text-xs text-muted-foreground truncate">
                                     {new Date(tx.created_at).toLocaleString()}                                  </p>
                                 </div>

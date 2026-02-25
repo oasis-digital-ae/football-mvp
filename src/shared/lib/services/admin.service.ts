@@ -692,7 +692,7 @@ export const adminService = {
           created_at,
           profiles!inner(username)
         `)
-        .in('type', ['deposit', 'refund', 'adjustment'])
+        .in('type', ['deposit', 'refund', 'adjustment', 'credit_loan'])
         .order('created_at', { ascending: false })
         .limit(limit);
 
@@ -708,6 +708,8 @@ export const adminService = {
             description = `${profile.username || 'User'} received a refund of ${formatCurrency(amount)}`;
           } else if (deposit.type === 'adjustment') {
             description = `${profile.username || 'User'} wallet adjusted by ${formatCurrency(amount)}`;
+          } else if (deposit.type === 'credit_loan') {
+            description = `Credit loan of ${formatCurrency(amount)} to ${profile.username || 'User'}`;
           }
           
           activities.push({
@@ -773,6 +775,111 @@ export const adminService = {
         .slice(0, limit);
     } catch (error) {
       logger.error('Error fetching recent activity:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get credit loan transactions (admin loans to users)
+   */
+  async getCreditLoans(limit = 500): Promise<Array<{
+    id: number;
+    user_id: string;
+    username: string;
+    amount_cents: number;
+    currency: string;
+    type: string;
+    ref?: string;
+    created_at: string;
+  }>> {
+    try {
+      const { data: transactions, error: transactionsError } = await supabase
+        .from('wallet_transactions')
+        .select('*')
+        .eq('type', 'credit_loan')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (transactionsError) throw transactionsError;
+
+      const userIds = [...new Set((transactions || []).map(tx => tx.user_id))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .in('id', userIds);
+
+      const profilesMap = new Map((profiles || []).map(p => [p.id, p.username]));
+
+      return (transactions || []).map(tx => ({
+        id: tx.id,
+        user_id: tx.user_id,
+        username: profilesMap.get(tx.user_id) || 'Unknown',
+        amount_cents: tx.amount_cents,
+        currency: tx.currency,
+        type: tx.type,
+        ref: tx.ref,
+        created_at: tx.created_at
+      }));
+    } catch (error) {
+      logger.error('Error fetching credit loans:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get credit loan summary (total extended, per-user breakdown)
+   */
+  async getCreditLoanSummary(): Promise<{
+    totalCreditExtended: number;
+    usersWithCredit: number;
+    perUserBreakdown: Array<{ user_id: string; username: string; total_credit_cents: number; count: number }>;
+  }> {
+    try {
+      const { data: transactions, error } = await supabase
+        .from('wallet_transactions')
+        .select('user_id, amount_cents')
+        .eq('type', 'credit_loan');
+
+      if (error) throw error;
+
+      const userTotals = new Map<string, { totalCents: number; count: number }>();
+      let totalCreditCents = 0;
+
+      (transactions || []).forEach(tx => {
+        const current = userTotals.get(tx.user_id) || { totalCents: 0, count: 0 };
+        const amount = tx.amount_cents || 0;
+        userTotals.set(tx.user_id, {
+          totalCents: current.totalCents + amount,
+          count: current.count + 1
+        });
+        totalCreditCents += amount;
+      });
+
+      const userIds = [...userTotals.keys()];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .in('id', userIds);
+
+      const profilesMap = new Map((profiles || []).map(p => [p.id, p.username]));
+
+      const perUserBreakdown = userIds.map(userId => {
+        const { totalCents, count } = userTotals.get(userId)!;
+        return {
+          user_id: userId,
+          username: profilesMap.get(userId) || 'Unknown',
+          total_credit_cents: totalCents,
+          count
+        };
+      });
+
+      return {
+        totalCreditExtended: fromCents(totalCreditCents).toNumber(),
+        usersWithCredit: userIds.length,
+        perUserBreakdown
+      };
+    } catch (error) {
+      logger.error('Error fetching credit loan summary:', error);
       throw error;
     }
   }

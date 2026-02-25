@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
-import { Shield, AlertTriangle, RefreshCw, Users, TrendingUp, BarChart3, Calendar, DollarSign, Database, Trophy } from 'lucide-react';
+import { Shield, AlertTriangle, RefreshCw, Users, TrendingUp, BarChart3, Calendar, DollarSign, Database, Trophy, Wallet } from 'lucide-react';
 import { DashboardOverview } from './DashboardOverview';
 import { UsersManagementPanel } from './UsersManagementPanel';
 import { TradingActivityTable } from './TradingActivityTable';
@@ -13,6 +13,7 @@ import { MatchesManagementPanel } from './MatchesManagementPanel';
 import { FinancialOverviewPanel } from './FinancialOverviewPanel';
 import { AuditLogViewer } from './AuditLogViewer';
 import { AdminWeeklyLeaderboardPanel } from './WeeklyLeaderboardPanel';
+import { CreditWalletPanel } from './CreditWalletPanel';
 import { AdminErrorBoundary } from './AdminErrorBoundary';
 import { adminService } from '@/shared/lib/services/admin.service';
 import { useAuth } from '@/features/auth/contexts/AuthContext';
@@ -103,6 +104,10 @@ export const AdminDashboard: React.FC = () => {
                   <Users className="h-4 w-4" />
                   <span className="hidden sm:inline">Users & Wallets</span>
                 </TabsTrigger>
+                <TabsTrigger value="credit" className="flex items-center gap-2">
+                  <Wallet className="h-4 w-4" />
+                  <span className="hidden sm:inline">Credit Wallet</span>
+                </TabsTrigger>
                 <TabsTrigger value="trading" className="flex items-center gap-2">
                   <TrendingUp className="h-4 w-4" />
                   <span className="hidden sm:inline">Trading Activity</span>
@@ -136,7 +141,11 @@ export const AdminDashboard: React.FC = () => {
 
             <TabsContent value="users" className="space-y-6">
               <UsersManagementPanel />
-            </TabsContent>            <TabsContent value="trading" className="space-y-6">
+            </TabsContent>
+            <TabsContent value="credit" className="space-y-6">
+              <CreditWalletPanel />
+            </TabsContent>
+            <TabsContent value="trading" className="space-y-6">
               <TradingActivityTable />
             </TabsContent>
 

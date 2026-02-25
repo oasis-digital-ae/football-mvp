@@ -646,7 +646,7 @@ export const usersService = {
   },
 
   /**
-   * Credit user wallet (admin action)
+   * Credit user wallet (admin action) - records as deposit (e.g. Stripe, manual deposit)
    */
   async creditUserWallet(userId: string, amount: number, ref?: string): Promise<void> {
     try {
@@ -661,6 +661,26 @@ export const usersService = {
       if (error) throw error;
     } catch (error) {
       logger.error('Error crediting user wallet:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Credit user wallet as loan (admin action) - records as credit_loan, tracked separately
+   */
+  async creditUserWalletLoan(userId: string, amount: number, ref?: string): Promise<void> {
+    try {
+      const amountCents = Math.round(amount * 100);
+      const { error } = await supabase.rpc('credit_wallet_loan', {
+        p_user_id: userId,
+        p_amount_cents: amountCents,
+        p_ref: ref || `credit_loan_${Date.now()}`,
+        p_currency: 'usd'
+      });
+
+      if (error) throw error;
+    } catch (error) {
+      logger.error('Error crediting user wallet loan:', error);
       throw error;
     }
   }
