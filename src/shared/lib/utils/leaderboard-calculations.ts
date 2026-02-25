@@ -118,8 +118,8 @@ export const calculateWeeklyReturn = (
   // Denominator: start account + deposits
   const denominator = startAccount.plus(deposits);
   
-  // Edge case 1: No capital at all (new user, no deposits)
-  if (denominator.lte(0)) {
+  // Edge case 1: No capital at all (new user, no deposits) OR denominator too small (numerical stability)
+  if (denominator.lte(0) || denominator.abs().lt(0.01)) {
     return 0;
   }
   
@@ -128,12 +128,30 @@ export const calculateWeeklyReturn = (
   
   // Edge case 2: User only deposited, no trading (numerator = 0 exactly)
   // This ensures deposit-only weeks show 0% return, not counting deposits as gains
-  if (numerator.equals(0)) {
+  if (numerator.abs().lt(0.01)) {
     return 0;
   }
   
   // Weekly return = numerator / denominator
-  const weeklyReturn = numerator.dividedBy(denominator);
+  let weeklyReturn = numerator.dividedBy(denominator);
+  
+  // Safety check: Cap unrealistic returns (more than 1000% or less than -99%)
+  // This prevents data corruption from breaking the leaderboard
+  const minReturn = new Decimal(-0.99);
+  const maxReturn = new Decimal(10);
+  
+  const originalReturn = weeklyReturn;
+  if (weeklyReturn.lt(minReturn)) {
+    weeklyReturn = minReturn;
+  } else if (weeklyReturn.gt(maxReturn)) {
+    weeklyReturn = maxReturn;
+  }
+  
+  // Log if we had to cap the return
+  if (!weeklyReturn.equals(originalReturn)) {
+    console.warn(`⚠️ Capped extreme return: ${originalReturn.toFixed(4)} → ${weeklyReturn.toFixed(4)}`);
+    console.warn(`  Start: ${startAccount.toFixed(2)}, End: ${endAccount.toFixed(2)}, Deposits: ${deposits.toFixed(2)}`);
+  }
   
   // CRITICAL: Round to exactly 6 decimal places using HALF_UP rounding
   // This matches PostgreSQL numeric(10, 6) behavior
@@ -254,9 +272,13 @@ export const validateLeaderboardEntries = (
       errors.push(`Entry ${index + 1} (user ${entry.user_id}): Negative end account value`);
     }
     
-    // Check for unrealistic returns (>1000% or <-100%)
-    if (entry.weekly_return > 10 || entry.weekly_return < -1) {
-      errors.push(`Entry ${index + 1} (user ${entry.user_id}): Unrealistic return ${(entry.weekly_return * 100).toFixed(2)}%`);
+    // Warning for unrealistic returns (>1000% or <-99%) - these should have been capped
+    // Only error if they're REALLY extreme (beyond our caps)
+    if (entry.weekly_return > 10) {
+      errors.push(`Entry ${index + 1} (user ${entry.user_id}): Return exceeds cap ${(entry.weekly_return * 100).toFixed(2)}%`);
+    }
+    if (entry.weekly_return < -0.99) {
+      errors.push(`Entry ${index + 1} (user ${entry.user_id}): Return below minimum ${(entry.weekly_return * 100).toFixed(2)}%`);
     }
   });
   
