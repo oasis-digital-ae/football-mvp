@@ -778,9 +778,9 @@ export const adminService = {
       throw error;
     }
   },
-
   /**
    * Get credit loan transactions (admin loans to users)
+   * Excludes reversal transactions - only shows original loans
    */
   async getCreditLoans(limit = 500): Promise<Array<{
     id: number;
@@ -791,8 +791,10 @@ export const adminService = {
     type: string;
     ref?: string;
     created_at: string;
+    is_reversed: boolean;
   }>> {
     try {
+      // Get all credit loans
       const { data: transactions, error: transactionsError } = await supabase
         .from('wallet_transactions')
         .select('*')
@@ -801,6 +803,19 @@ export const adminService = {
         .limit(limit);
 
       if (transactionsError) throw transactionsError;
+
+      // Get all reversals to check which loans have been reversed
+      const { data: reversals } = await supabase
+        .from('wallet_transactions')
+        .select('ref')
+        .eq('type', 'credit_loan_reversal');
+
+      // Create a set of reversed transaction refs
+      const reversedRefs = new Set(
+        (reversals || [])
+          .map(r => r.ref?.replace('reversal_', ''))
+          .filter(Boolean)
+      );
 
       const userIds = [...new Set((transactions || []).map(tx => tx.user_id))];
       const { data: profiles } = await supabase
@@ -818,16 +833,17 @@ export const adminService = {
         currency: tx.currency,
         type: tx.type,
         ref: tx.ref,
-        created_at: tx.created_at
+        created_at: tx.created_at,
+        is_reversed: reversedRefs.has(tx.ref || '') || reversedRefs.has(tx.id.toString())
       }));
     } catch (error) {
       logger.error('Error fetching credit loans:', error);
       throw error;
     }
   },
-
   /**
    * Get credit loan summary (total extended, per-user breakdown)
+   * Calculates NET credit (loans minus reversals)
    */
   async getCreditLoanSummary(): Promise<{
     totalCreditExtended: number;
@@ -835,10 +851,11 @@ export const adminService = {
     perUserBreakdown: Array<{ user_id: string; username: string; total_credit_cents: number; count: number }>;
   }> {
     try {
+      // Get all credit loans and reversals
       const { data: transactions, error } = await supabase
         .from('wallet_transactions')
-        .select('user_id, amount_cents')
-        .eq('type', 'credit_loan');
+        .select('user_id, amount_cents, type')
+        .in('type', ['credit_loan', 'credit_loan_reversal']);
 
       if (error) throw error;
 
@@ -848,14 +865,21 @@ export const adminService = {
       (transactions || []).forEach(tx => {
         const current = userTotals.get(tx.user_id) || { totalCents: 0, count: 0 };
         const amount = tx.amount_cents || 0;
+        
+        // For reversals, amount_cents is negative, so adding it will subtract
         userTotals.set(tx.user_id, {
           totalCents: current.totalCents + amount,
-          count: current.count + 1
+          count: tx.type === 'credit_loan' ? current.count + 1 : current.count
         });
         totalCreditCents += amount;
       });
 
-      const userIds = [...userTotals.keys()];
+      // Filter out users with zero or negative net credit
+      const userIds = [...userTotals.keys()].filter(userId => {
+        const totals = userTotals.get(userId);
+        return totals && totals.totalCents > 0;
+      });
+
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, username')
@@ -871,15 +895,37 @@ export const adminService = {
           total_credit_cents: totalCents,
           count
         };
-      });
+      }).filter(user => user.total_credit_cents > 0); // Only show users with positive balance
 
       return {
-        totalCreditExtended: fromCents(totalCreditCents).toNumber(),
-        usersWithCredit: userIds.length,
+        totalCreditExtended: fromCents(Math.max(0, totalCreditCents)).toNumber(),
+        usersWithCredit: perUserBreakdown.length,
         perUserBreakdown
       };
     } catch (error) {
       logger.error('Error fetching credit loan summary:', error);
+      throw error;
+    }
+  },
+  /**
+   * Reverse a credit loan transaction
+   */
+  async reverseCreditLoan(transactionId: number): Promise<void> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { error } = await supabase.rpc('reverse_credit_loan', {
+        p_transaction_id: transactionId
+      });
+
+      if (error) throw error;
+
+      await auditService.logAdminAction(user.id, 'reverse_credit_loan', {
+        transaction_id: transactionId
+      });
+    } catch (error) {
+      logger.error('Error reversing credit loan:', error);
       throw error;
     }
   }

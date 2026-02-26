@@ -40,7 +40,6 @@ export const walletService = {
     if (error) throw error;
     return data || [];
   },
-
   async getTotalDeposits(userId: string): Promise<number> {
     // Get total deposits for a user (sum of all deposit transactions)
     const { data, error } = await supabase
@@ -56,6 +55,25 @@ export const walletService = {
     // Sum up all deposits and convert from cents to dollars
     const total = (data || []).reduce((sum, tx) => sum + fromCents(tx.amount_cents || 0).toNumber(), 0);
     return total;
+  },  async getCreditBalance(userId: string): Promise<number> {
+    // Get NET credit balance by summing credit_loan AND credit_loan_reversal transactions
+    // Reversals have negative amounts, so they automatically subtract from the total
+    const { data, error } = await supabase
+      .from('wallet_transactions')
+      .select('amount_cents')
+      .eq('user_id', userId)
+      .in('type', ['credit_loan', 'credit_loan_reversal']);
+
+    if (error) {
+      console.error('Error fetching credit balance:', error);
+      return 0;
+    }
+
+    // Sum up all credit transactions (loans + reversals) and convert from cents to dollars
+    // Reversal amounts are negative, so they subtract automatically
+    const total = (data || []).reduce((sum, tx) => sum + fromCents(tx.amount_cents || 0).toNumber(), 0);
+    // Return max(0, total) to ensure credit balance is never negative
+    return Math.max(0, total);
   },
 };
 
