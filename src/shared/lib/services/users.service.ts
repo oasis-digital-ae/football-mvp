@@ -603,9 +603,7 @@ export const usersService = {
 
       const totalDeposits = (walletTransactions || []).reduce((sum, tx) => {
         return sum + fromCents(tx.amount_cents || 0).toNumber();
-      }, 0);
-
-      return {
+      }, 0);      return {
         id: profile.id,
         username: profile.username || 'Unknown',
         first_name: profile.first_name,

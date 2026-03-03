@@ -26,6 +26,7 @@ import { useAuth } from '@/features/auth/contexts/AuthContext';
 import { AppContext } from '@/features/trading/contexts/AppContext';
 import { DepositModal } from '@/features/trading/components/DepositModal';
 import { formatCurrency } from '@/shared/lib/formatters';
+import { useNetWorth } from '@/shared/hooks/useNetWorth';
 import {
   Trophy,
   Briefcase,
@@ -86,8 +87,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
     } catch (error) {
       console.error('Error signing out:', error);
     }
-  };
-  // Handle Net Worth dialog opening with data refresh
+  };  // Handle Net Worth dialog opening with data refresh
   const handleNetWorthClick = async () => {
     setNetWorthDialogOpen(true);
     // Refresh wallet balance, credit balance, and portfolio values
@@ -99,17 +99,24 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
     } catch (error) {
       console.error('Error refreshing data:', error);
     }
-  };// Calculate Net Worth values
-  const portfolioValue = totalMarketValue || 0;
-  // Net Worth = Portfolio + Wallet - Credit (credit is a liability)
-  const netWorth = walletBalance + portfolioValue - creditBalance;
-  // Total deposited includes both cash deposits AND credit (for display in Performance section)
-  const totalDepositsWithCredit = totalDeposits + creditBalance;
-  // P&L = Net Worth - Actual Cash Deposited (NOT including credit, because credit isn't real money you deposited)
-  const pnl = netWorth - totalDeposits;
-  const isProfit = pnl > 0;
-  const isLoss = pnl < 0;
-  const isBreakEven = pnl === 0;
+  };
+
+  // Use centralized Net Worth calculation hook
+  const {
+    netWorth,
+    portfolioValue,
+    pnl,
+    pnlPercentage,
+    isProfit,
+    isLoss,
+    isBreakEven,
+    totalDepositsWithCredit,
+  } = useNetWorth({
+    portfolioValue: totalMarketValue || 0,
+    walletBalance,
+    creditBalance,
+    totalDeposits,
+  });
   
   return (
     <>
@@ -402,9 +409,15 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
               <div className="text-sm text-gray-400">
                 Current total value
               </div>
-            </div>            {/* Horizontal Divider */}
-            <div className="border-t border-gray-700"></div>            {/* Two Column Layout */}
-            <div className="grid grid-cols-[1fr_auto_1fr] gap-0 py-6">              {/* Net Worth Column */}
+            </div>            
+            
+            {/* Horizontal Divider */}
+            <div className="border-t border-gray-700"></div>
+
+            {/* Two Column Layout */}
+            <div className="grid grid-cols-[1fr_auto_1fr] gap-0 py-6">
+
+              {/* Net Worth Column */}
               <div className="space-y-4 pr-4">
                 <h3 className="text-sm font-semibold text-white mb-4">Net Worth</h3>
                 
@@ -432,7 +445,9 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
                 </div>              </div>
 
               {/* Vertical Divider */}
-              <div className="border-l border-gray-700"></div>              {/* Performance Column */}
+              <div className="border-l border-gray-700"></div>              
+              
+              {/* Performance Column */}
               <div className="space-y-4 pl-4">
                 <h3 className="text-sm font-semibold text-white mb-4">Performance</h3>
                 
@@ -457,8 +472,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
                     <span className="text-white font-medium text-sm">{formatCurrency(totalDepositsWithCredit)}</span>
                   </div>
                 )}
-                
-                {/* Overall P&L Row */}
+                  {/* Overall P&L Row */}
                 <div className="flex justify-between items-center py-2 mt-2">
                   <span className="text-gray-400 text-sm">Overall P&L</span>
                   <span className={`font-medium text-sm ${
@@ -466,9 +480,9 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
                   }`}>
                     {isProfit ? '+' : ''}
                     {formatCurrency(Math.abs(pnl))}
-                    {!isBreakEven && totalDeposits !== 0 && (
+                    {!isBreakEven && totalDepositsWithCredit !== 0 && (
                       <span className="ml-1">
-                        ({isProfit ? '+' : ''}{((pnl / totalDeposits) * 100).toFixed(2)}%)
+                        ({isProfit ? '+' : ''}{pnlPercentage}%)
                       </span>
                     )}
                   </span>

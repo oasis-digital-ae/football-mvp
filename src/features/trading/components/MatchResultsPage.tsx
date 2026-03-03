@@ -468,8 +468,10 @@ const MatchResultsPage: React.FC = () => {
                                 Closes {formatTime(fixture.buy_close_at)}
                               </div>
                             )}
-                          </div>                          {/* Match Display */}
-                          <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-700/30">                            {/* Home Team Row */}
+                          </div>                          
+                          {/* Match Display */}
+                          <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-700/30">                            
+                          {/* Home Team Row */}
                             <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                               <TeamLogo 
@@ -549,7 +551,8 @@ const MatchResultsPage: React.FC = () => {
                                   {formatTime(fixture.kickoff_at)}
                                 </span>
                               </div>
-                            )}                            {/* Away Team Row */}
+                            )}                            
+                            {/* Away Team Row */}
                             <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                               <TeamLogo 
@@ -601,16 +604,21 @@ const MatchResultsPage: React.FC = () => {
                               )}
                             </div>
                           </div>
-                        </div>{/* Desktop/Tablet Layout */}
+                        </div>
+                        
+                        {/* Desktop/Tablet Layout */}
                         <div className="hidden md:grid grid-cols-[140px_50px_60px_1fr_32px_80px_32px_1fr_60px_50px_120px] items-center gap-2">
-                          {/* Left: Matchday & Status */}                          <div className="flex items-center gap-3">
+                          {/* Left: Matchday & Status */}
+                          <div className="flex items-center gap-3">
                             <div className={`text-xs font-mono font-bold ${
                               (fixture.status === 'live' || fixture.status === 'closed') ? 'text-yellow-500' : 'text-gray-500'
                             }`}>
                               MD{fixture.matchday}
                             </div>
                             {getStatusBadge(fixture.status)}
-                          </div>                          {/* Home Buy Button */}
+                          </div>                          
+                          
+                          {/* Home Buy Button */}
                           <div className="flex justify-center">
                             {fixture.home_team_id && fixture.status === 'scheduled' && (
                               <Button
@@ -683,7 +691,9 @@ const MatchResultsPage: React.FC = () => {
                                 {formatTime(fixture.kickoff_at)}
                               </span>
                             )}
-                          </div>                          {/* Away Team Logo */}
+                          </div>                          
+                          
+                          {/* Away Team Logo */}
                           <div className="flex justify-center">
                             <TeamLogo 
                               teamName={fixture.away_team?.name || 'Away Team'} 
@@ -702,7 +712,9 @@ const MatchResultsPage: React.FC = () => {
                               variant="default"
                               className="text-sm font-medium text-white hover:text-trading-primary transition-colors text-left truncate"
                             />
-                          </div>                          {/* Away Projected % Return */}
+                          </div>                          
+                          
+                          {/* Away Projected % Return */}
                           <div className="flex justify-center items-center">
                             {fixture.status === 'scheduled' && (() => {
                               const projectedReturn = calculateProjectedReturn(fixture.away_team_id, fixture.home_team_id);
