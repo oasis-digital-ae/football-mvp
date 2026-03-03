@@ -439,7 +439,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
                   <span className="text-gray-400 text-sm">Credit Balance</span>
                   <span className="text-red-400 font-medium text-sm">-{formatCurrency(creditBalance)}</span>
                 </div> */}
-                
+
                 {/* Total Value Row */}
                 <div className="flex justify-between items-center py-2 border-t border-gray-700/50 pt-3">
                   <span className="text-gray-400 text-sm">Total Value</span>
@@ -454,10 +454,10 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
                 <h3 className="text-sm font-semibold text-white mb-4">Performance</h3>
                 
                 {/* Actual Cash Deposited Row */}
-                <div className="flex justify-between items-center py-2">
+                {/* <div className="flex justify-between items-center py-2">
                   <span className="text-gray-400 text-sm">Actual Cash Deposited</span>
                   <span className="text-white font-medium text-sm">{formatCurrency(totalDeposits)}</span>
-                </div>
+                </div> */}
                 
                 {/* Credit Deposited Row - Only show if credit exists */}
                 {creditBalance > 0 && (
