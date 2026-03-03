@@ -521,36 +521,15 @@ const MatchResultsPage: React.FC = () => {
                                   </Button>
                                 )
                               )}
-                            </div>{/* Score/Time Divider */}
-                            {(fixture.status === 'applied' || fixture.status === 'live' || fixture.status === 'closed') && fixture.home_score != null && fixture.away_score !== null ? (
-                              <div className="flex items-center justify-center py-2 mb-2">
-                                <div className="flex items-center gap-2">
-                                  <span className={`text-xl font-bold ${
-                                    fixture.status === 'applied' && fixture.result === 'home_win' ? 'text-green-400' : 
-                                    fixture.status === 'applied' && fixture.result === 'away_win' ? 'text-gray-400' : 'text-white'
-                                  }`}>
-                                    {fixture.home_score}
-                                  </span>
-                                  <span className="text-gray-500">-</span>
-                                  <span className={`text-xl font-bold ${
-                                    fixture.status === 'applied' && fixture.result === 'away_win' ? 'text-green-400' : 
-                                    fixture.status === 'applied' && fixture.result === 'home_win' ? 'text-gray-400' : 'text-white'
-                                  }`}>
-                                    {fixture.away_score}
-                                  </span>
-                                </div>
-                                {(fixture.status === 'live' || fixture.status === 'closed') && (
-                                  <Badge variant="outline" className="ml-2 text-yellow-400 border-yellow-400/50 text-[10px] px-1.5 py-0 animate-pulse">
-                                    LIVE
-                                  </Badge>
-                                )}
-                              </div>
-                            ) : (
+                            </div>{/* Mobile: kickoff time for scheduled; divider only for scored matches (scores shown next to teams) */}
+                            {fixture.status === 'scheduled' ? (
                               <div className="text-center py-2 mb-2 border-y border-gray-700/30">
                                 <span className="text-sm text-gray-400 font-mono">
                                   {formatTime(fixture.kickoff_at)}
                                 </span>
                               </div>
+                            ) : (
+                              <div className="py-2 mb-2 border-y border-gray-700/30" />
                             )}                            
                             {/* Away Team Row */}
                             <div className="flex items-center justify-between">
