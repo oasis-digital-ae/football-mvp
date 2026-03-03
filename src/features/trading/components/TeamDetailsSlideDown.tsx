@@ -908,22 +908,22 @@ const TeamDetailsSlideDown: React.FC<TeamDetailsSlideDownProps> = ({
 
                                   {/* Stats Row: Share Prices and Market Caps */}
                                   <div className="space-y-2 pt-2 border-t border-gray-700/20">
-                                    {/* Selected Team */}
+                                    {/* Team Price and Market Cap */}
                                     <div className="grid grid-cols-2 gap-2">
                                       <div>
-                                        <p className="text-[9px] sm:text-[10px] text-gray-400 mb-0.5">{teamName} Price</p>
+                                        <p className="text-[9px] sm:text-[10px] text-gray-400 mb-0.5">Team Price</p>
                                         <p className="text-[11px] sm:text-xs font-semibold font-mono text-white">
                                           {formatCurrency(match.teamSharePrice)}
                                         </p>
                                       </div>
                                       <div className="text-right">
-                                        <p className="text-[9px] sm:text-[10px] text-gray-400 mb-0.5">{teamName} Market Cap</p>
+                                        <p className="text-[9px] sm:text-[10px] text-gray-400 mb-0.5">Team Market Cap</p>
                                         <p className="text-[11px] sm:text-xs font-semibold font-mono text-white">
                                           {formatCurrency(match.teamMarketCap)}
                                         </p>
                                       </div>
                                     </div>
-                                    {/* Opponent Team */}
+                                    {/* Opponent Price and Market Cap */}
                                     <div className="grid grid-cols-2 gap-2">
                                       <div>
                                         <p className="text-[9px] sm:text-[10px] text-gray-400 mb-0.5">Opponent Price</p>
