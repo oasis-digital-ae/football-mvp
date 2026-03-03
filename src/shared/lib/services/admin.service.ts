@@ -810,11 +810,12 @@ export const adminService = {
         .select('ref')
         .eq('type', 'credit_loan_reversal');
 
-      // Create a set of reversed transaction refs
-      const reversedRefs = new Set(
+      // Match by transaction ID: reversal ref format is "reversal_<original_tx_id>"
+      // (Ref-based matching was wrong when multiple loans shared the same ref)
+      const reversedIds = new Set(
         (reversals || [])
-          .map(r => r.ref?.replace('reversal_', ''))
-          .filter(Boolean)
+          .map(r => r.ref?.match(/^reversal_(\d+)/)?.[1])
+          .filter((id): id is string => Boolean(id))
       );
 
       const userIds = [...new Set((transactions || []).map(tx => tx.user_id))];
@@ -834,7 +835,7 @@ export const adminService = {
         type: tx.type,
         ref: tx.ref,
         created_at: tx.created_at,
-        is_reversed: reversedRefs.has(tx.ref || '') || reversedRefs.has(tx.id.toString())
+        is_reversed: reversedIds.has(tx.id.toString())
       }));
     } catch (error) {
       logger.error('Error fetching credit loans:', error);

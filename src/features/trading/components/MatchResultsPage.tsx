@@ -495,7 +495,7 @@ const MatchResultsPage: React.FC = () => {
                                   </span>
                                 );
                               })()}
-                              {(fixture.status === 'applied' || fixture.status === 'closed') && fixture.home_score !== null ? (
+                              {(fixture.status === 'applied' || fixture.status === 'live' || fixture.status === 'closed') && fixture.home_score != null ? (
                                 <span className={`text-lg font-bold ml-2 ${
                                   fixture.status === 'applied' && fixture.result === 'home_win' ? 'text-green-400' : 
                                   fixture.status === 'applied' && fixture.result === 'away_win' ? 'text-gray-400' : 'text-white'
@@ -520,7 +520,7 @@ const MatchResultsPage: React.FC = () => {
                                 )
                               )}
                             </div>{/* Score/Time Divider */}
-                            {(fixture.status === 'applied' || fixture.status === 'closed') && fixture.home_score !== null && fixture.away_score !== null ? (
+                            {(fixture.status === 'applied' || fixture.status === 'live' || fixture.status === 'closed') && fixture.home_score != null && fixture.away_score !== null ? (
                               <div className="flex items-center justify-center py-2 mb-2">
                                 <div className="flex items-center gap-2">
                                   <span className={`text-xl font-bold ${
@@ -537,7 +537,7 @@ const MatchResultsPage: React.FC = () => {
                                     {fixture.away_score}
                                   </span>
                                 </div>
-                                {fixture.status === 'closed' && (
+                                {(fixture.status === 'live' || fixture.status === 'closed') && (
                                   <Badge variant="outline" className="ml-2 text-yellow-400 border-yellow-400/50 text-[10px] px-1.5 py-0 animate-pulse">
                                     LIVE
                                   </Badge>
@@ -575,7 +575,7 @@ const MatchResultsPage: React.FC = () => {
                                   </span>
                                 );
                               })()}
-                              {(fixture.status === 'applied' || fixture.status === 'closed') && fixture.away_score !== null ? (
+                              {(fixture.status === 'applied' || fixture.status === 'live' || fixture.status === 'closed') && fixture.away_score != null ? (
                                 <span className={`text-lg font-bold ml-2 ${
                                   fixture.status === 'applied' && fixture.result === 'away_win' ? 'text-green-400' : 
                                   fixture.status === 'applied' && fixture.result === 'home_win' ? 'text-gray-400' : 'text-white'
@@ -662,7 +662,7 @@ const MatchResultsPage: React.FC = () => {
                             />
                           </div>{/* Score/Time */}
                           <div className="flex items-center gap-2 justify-center">
-                            {(fixture.status === 'applied' || fixture.status === 'closed') && fixture.home_score !== null && fixture.away_score !== null ? (
+                            {(fixture.status === 'applied' || fixture.status === 'live' || fixture.status === 'closed') && fixture.home_score != null && fixture.away_score !== null ? (
                               <>
                                 <span className={`text-lg font-bold ${
                                   fixture.status === 'applied' && fixture.result === 'home_win' ? 'text-green-400' : 

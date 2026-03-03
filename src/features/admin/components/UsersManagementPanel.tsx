@@ -32,7 +32,7 @@ import {
   calculateAverageCost
 } from '@/shared/lib/utils/calculations';
 
-type SortField = 'username' | 'wallet_balance' | 'total_deposits' | 'net_worth' | 'portfolio_value' | 'profit_loss' | 'return_percent' | 'positions_count' | 'reffered_by' | 'last_activity' | 'created_at';
+type SortField = 'username' | 'wallet_balance' | 'total_deposits' | 'credit_balance' | 'net_worth' | 'portfolio_value' | 'profit_loss' | 'return_percent' | 'positions_count' | 'reffered_by' | 'last_activity' | 'created_at';
 type SortDirection = 'asc' | 'desc';
 
 export const UsersManagementPanel: React.FC = () => {
@@ -160,22 +160,28 @@ export const UsersManagementPanel: React.FC = () => {
           aValue = a.total_deposits;
           bValue = b.total_deposits;
           break;
+        case 'credit_balance':
+          aValue = a.credit_balance;
+          bValue = b.credit_balance;
+          break;
         case 'net_worth':
-          aValue = a.wallet_balance + a.portfolio_value;
-          bValue = b.wallet_balance + b.portfolio_value;
+          aValue = (a.wallet_balance + a.portfolio_value) - (a.credit_balance || 0);
+          bValue = (b.wallet_balance + b.portfolio_value) - (b.credit_balance || 0);
           break;
         case 'portfolio_value':
           aValue = a.portfolio_value;
           bValue = b.portfolio_value;
           break;
         case 'profit_loss':
-          // Calculate Total P&L the same way as in the table display
-          aValue = (a.wallet_balance + a.portfolio_value) - a.total_deposits;
-          bValue = (b.wallet_balance + b.portfolio_value) - b.total_deposits;
+          // Calculate Total P&L: Net Worth (excl. credit) minus deposits
+          aValue = (a.wallet_balance + a.portfolio_value) - (a.credit_balance || 0) - a.total_deposits;
+          bValue = (b.wallet_balance + b.portfolio_value) - (b.credit_balance || 0) - b.total_deposits;
           break;
         case 'return_percent':
-          aValue = a.total_deposits !== 0 ? ((a.wallet_balance + a.portfolio_value - a.total_deposits) / a.total_deposits) * 100 : 0;
-          bValue = b.total_deposits !== 0 ? ((b.wallet_balance + b.portfolio_value - b.total_deposits) / b.total_deposits) * 100 : 0;
+          const aNetWorth = (a.wallet_balance + a.portfolio_value) - (a.credit_balance || 0);
+          const bNetWorth = (b.wallet_balance + b.portfolio_value) - (b.credit_balance || 0);
+          aValue = a.total_deposits !== 0 ? ((aNetWorth - a.total_deposits) / a.total_deposits) * 100 : 0;
+          bValue = b.total_deposits !== 0 ? ((bNetWorth - b.total_deposits) / b.total_deposits) * 100 : 0;
           break;        case 'positions_count':
           aValue = a.positions_count;
           bValue = b.positions_count;
@@ -210,6 +216,7 @@ export const UsersManagementPanel: React.FC = () => {
       'Portfolio Value',
       'Net Worth',
       'Total Deposits',
+      'Credit',
       'Total P&L',
       'Return %',
       'Positions',
@@ -219,7 +226,7 @@ export const UsersManagementPanel: React.FC = () => {
     ];
 
     const csvData = filteredAndSortedUsers.map(user => {
-      const netWorth = user.wallet_balance + user.portfolio_value;
+      const netWorth = (user.wallet_balance + user.portfolio_value) - (user.credit_balance || 0);
       const totalPnL = netWorth - user.total_deposits;
       const returnPercent = user.total_deposits !== 0 ? (totalPnL / user.total_deposits) * 100 : 0;
         return [
@@ -230,7 +237,9 @@ export const UsersManagementPanel: React.FC = () => {
         user.portfolio_value,
         netWorth,
         user.total_deposits,
-        totalPnL,        returnPercent.toFixed(2) + '%',
+        user.credit_balance,
+        totalPnL,
+        returnPercent.toFixed(2) + '%',
         user.positions_count,
         user.reffered_by || 'N/A',
         new Date(user.last_activity).toLocaleString(),
@@ -367,6 +376,15 @@ export const UsersManagementPanel: React.FC = () => {
                         <SortIcon field="total_deposits" />
                       </button>
                     </th>
+                    <th className="px-4 text-center min-w-[110px]">
+                      <button
+                        onClick={() => handleSort('credit_balance')}
+                        className="flex items-center justify-center gap-2 hover:text-foreground transition-colors mx-auto"
+                      >
+                        <span>Credit</span>
+                        <SortIcon field="credit_balance" />
+                      </button>
+                    </th>
                     <th className="px-4 text-center min-w-[130px]">
                       <button
                         onClick={() => handleSort('profit_loss')}
@@ -417,7 +435,7 @@ export const UsersManagementPanel: React.FC = () => {
                 </thead>
                 <tbody>
                   {filteredAndSortedUsers.map((user) => {
-                    const netWorth = user.wallet_balance + user.portfolio_value;
+                    const netWorth = (user.wallet_balance + user.portfolio_value) - (user.credit_balance || 0);
                     const totalPnL = netWorth - user.total_deposits;
                     const returnPercent = user.total_deposits !== 0 ? (totalPnL / user.total_deposits) * 100 : 0;
                     
@@ -447,6 +465,9 @@ export const UsersManagementPanel: React.FC = () => {
                         </td>
                         <td className="px-4 text-center">
                           <div className="font-medium font-mono text-sm">{formatCurrency(user.total_deposits)}</div>
+                        </td>
+                        <td className="px-4 text-center">
+                          <div className="font-medium font-mono text-sm">{formatCurrency(user.credit_balance)}</div>
                         </td>
                         <td className="px-4 text-center">
                           <div className="flex items-center justify-center gap-1">

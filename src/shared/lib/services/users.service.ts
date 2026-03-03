@@ -12,6 +12,7 @@ export interface UserListItem {
   email?: string;
   wallet_balance: number;
   total_deposits: number; // Total deposits made by user
+  credit_balance: number; // Net credit extended (loans minus reversals)
   total_invested: number;
   portfolio_value: number;  
   unrealized_pnl: number;
@@ -140,6 +141,18 @@ export const usersService = {
         totalDepositsMap.set(tx.user_id, current + fromCents(tx.amount_cents || 0).toNumber());
       });
 
+      // Get credit loans and reversals for credit balance per user
+      const { data: creditTransactions } = await supabase
+        .from('wallet_transactions')
+        .select('user_id, amount_cents')
+        .in('type', ['credit_loan', 'credit_loan_reversal']);
+
+      const creditBalanceMap = new Map<string, number>();
+      (creditTransactions || []).forEach(tx => {
+        const current = creditBalanceMap.get(tx.user_id) || 0;
+        creditBalanceMap.set(tx.user_id, current + fromCents(tx.amount_cents || 0).toNumber());
+      });
+
       // Group orders by user to find last activity
       const lastActivityMap = new Map<string, string>();
       (orders || []).forEach(order => {
@@ -243,7 +256,8 @@ export const usersService = {
           realizedPnl: 0,
           profitLoss: 0,
           positionsCount: 0
-        };        return {
+        };        const creditBalance = Math.max(0, creditBalanceMap.get(profile.id) || 0);
+        return {
           id: profile.id,
           username: profile.username || 'Unknown',
           first_name: profile.first_name,
@@ -251,6 +265,7 @@ export const usersService = {
           email: profile.email,
           wallet_balance: fromCents(profile.wallet_balance || 0).toNumber(),
           total_deposits: totalDepositsMap.get(profile.id) || 0,
+          credit_balance: creditBalance,
           total_invested: metrics.totalInvested,
           portfolio_value: metrics.portfolioValue,
           unrealized_pnl: metrics.unrealizedPnl,
@@ -597,13 +612,18 @@ export const usersService = {
       // Get total deposits for this user
       const { data: walletTransactions } = await supabase
         .from('wallet_transactions')
-        .select('amount_cents')
+        .select('amount_cents, type')
         .eq('user_id', userId)
-        .eq('type', 'deposit');
+        .in('type', ['deposit', 'credit_loan', 'credit_loan_reversal']);
 
-      const totalDeposits = (walletTransactions || []).reduce((sum, tx) => {
-        return sum + fromCents(tx.amount_cents || 0).toNumber();
-      }, 0);
+      let totalDeposits = 0;
+      let creditBalance = 0;
+      (walletTransactions || []).forEach(tx => {
+        const amount = fromCents(tx.amount_cents || 0).toNumber();
+        if (tx.type === 'deposit') totalDeposits += amount;
+        if (tx.type === 'credit_loan' || tx.type === 'credit_loan_reversal') creditBalance += amount;
+      });
+      creditBalance = Math.max(0, creditBalance);
 
       return {
         id: profile.id,
@@ -616,6 +636,7 @@ export const usersService = {
         phone: profile.phone,
         wallet_balance: fromCents(profile.wallet_balance || 0).toNumber(),
         total_deposits: totalDeposits,
+        credit_balance: creditBalance,
         total_invested: totalInvested,
         portfolio_value: portfolioValue,
         unrealized_pnl: unrealizedPnl,
