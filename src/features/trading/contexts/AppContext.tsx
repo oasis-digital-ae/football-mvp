@@ -889,7 +889,26 @@ const AppProviderInner: React.FC<{ children: React.ReactNode }> = ({ children })
   }, 'simulateMatch');
 
   const getTransactionsByClub = (clubId: string): Transaction[] => {
-    return transactions.filter(t => t.clubId === clubId).sort((a, b) => 
+    const teamTransactions = transactions
+      .filter(t => t.clubId === clubId)
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()); // Chronological for cycle logic
+
+    if (teamTransactions.length === 0) return [];
+
+    let runningShares = 0;
+    let currentCycleStartIndex = 0;
+
+    teamTransactions.forEach((tx, i) => {
+      if (tx.orderType === 'BUY') {
+        if (runningShares === 0) currentCycleStartIndex = i; // New cycle starts
+        runningShares += tx.units;
+      } else {
+        runningShares -= tx.units;
+      }
+    });
+
+    const currentCycleTransactions = teamTransactions.slice(currentCycleStartIndex);
+    return currentCycleTransactions.sort((a, b) =>
       new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
   };
