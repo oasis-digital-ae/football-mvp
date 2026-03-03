@@ -118,7 +118,7 @@ export const handler = schedule('*/30 * * * *', async (event: HandlerEvent): Pro
   }
 });
 
-async function processUpdate() {
+export async function processUpdate() {
   const results = {
     checked: 0,
     updated: 0,

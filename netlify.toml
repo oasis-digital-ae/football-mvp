@@ -26,7 +26,10 @@
 # Scheduled function configuration
 # This ensures Netlify recognizes the scheduled function
 [functions."update-matches"]
-  schedule = "*/30 * * * *"  # Every 30 minutes
+  schedule = "*/30 * * * *"  # Every 30 minutes (full sync + score updates)
+
+[functions."update-matches-live"]
+  schedule = "* 0-3,11-23 * * *"  # Every minute 11:00-03:00 UTC (covers matches running past midnight) - exits early if no live matches
 
 # Scheduled function configuration
 # This ensures Netlify recognizes the scheduled function for Weekly Leaderboard
