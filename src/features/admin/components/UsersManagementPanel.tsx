@@ -20,27 +20,25 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Wallet,
   CreditCard
 } from 'lucide-react';
-import { usersService, type UserListItem, type UserDetails, type WalletTransactionEnriched } from '@/shared/lib/services/users.service';
-import { adminService } from '@/shared/lib/services/admin.service';
+import { usersService, type UserListItem, type UserDetails, type WalletTransaction } from '@/shared/lib/services/users.service';
 import { formatCurrency } from '@/shared/lib/formatters';
 import { useToast } from '@/shared/hooks/use-toast';
 import { supabase } from '@/shared/lib/supabase';
-import { calculateNetWorth } from '@/shared/hooks/useNetWorth';
 import {
   calculatePercentChange,
   calculateAverageCost
 } from '@/shared/lib/utils/calculations';
 
-type SortField = 'username' | 'wallet_balance' | 'total_deposits' | 'credit_balance' | 'net_worth' | 'portfolio_value' | 'profit_loss' | 'return_percent' | 'positions_count' | 'reffered_by' | 'last_activity' | 'created_at';
+type SortField = 'username' | 'wallet_balance' | 'total_deposits' | 'net_worth' | 'portfolio_value' | 'profit_loss' | 'return_percent' | 'positions_count' | 'reffered_by' | 'last_activity' | 'created_at';
 type SortDirection = 'asc' | 'desc';
 
 export const UsersManagementPanel: React.FC = () => {
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserDetails | null>(null);
-  const [userTransactions, setUserTransactions] = useState<WalletTransactionEnriched[]>([]);
-  const [creditByUser, setCreditByUser] = useState<Map<string, number>>(new Map());
+  const [userTransactions, setUserTransactions] = useState<WalletTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -50,21 +48,12 @@ export const UsersManagementPanel: React.FC = () => {
   const [creditAmount, setCreditAmount] = useState('');
   const [crediting, setCrediting] = useState(false);
   const { toast } = useToast();
+
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const [userList, creditSummary] = await Promise.all([
-        usersService.getUserList(),
-        adminService.getCreditLoanSummary()
-      ]);
+      const userList = await usersService.getUserList();
       setUsers(userList);
-      
-      // Create a map of user_id -> total credit in dollars (not cents)
-      const creditMap = new Map<string, number>();
-      creditSummary.perUserBreakdown.forEach(user => {
-        creditMap.set(user.user_id, user.total_credit_cents / 100);
-      });
-      setCreditByUser(creditMap);
     } catch (error) {
       console.error('Error loading users:', error);
       toast({
@@ -87,7 +76,7 @@ export const UsersManagementPanel: React.FC = () => {
     try {
       const [details, transactions] = await Promise.all([
         usersService.getUserDetails(userId),
-        usersService.getUserTransactionsEnriched(userId, 50)
+        usersService.getUserTransactions(userId, 50)
       ]);
       setSelectedUser(details);
       setUserTransactions(transactions);
@@ -118,10 +107,10 @@ export const UsersManagementPanel: React.FC = () => {
 
     setCrediting(true);
     try {
-      await usersService.creditUserWalletLoan(selectedUser.id, amount);
+      await usersService.creditUserWallet(selectedUser.id, amount);
       toast({
         title: 'Success',
-        description: `Extended ${formatCurrency(amount)} credit to ${selectedUser.username}'s wallet`
+        description: `Credited ${formatCurrency(amount)} to ${selectedUser.username}'s wallet`
       });
       setCreditAmount('');
       await loadUsers();
@@ -147,6 +136,7 @@ export const UsersManagementPanel: React.FC = () => {
       setSortDirection('desc');
     }
   };
+
   const filteredAndSortedUsers = useMemo(() => {
     let filtered = users.filter(user =>
       user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -165,33 +155,28 @@ export const UsersManagementPanel: React.FC = () => {
         case 'wallet_balance':
           aValue = a.wallet_balance;
           bValue = b.wallet_balance;
-          break;        case 'total_deposits':
+          break;
+        case 'total_deposits':
           aValue = a.total_deposits;
           bValue = b.total_deposits;
-          break;        
-        case 'credit_balance':
-          aValue = creditByUser.get(a.id) || 0;
-          bValue = creditByUser.get(b.id) || 0;
           break;
         case 'net_worth':
-          // Use centralized Net Worth calculation with actual credit balance
-          aValue = calculateNetWorth(a.portfolio_value, a.wallet_balance, creditByUser.get(a.id) || 0, a.total_deposits).netWorth;
-          bValue = calculateNetWorth(b.portfolio_value, b.wallet_balance, creditByUser.get(b.id) || 0, b.total_deposits).netWorth;
+          aValue = a.wallet_balance + a.portfolio_value;
+          bValue = b.wallet_balance + b.portfolio_value;
           break;
         case 'portfolio_value':
           aValue = a.portfolio_value;
           bValue = b.portfolio_value;
           break;
         case 'profit_loss':
-          // Use centralized P&L calculation with actual credit balance
-          aValue = calculateNetWorth(a.portfolio_value, a.wallet_balance, creditByUser.get(a.id) || 0, a.total_deposits).pnl;
-          bValue = calculateNetWorth(b.portfolio_value, b.wallet_balance, creditByUser.get(b.id) || 0, b.total_deposits).pnl;
+          // Calculate Total P&L the same way as in the table display
+          aValue = (a.wallet_balance + a.portfolio_value) - a.total_deposits;
+          bValue = (b.wallet_balance + b.portfolio_value) - b.total_deposits;
           break;
         case 'return_percent':
-          // Use centralized P&L percentage calculation with actual credit balance
-          aValue = parseFloat(calculateNetWorth(a.portfolio_value, a.wallet_balance, creditByUser.get(a.id) || 0, a.total_deposits).pnlPercentage);
-          bValue = parseFloat(calculateNetWorth(b.portfolio_value, b.wallet_balance, creditByUser.get(b.id) || 0, b.total_deposits).pnlPercentage);
-          break;case 'positions_count':
+          aValue = a.total_deposits !== 0 ? ((a.wallet_balance + a.portfolio_value - a.total_deposits) / a.total_deposits) * 100 : 0;
+          bValue = b.total_deposits !== 0 ? ((b.wallet_balance + b.portfolio_value - b.total_deposits) / b.total_deposits) * 100 : 0;
+          break;        case 'positions_count':
           aValue = a.positions_count;
           bValue = b.positions_count;
           break;
@@ -211,12 +196,13 @@ export const UsersManagementPanel: React.FC = () => {
           return 0;
       }
 
-      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
 
     return filtered;
-  }, [users, searchTerm, sortField, sortDirection, creditByUser]);const handleExportCSV = () => {    const headers = [
+  }, [users, searchTerm, sortField, sortDirection]);  const handleExportCSV = () => {    const headers = [
       'Username',
       'Name',
       'Email',
@@ -224,34 +210,27 @@ export const UsersManagementPanel: React.FC = () => {
       'Portfolio Value',
       'Net Worth',
       'Total Deposits',
-      'Credit Balance',
       'Total P&L',
       'Return %',
       'Positions',
       'Referred By',
       'Last Activity',
       'Created'
-    ];    const csvData = filteredAndSortedUsers.map(user => {
-      const creditBalance = creditByUser.get(user.id) || 0;
-      // Use centralized Net Worth calculation with actual credit balance
-      const netWorthData = calculateNetWorth(
-        user.portfolio_value,
-        user.wallet_balance,
-        creditBalance,
-        user.total_deposits
-      );
-      
-      return [
+    ];
+
+    const csvData = filteredAndSortedUsers.map(user => {
+      const netWorth = user.wallet_balance + user.portfolio_value;
+      const totalPnL = netWorth - user.total_deposits;
+      const returnPercent = user.total_deposits !== 0 ? (totalPnL / user.total_deposits) * 100 : 0;
+        return [
         user.username,
         `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'N/A',
         user.email || 'N/A',
         user.wallet_balance,
         user.portfolio_value,
-        netWorthData.netWorth,
+        netWorth,
         user.total_deposits,
-        creditBalance,
-        netWorthData.pnl,
-        netWorthData.pnlPercentage + '%',
+        totalPnL,        returnPercent.toFixed(2) + '%',
         user.positions_count,
         user.reffered_by || 'N/A',
         new Date(user.last_activity).toLocaleString(),
@@ -351,7 +330,8 @@ export const UsersManagementPanel: React.FC = () => {
                         <span>User</span>
                         <SortIcon field="username" />
                       </button>
-                    </th>                    <th className="px-4 text-center min-w-[120px]">
+                    </th>
+                    <th className="px-4 text-center min-w-[120px]">
                       <button
                         onClick={() => handleSort('wallet_balance')}
                         className="flex items-center justify-center gap-2 hover:text-foreground transition-colors mx-auto"
@@ -377,22 +357,14 @@ export const UsersManagementPanel: React.FC = () => {
                         <span>Net Worth</span>
                         <SortIcon field="net_worth" />
                       </button>
-                    </th>                    <th className="px-4 text-center min-w-[140px]">
+                    </th>
+                    <th className="px-4 text-center min-w-[140px]">
                       <button
                         onClick={() => handleSort('total_deposits')}
                         className="flex items-center justify-center gap-2 hover:text-foreground transition-colors mx-auto"
                       >
                         <span>Deposits</span>
                         <SortIcon field="total_deposits" />
-                      </button>
-                    </th>
-                    <th className="px-4 text-center min-w-[120px]">
-                      <button
-                        onClick={() => handleSort('credit_balance')}
-                        className="flex items-center justify-center gap-2 hover:text-foreground transition-colors mx-auto"
-                      >
-                        <span>Credit</span>
-                        <SortIcon field="credit_balance" />
                       </button>
                     </th>
                     <th className="px-4 text-center min-w-[130px]">
@@ -439,17 +411,15 @@ export const UsersManagementPanel: React.FC = () => {
                         <span>Referred By</span>
                         <SortIcon field="reffered_by" />
                       </button>
-                    </th>                    <th className="px-4 text-left min-w-[100px]">Actions</th>
+                    </th>
+                    <th className="px-4 text-left min-w-[100px]">Actions</th>
                   </tr>
-                </thead>                <tbody>                  {filteredAndSortedUsers.map((user) => {
-                    const creditBalance = creditByUser.get(user.id) || 0;
-                    // Use centralized Net Worth calculation with actual credit balance
-                    const netWorthData = calculateNetWorth(
-                      user.portfolio_value,
-                      user.wallet_balance,
-                      creditBalance,
-                      user.total_deposits
-                    );
+                </thead>
+                <tbody>
+                  {filteredAndSortedUsers.map((user) => {
+                    const netWorth = user.wallet_balance + user.portfolio_value;
+                    const totalPnL = netWorth - user.total_deposits;
+                    const returnPercent = user.total_deposits !== 0 ? (totalPnL / user.total_deposits) * 100 : 0;
                     
                     return (
                       <tr key={user.id}>
@@ -465,36 +435,35 @@ export const UsersManagementPanel: React.FC = () => {
                               <p className="text-xs text-muted-foreground">{user.email}</p>
                             )}
                           </div>
-                        </td>                        <td className="px-4 text-center">
+                        </td>
+                        <td className="px-4 text-center">
                           <div className="font-medium font-mono text-sm">{formatCurrency(user.wallet_balance)}</div>
                         </td>
                         <td className="px-4 text-center">
                           <div className="font-medium font-mono text-sm">{formatCurrency(user.portfolio_value)}</div>
                         </td>
                         <td className="px-4 text-center">
-                          <div className="font-medium font-mono text-sm">{formatCurrency(netWorthData.netWorth)}</div>
-                        </td>                        <td className="px-4 text-center">
+                          <div className="font-medium font-mono text-sm">{formatCurrency(netWorth)}</div>
+                        </td>
+                        <td className="px-4 text-center">
                           <div className="font-medium font-mono text-sm">{formatCurrency(user.total_deposits)}</div>
                         </td>
                         <td className="px-4 text-center">
-                          <div className="font-medium font-mono text-sm">{formatCurrency(creditBalance)}</div>
-                        </td>
-                        <td className="px-4 text-center">
                           <div className="flex items-center justify-center gap-1">
-                            {netWorthData.pnl >= 0 ? (
+                            {totalPnL >= 0 ? (
                               <TrendingUp className="h-4 w-4 text-green-600" />
                             ) : (
                               <TrendingDown className="h-4 w-4 text-red-600" />
                             )}
-                            <span className={`font-mono text-sm ${netWorthData.pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {netWorthData.pnl >= 0 ? '+' : ''}
-                              {formatCurrency(netWorthData.pnl)}
+                            <span className={`font-mono text-sm ${totalPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {totalPnL >= 0 ? '+' : ''}
+                              {formatCurrency(totalPnL)}
                             </span>
                           </div>
                         </td>
                         <td className="px-4 text-center">
-                          <div className={`font-mono font-semibold text-sm ${netWorthData.isProfit ? 'text-green-600' : netWorthData.isLoss ? 'text-red-600' : 'text-gray-600'}`}>
-                            {netWorthData.isProfit ? '+' : ''}{netWorthData.pnlPercentage}%
+                          <div className={`font-mono font-semibold text-sm ${returnPercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {returnPercent >= 0 ? '+' : ''}{returnPercent.toFixed(2)}%
                           </div>
                         </td>
                         <td className="px-4 text-center">
@@ -612,7 +581,7 @@ export const UsersManagementPanel: React.FC = () => {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
-                      <p className="text-sm font-medium mb-2">Extend Credit (Loan)</p>
+                      <p className="text-sm font-medium mb-2">Credit Wallet</p>
                       <div className="flex flex-col sm:flex-row gap-2">
                         <Input
                           type="number"
@@ -632,82 +601,26 @@ export const UsersManagementPanel: React.FC = () => {
                       </div>
                     </div>
                     <div>
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <div>
-                          <p className="text-sm font-medium">Transaction History</p>
-                          <p className="text-xs text-muted-foreground">
-                            Purchase/sale details show team, quantity, and price for easier leaderboard tracing
-                          </p>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            const headers = ['Date', 'Type', 'Amount', 'Team', 'Quantity', 'Price/Share', 'Order ID', 'Ref'];
-                            const rows = userTransactions.map((tx) => [
-                              new Date(tx.created_at).toISOString(),
-                              tx.type,
-                              (tx.amount_cents / 100).toFixed(2),
-                              tx.team_name ?? '',
-                              tx.quantity ?? '',
-                              tx.price_per_share_cents != null ? (tx.price_per_share_cents / 100).toFixed(2) : '',
-                              tx.order_id ?? '',
-                              tx.ref ?? ''
-                            ]);
-                            const csv = [headers.join(','), ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\n');
-                            const blob = new Blob([csv], { type: 'text/csv' });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = `transactions-${selectedUser?.username ?? 'user'}-${new Date().toISOString().slice(0, 10)}.csv`;
-                            a.click();
-                            URL.revokeObjectURL(url);
-                          }}
-                          disabled={userTransactions.length === 0}
-                        >
-                          <Download className="h-4 w-4 mr-1.5" />
-                          Export CSV
-                        </Button>
-                      </div>
-                      <div className="space-y-2 max-h-80 overflow-y-auto scrollbar-hide">                        
+                      <p className="text-sm font-medium mb-2">Transaction History</p>
+                      <div className="space-y-2 max-h-64 overflow-y-auto scrollbar-hide">                        
                         {userTransactions.length === 0 ? (
                           <p className="text-sm text-muted-foreground">No transactions</p>
                         ) : (
                           userTransactions.map((tx) => {
-                            const isPositive = ['deposit', 'sale', 'refund', 'credit_loan'].includes(tx.type.toLowerCase());
+                            // Types that add money to wallet (positive/green): deposit, sale, refund
+                            const isPositive = ['deposit', 'sale', 'refund'].includes(tx.type.toLowerCase());
                             const amount = tx.amount_cents / 100;
-                            const displayType = tx.type === 'credit_loan' ? 'Platform Credit' : tx.type === 'credit_loan_reversal' ? 'Credit Reversal' : tx.type;
-                            
-                            let description: string;
-                            if (tx.type === 'purchase' && tx.team_name != null) {
-                              const price = (tx.price_per_share_cents ?? 0) / 100;
-                              description = `${tx.quantity ?? '?'} shares of ${tx.team_name} @ ${formatCurrency(price)}`;
-                            } else if (tx.type === 'sale' && tx.team_name != null) {
-                              const price = (tx.price_per_share_cents ?? 0) / 100;
-                              description = `${tx.quantity ?? '?'} shares of ${tx.team_name} @ ${formatCurrency(price)}`;
-                            } else if (tx.ref) {
-                              description = tx.ref;
-                            } else {
-                              description = new Date(tx.created_at).toLocaleString();
-                            }
                             
                             return (
-                              <div key={tx.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 p-2.5 border rounded text-sm">
+                              <div key={tx.id} className="flex items-center justify-between p-2 border rounded text-sm">
                                 <div className="min-w-0 flex-1">
-                                  <p className="text-sm font-medium capitalize">{displayType}</p>
-                                  <p className="text-xs text-muted-foreground break-words" title={description}>
-                                    {description}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground/80 mt-0.5">
-                                    {new Date(tx.created_at).toLocaleString()}
-                                    {tx.order_id != null && (
-                                      <span className="ml-1.5 font-mono">#{tx.order_id}</span>
-                                    )}
-                                  </p>
+                                  <p className="text-sm font-medium capitalize truncate">{tx.type}</p>
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {new Date(tx.created_at).toLocaleString()}                                  </p>
                                 </div>
                                 <div className="text-right flex-shrink-0">
                                   <p className={`text-sm font-medium font-mono whitespace-nowrap ${
-                                    isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                                    isPositive ? 'text-green-600' : 'text-red-600'
                                   }`}>
                                     {isPositive ? '+' : '-'}{formatCurrency(Math.abs(amount))}
                                   </p>

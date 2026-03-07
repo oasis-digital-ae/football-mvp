@@ -452,27 +452,16 @@ export const handler = schedule("0 23 * * 0", async (event: HandlerEvent): Promi
   }
 
   /**
-   * Step 4: Demote ALL previous leaderboard entries (set is_latest = false)
-   * Then promote only this week's rows. Using a two-step approach avoids
-   * timestamp format mismatches (JS ISO vs Postgres) that caused multiple
-   * weeks to have is_latest=true, producing duplicate users in the RPC.
+   * Step 4: Demote previous leaderboard entries (set is_latest = false)
+   * Use week_start string for consistent comparison with timestamptz
    */
-  const { error: demoteAllError } = await supabase
+  const { error: demoteError } = await supabase
     .from("weekly_leaderboard")
     .update({ is_latest: false })
-    .eq("is_latest", true);
+    .neq("week_start", weekStartStr);
 
-  if (demoteAllError) {
-    console.warn("⚠️ Demote all failed (non-fatal):", demoteAllError);
-  } else {
-    const { error: promoteError } = await supabase
-      .from("weekly_leaderboard")
-      .update({ is_latest: true })
-      .eq("week_start", weekStartStr);
-
-    if (promoteError) {
-      console.warn("⚠️ Promote current week failed (non-fatal):", promoteError);
-    }
+  if (demoteError) {
+    console.warn("⚠️ Demote previous failed (non-fatal):", demoteError);
   }
 
   console.log(`✅ Weekly leaderboard generated (${rows.length} users)`);

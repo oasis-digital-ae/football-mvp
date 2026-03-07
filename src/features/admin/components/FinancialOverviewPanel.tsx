@@ -31,19 +31,15 @@ export const FinancialOverviewPanel: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const [creditSummary, setCreditSummary] = useState<{ totalCreditExtended: number } | null>(null);
-
   const loadFinancialData = async () => {
     try {
       setLoading(true);
-      const [financial, transactions, credit] = await Promise.all([
+      const [financial, transactions] = await Promise.all([
         adminService.getFinancialOverview(),
-        adminService.getAllWalletTransactions(100),
-        adminService.getCreditLoanSummary().catch(() => ({ totalCreditExtended: 0, usersWithCredit: 0, perUserBreakdown: [] }))
+        adminService.getAllWalletTransactions(100)
       ]);
       setOverview(financial);
       setWalletTransactions(transactions);
-      setCreditSummary(credit);
     } catch (error: any) {
       console.error('Error loading financial data:', error);
       const errorMessage = error?.message || 'Failed to load financial data';
@@ -74,7 +70,6 @@ export const FinancialOverviewPanel: React.FC = () => {
       ['Total Platform Value', overview.totalPlatformValue],
       ['Total User Deposits', overview.totalUserDeposits],
       ['Total User Wallets', overview.totalUserWallets],
-      ['Total Credit Extended', creditSummary?.totalCreditExtended ?? 0],
       ['Cost', overview.totalInvested],
       ['Platform Revenue', overview.platformRevenue]
     ];
@@ -98,7 +93,7 @@ export const FinancialOverviewPanel: React.FC = () => {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {Array.from({ length: 5 }).map((_, i) => (
             <Card key={i}>
               <CardContent className="p-4">
@@ -159,12 +154,6 @@ export const FinancialOverviewPanel: React.FC = () => {
       value: formatCurrency(overview.totalInvested),
       icon: BarChart3,
       description: 'In positions'
-    },
-    {
-      title: 'Total Credit Extended',
-      value: formatCurrency(creditSummary?.totalCreditExtended ?? 0),
-      icon: Wallet,
-      description: 'Admin loans to users'
     },
     {
       title: 'Platform Revenue',
@@ -255,27 +244,24 @@ export const FinancialOverviewPanel: React.FC = () => {
               {walletTransactions.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">No transactions</p>
               ) : (
-                walletTransactions.slice(0, 10).map((tx) => {
-                  const isCredit = tx.type === 'deposit' || tx.type === 'credit_loan';
-                  const displayType = tx.type === 'credit_loan' ? 'Platform Credit' : tx.type;
-                  return (
+                walletTransactions.slice(0, 10).map((tx) => (
                   <div key={tx.id} className="flex items-center justify-between p-2 border rounded">
                     <div>
                       <p className="text-sm font-medium">{tx.username}</p>
-                      <p className="text-xs text-muted-foreground">{displayType}</p>
+                      <p className="text-xs text-muted-foreground">{tx.type}</p>
                     </div>
                     <div className="text-right">
                       <p className={`text-sm font-medium ${
-                        isCredit ? 'text-green-600' : 'text-red-600'
+                        tx.type === 'deposit' ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {isCredit ? '+' : '-'}{formatCurrency(tx.amount_cents / 100)}
+                        {tx.type === 'deposit' ? '+' : '-'}{formatCurrency(tx.amount_cents / 100)}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {new Date(tx.created_at).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
-                );})
+                ))
               )}
             </div>
           </CardContent>

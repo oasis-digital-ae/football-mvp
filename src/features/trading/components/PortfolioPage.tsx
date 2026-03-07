@@ -230,7 +230,7 @@ const PortfolioPage: React.FC = () => {
   }, [portfolio, matchdayChanges, getTransactionsByClub]);
 
   // Memoized KPI calculations
-  const { totalInvested, totalMarketValue, totalUnrealizedPnl, totalProfitLoss } = useMemo(() => {
+  const { totalInvested, totalMarketValue, totalUnrealizedPnl, totalRealizedPnl, totalProfitLoss } = useMemo(() => {
     // Calculate net invested and P&L breakdown from portfolio items
     // Use Decimal for precision to prevent rounding drift
     let invested = toDecimal(0);
@@ -255,6 +255,7 @@ const PortfolioPage: React.FC = () => {
       totalInvested: roundForDisplay(invested),
       totalMarketValue: roundForDisplay(marketValue),
       totalUnrealizedPnl: roundForDisplay(unrealizedPnl),
+      totalRealizedPnl: roundForDisplay(realizedPnl),
       totalProfitLoss: roundForDisplay(totalPnl)
     };
   }, [portfolio]);
@@ -384,6 +385,8 @@ const PortfolioPage: React.FC = () => {
       }
     }
     
+    const unrealizedPnl = item.unrealizedPnl ?? 0;
+    const realizedPnl = item.realizedPnl ?? 0;
     const profitLoss = item.profitLoss;
     const portfolioPercent = calculatePortfolioPercentage(item.totalValue, totalMarketValue);
     
@@ -409,7 +412,8 @@ const PortfolioPage: React.FC = () => {
           {percentChange > 0 ? '+' : ''}{percentChange.toFixed(2)}%
         </td>
         <td className="px-3 text-right font-mono">{formatCurrency(item.totalValue)}</td>
-        <td className="px-3 text-right font-semibold text-trading-primary">{portfolioPercent.toFixed(2)}%</td>
+        <td className="px-3 text-right font-semibold text-trading-primary">{portfolioPercent.toFixed(2)}%</td>        {pnlCell(unrealizedPnl)}
+        {pnlCell(realizedPnl)}
         {pnlCell(profitLoss)}
         <td className="px-3 text-center" onClick={(e) => e.stopPropagation()}>
           {tradingWindowStatus.get(item.clubId) === false ? (
@@ -461,9 +465,8 @@ const PortfolioPage: React.FC = () => {
           <h1 className="text-lg sm:text-xl md:text-2xl font-bold">Welcome, {profile.first_name || (profile.full_name ? profile.full_name.split(' ')[0] : 'User')}</h1>
         </div>
       )}
-        {/* Portfolio Overview Cards - Grouped for clarity */}
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 lg:gap-4">
+        {/* Portfolio Overview Cards - Mobile Optimized */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-3 lg:gap-4">
         {/* Cost */}
         <Card className="trading-card group">
           <CardContent className="p-3 sm:p-4 lg:p-6">
@@ -525,6 +528,33 @@ const PortfolioPage: React.FC = () => {
           </CardContent>
         </Card>
 
+        {/* Realized P&L */}
+        <Card className="trading-card group">
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-400 text-xs sm:text-sm font-medium mb-1 sm:mb-2">Realized P&L</p>
+                <p className={`text-lg sm:text-xl lg:text-2xl font-bold ${totalRealizedPnl === 0 ? 'text-gray-400' : totalRealizedPnl > 0 ? 'price-positive' : 'price-negative'}`}>
+                  {formatCurrency(totalRealizedPnl)}
+                </p>
+              </div>
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center group-hover:animate-bounce-gentle ${
+                totalRealizedPnl > 0 ? 'bg-gradient-success' : totalRealizedPnl < 0 ? 'bg-gradient-danger' : 'bg-gray-600'
+              }`}>
+                {totalRealizedPnl !== 0 ? (
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l9.2-9.2M17 17V7H7" />
+                  </svg>
+                ) : (
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                  </svg>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Total P&L */}
         <Card className="trading-card group">
           <CardContent className="p-3 sm:p-4 lg:p-6">
@@ -558,7 +588,6 @@ const PortfolioPage: React.FC = () => {
             </div>
           </CardContent>
         </Card>
-        </div>
       </div>
 
       {/* Holdings Table */}
@@ -589,15 +618,17 @@ const PortfolioPage: React.FC = () => {
                 <table className="trading-table w-full">
                   <thead>
                     <tr>
-                      <th className="text-left px-3 py-3">Club</th>
-                      <th className="text-right px-3 py-3">Units</th>
-                      <th className="text-right px-3 py-3">Avg Price</th>
-                      <th className="text-right px-3 py-3">Current</th>
-                      <th className="text-right px-3 py-3">% Chg</th>
-                      <th className="text-right px-3 py-3">Value</th>
-                      <th className="text-right px-3 py-3">% Port</th>
-                      <th className="text-right px-3 py-3">P&L</th>
-                      <th className="text-center px-3 py-3 w-24">Action</th>
+                      <th className="text-left px-3">Club</th>
+                      <th className="text-right px-3">Units</th>
+                      <th className="text-right px-3">Avg Price</th>
+                      <th className="text-right px-3">Current Price</th>
+                      <th className="text-right px-3">% Change</th>
+                      <th className="text-right px-3">Total Value</th>
+                      <th className="text-right px-3">% Portfolio</th>
+                      <th className="text-right px-3">Unrealized</th>
+                      <th className="text-right px-3">Realized</th>
+                      <th className="text-right px-3">Total P&L</th>
+                      <th className="text-center px-3">Action</th>
                     </tr>
                   </thead>
                   <tbody>

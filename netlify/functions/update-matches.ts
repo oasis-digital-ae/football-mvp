@@ -118,7 +118,7 @@ export const handler = schedule('*/30 * * * *', async (event: HandlerEvent): Pro
   }
 });
 
-export async function processUpdate() {
+async function processUpdate() {
   const results = {
     checked: 0,
     updated: 0,
@@ -163,16 +163,16 @@ export async function processUpdate() {
     }
 
     // Get fixtures that need updates
+    // - Status is scheduled or closed
+    // - Kickoff within last 2 hours or next 48 hours
     const now = new Date();
-    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const twoDaysLater = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-
-    // Query 1: Fixtures in active window (kickoff last 24h or next 48h)
-    const { data: windowedFixtures, error: fetchError } = await supabase
+    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+    const twoDaysLater = new Date(now.getTime() + 48 * 60 * 60 * 1000);    // Get fixtures that need updating (scheduled, live, or recently finished)
+    const { data: fixtures, error: fetchError } = await supabase
       .from('fixtures')
       .select('*')
-      .in('status', ['scheduled', 'live', 'closed'])
-      .gte('kickoff_at', twentyFourHoursAgo.toISOString())
+      .in('status', ['scheduled', 'live', 'closed']) // Include 'closed' for backward compatibility
+      .gte('kickoff_at', twoHoursAgo.toISOString())
       .lte('kickoff_at', twoDaysLater.toISOString());
 
     if (fetchError) {
@@ -180,32 +180,7 @@ export async function processUpdate() {
       throw new Error(`Failed to fetch fixtures: ${fetchError.message}`);
     }
 
-    // Query 2: Stuck fixtures (live/closed + pending) - may be outside 24h window
-    // These keep shares locked; must fetch regardless of when kickoff was
-    const { data: stuckFixtures, error: stuckError } = await supabase
-      .from('fixtures')
-      .select('*')
-      .in('status', ['live', 'closed'])
-      .or('result.is.null,result.eq.pending')
-      .not('external_id', 'is', null);
-
-    if (stuckError) {
-      console.warn('⚠️ Error fetching stuck fixtures:', stuckError);
-    }
-
-    // Merge and dedupe by fixture id
-    const fixtureMap = new Map<number, any>();
-    for (const f of windowedFixtures || []) {
-      fixtureMap.set(f.id, f);
-    }
-    for (const f of stuckFixtures || []) {
-      if (!fixtureMap.has(f.id)) {
-        fixtureMap.set(f.id, f);
-      }
-    }
-    const fixtures = Array.from(fixtureMap.values());
-
-    if (fixtures.length === 0) {
+    if (!fixtures || fixtures.length === 0) {
       console.log('✅ No fixtures need updating');
       return results;
     }
@@ -218,8 +193,7 @@ export async function processUpdate() {
         // Skip fixtures without external_id
         if (!fixture.external_id) {
           continue;
-        }
-        results.checked++;
+        }        results.checked++;
 
         const kickoffTime = new Date(fixture.kickoff_at);
         const buyCloseTime = new Date(kickoffTime.getTime() - 15 * 60 * 1000);
@@ -254,17 +228,13 @@ export async function processUpdate() {
 
             results.snapshots++;
           }
-        }
-        // Update match data from Football API
-        // ALWAYS update fixtures with live/closed + pending result (unlock shares after match ends)
-        // For scheduled fixtures, only update within 30min before kickoff to 6 hours after
+        }        // Update match data for fixtures that are potentially live or recently finished
+        // Check matches from 30 min before kickoff until 3 hours after kickoff
+        // This ensures we catch matches that start late or go into extra time
         const thirtyMinBeforeKickoff = new Date(kickoffTime.getTime() - 30 * 60 * 1000);
-        const sixHoursAfterKickoff = new Date(kickoffTime.getTime() + 6 * 60 * 60 * 1000);
-        const isStuckPending = (fixture.status === 'live' || fixture.status === 'closed') &&
-          (!fixture.result || fixture.result === 'pending');
-        const isInActiveWindow = now >= thirtyMinBeforeKickoff && now <= sixHoursAfterKickoff;
-
-        if (isStuckPending || isInActiveWindow) {
+        const threeHoursAfterKickoff = new Date(kickoffTime.getTime() + 3 * 60 * 60 * 1000);
+        
+        if (now >= thirtyMinBeforeKickoff && now <= threeHoursAfterKickoff) {
           console.log(`🔥 Updating match fixture ${fixture.id} (${fixture.status})`);
 
           // Fetch from Football API

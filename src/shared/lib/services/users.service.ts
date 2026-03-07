@@ -12,7 +12,6 @@ export interface UserListItem {
   email?: string;
   wallet_balance: number;
   total_deposits: number; // Total deposits made by user
-  credit_balance: number; // Net credit extended (loans minus reversals)
   total_invested: number;
   portfolio_value: number;  
   unrealized_pnl: number;
@@ -62,14 +61,6 @@ export interface WalletTransaction {
   type: string;
   ref?: string;
   created_at: string;
-}
-
-/** Enriched transaction with order/team details for purchase/sale */
-export interface WalletTransactionEnriched extends WalletTransaction {
-  order_id?: number;
-  team_name?: string;
-  quantity?: number;
-  price_per_share_cents?: number;
 }
 
 export const usersService = {
@@ -139,18 +130,6 @@ export const usersService = {
       (walletTransactions || []).forEach(tx => {
         const current = totalDepositsMap.get(tx.user_id) || 0;
         totalDepositsMap.set(tx.user_id, current + fromCents(tx.amount_cents || 0).toNumber());
-      });
-
-      // Get credit loans and reversals for credit balance per user
-      const { data: creditTransactions } = await supabase
-        .from('wallet_transactions')
-        .select('user_id, amount_cents')
-        .in('type', ['credit_loan', 'credit_loan_reversal']);
-
-      const creditBalanceMap = new Map<string, number>();
-      (creditTransactions || []).forEach(tx => {
-        const current = creditBalanceMap.get(tx.user_id) || 0;
-        creditBalanceMap.set(tx.user_id, current + fromCents(tx.amount_cents || 0).toNumber());
       });
 
       // Group orders by user to find last activity
@@ -256,8 +235,7 @@ export const usersService = {
           realizedPnl: 0,
           profitLoss: 0,
           positionsCount: 0
-        };        const creditBalance = Math.max(0, creditBalanceMap.get(profile.id) || 0);
-        return {
+        };        return {
           id: profile.id,
           username: profile.username || 'Unknown',
           first_name: profile.first_name,
@@ -265,7 +243,6 @@ export const usersService = {
           email: profile.email,
           wallet_balance: fromCents(profile.wallet_balance || 0).toNumber(),
           total_deposits: totalDepositsMap.get(profile.id) || 0,
-          credit_balance: creditBalance,
           total_invested: metrics.totalInvested,
           portfolio_value: metrics.portfolioValue,
           unrealized_pnl: metrics.unrealizedPnl,
@@ -612,13 +589,15 @@ export const usersService = {
       // Get total deposits for this user
       const { data: walletTransactions } = await supabase
         .from('wallet_transactions')
-        .select('amount_cents, type')
+        .select('amount_cents')
         .eq('user_id', userId)
-        .in('type', ['deposit', 'credit_loan', 'credit_loan_reversal']);
+        .eq('type', 'deposit');
 
       const totalDeposits = (walletTransactions || []).reduce((sum, tx) => {
         return sum + fromCents(tx.amount_cents || 0).toNumber();
-      }, 0);      return {
+      }, 0);
+
+      return {
         id: profile.id,
         username: profile.username || 'Unknown',
         first_name: profile.first_name,
@@ -629,7 +608,6 @@ export const usersService = {
         phone: profile.phone,
         wallet_balance: fromCents(profile.wallet_balance || 0).toNumber(),
         total_deposits: totalDeposits,
-        credit_balance: creditBalance,
         total_invested: totalInvested,
         portfolio_value: portfolioValue,
         unrealized_pnl: unrealizedPnl,
@@ -668,73 +646,7 @@ export const usersService = {
   },
 
   /**
-   * Get wallet transactions enriched with order/team details for purchase/sale.
-   * Enables admin to see exactly what was bought/sold (team name, quantity, price).
-   */
-  async getUserTransactionsEnriched(userId: string, limit = 100): Promise<WalletTransactionEnriched[]> {
-    try {
-      const { data: txs, error } = await supabase
-        .from('wallet_transactions')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-      if (error) throw error;
-      const transactions = (txs || []) as WalletTransaction[];
-
-      const orderIds = transactions
-        .filter((tx) => (tx.type === 'purchase' || tx.type === 'sale') && tx.ref?.startsWith('order_'))
-        .map((tx) => {
-          const match = tx.ref?.match(/order_(\d+)/);
-          return match ? parseInt(match[1], 10) : null;
-        })
-        .filter((id): id is number => id != null);
-
-      const orderMap = new Map<number, { team_name: string; quantity: number; price_per_share_cents: number }>();
-
-      if (orderIds.length > 0) {
-        const { data: orders } = await supabase
-          .from('orders')
-          .select('id, team_id, quantity, price_per_share, teams!inner(name)')
-          .eq('user_id', userId)
-          .in('id', orderIds);
-
-        if (orders) {
-          for (const o of orders) {
-            const team = o.teams as { name?: string };
-            orderMap.set(o.id, {
-              team_name: team?.name ?? 'Unknown',
-              quantity: Number(o.quantity),
-              price_per_share_cents: Number(o.price_per_share)
-            });
-          }
-        }
-      }
-
-      return transactions.map((tx) => {
-        const enriched: WalletTransactionEnriched = { ...tx };
-        if ((tx.type === 'purchase' || tx.type === 'sale') && tx.ref) {
-          const match = tx.ref.match(/order_(\d+)/);
-          const orderId = match ? parseInt(match[1], 10) : null;
-          if (orderId && orderMap.has(orderId)) {
-            const o = orderMap.get(orderId)!;
-            enriched.order_id = orderId;
-            enriched.team_name = o.team_name;
-            enriched.quantity = o.quantity;
-            enriched.price_per_share_cents = o.price_per_share_cents;
-          }
-        }
-        return enriched;
-      });
-    } catch (error) {
-      logger.error('Error fetching enriched transactions:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Credit user wallet (admin action) - records as deposit (e.g. Stripe, manual deposit)
+   * Credit user wallet (admin action)
    */
   async creditUserWallet(userId: string, amount: number, ref?: string): Promise<void> {
     try {
@@ -749,28 +661,6 @@ export const usersService = {
       if (error) throw error;
     } catch (error) {
       logger.error('Error crediting user wallet:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Credit user wallet as loan (admin action) - records as credit_loan, tracked separately
-   */
-  async creditUserWalletLoan(userId: string, amount: number, ref?: string): Promise<void> {
-    try {
-      const amountCents = Math.round(amount * 100);
-      // Always append timestamp to ensure unique ref (wallet_transactions has user_id+ref unique constraint)
-      const uniqueRef = ref ? `${ref}_${Date.now()}` : `credit_loan_${Date.now()}`;
-      const { error } = await supabase.rpc('credit_wallet_loan', {
-        p_user_id: userId,
-        p_amount_cents: amountCents,
-        p_ref: uniqueRef,
-        p_currency: 'usd'
-      });
-
-      if (error) throw error;
-    } catch (error) {
-      logger.error('Error crediting user wallet loan:', error);
       throw error;
     }
   }

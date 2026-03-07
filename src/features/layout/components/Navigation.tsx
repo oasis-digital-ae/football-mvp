@@ -26,7 +26,6 @@ import { useAuth } from '@/features/auth/contexts/AuthContext';
 import { AppContext } from '@/features/trading/contexts/AppContext';
 import { DepositModal } from '@/features/trading/components/DepositModal';
 import { formatCurrency } from '@/shared/lib/formatters';
-import { useNetWorth } from '@/shared/hooks/useNetWorth';
 import {
   Trophy,
   Briefcase,
@@ -51,7 +50,7 @@ interface NavigationProps {
 }
 
 const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) => {
-  const { signOut, profile, walletBalance, creditBalance, refreshWalletBalance, isAdmin, user, totalDeposits } = useAuth();
+  const { signOut, profile, walletBalance, refreshWalletBalance, isAdmin, user, totalDeposits } = useAuth();
   const [depositModalOpen, setDepositModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
@@ -87,36 +86,28 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
     } catch (error) {
       console.error('Error signing out:', error);
     }
-  };  // Handle Net Worth dialog opening with data refresh
+  };
+
+  // Handle Net Worth dialog opening with data refresh
   const handleNetWorthClick = async () => {
     setNetWorthDialogOpen(true);
-    // Refresh wallet balance, credit balance, and portfolio values
-    try {
-      await refreshWalletBalance();
-      if (refreshData) {
+    // Refresh data to get latest portfolio values after matches
+    if (refreshData) {
+      try {
         await refreshData();
+      } catch (error) {
+        console.error('Error refreshing data:', error);
       }
-    } catch (error) {
-      console.error('Error refreshing data:', error);
     }
   };
 
-  // Use centralized Net Worth calculation hook
-  const {
-    netWorth,
-    portfolioValue,
-    pnl,
-    pnlPercentage,
-    isProfit,
-    isLoss,
-    isBreakEven,
-    totalDepositsWithCredit,
-  } = useNetWorth({
-    portfolioValue: totalMarketValue || 0,
-    walletBalance,
-    creditBalance,
-    totalDeposits,
-  });
+  // Calculate Net Worth values
+  const portfolioValue = totalMarketValue || 0;
+  const netWorth = walletBalance + portfolioValue;
+  const pnl = netWorth - totalDeposits;
+  const isProfit = pnl > 0;
+  const isLoss = pnl < 0;
+  const isBreakEven = pnl === 0;
   
   return (
     <>
@@ -391,9 +382,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
-        </AlertDialog>        
-        
-        {/* Net Worth Dialog */}
+        </AlertDialog>        {/* Net Worth Dialog */}
         <AlertDialog open={netWorthDialogOpen} onOpenChange={setNetWorthDialogOpen}>
           <AlertDialogContent className="bg-gray-800 border-gray-700 text-white max-w-lg">
             <AlertDialogHeader>
@@ -409,20 +398,15 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
                 {formatCurrency(netWorth)}
               </div>
               <div className="text-sm text-gray-400">
-                Net Worth
+                Current total value
               </div>
-            </div>            
-            
-            {/* Horizontal Divider */}
-            <div className="border-t border-gray-700"></div>
-
-            {/* Two Column Layout */}
-            <div className="grid grid-cols-[1fr_auto_1fr] gap-0 py-6">              
-              
-              {/* Assets Column */}
+            </div>            {/* Horizontal Divider */}
+            <div className="border-t border-gray-700"></div>            {/* Two Column Layout */}
+            <div className="grid grid-cols-[1fr_auto_1fr] gap-0 py-6">
+              {/* Net Worth Column */}
               <div className="space-y-4 pr-4">
-                <h3 className="text-sm font-semibold text-white mb-4">Assets</h3>
-
+                <h3 className="text-sm font-semibold text-white mb-4">Net Worth</h3>
+                
                 {/* Portfolio Value Row */}
                 <div className="flex justify-between items-center py-2">
                   <span className="text-gray-400 text-sm">Portfolio Value</span>
@@ -434,70 +418,38 @@ const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) =>
                   <span className="text-gray-400 text-sm">Wallet Balance</span>
                   <span className="text-white font-medium text-sm">{formatCurrency(walletBalance)}</span>
                 </div>
-
-                {/* Total Assets Row */}
-                <div className="flex justify-between items-center py-2 border-t border-gray-700/50 pt-3">
-                  <span className="text-gray-400 text-sm">Total Assets</span>
-                  <span className="text-white font-semibold text-sm">{formatCurrency(portfolioValue + walletBalance)}</span>
-                </div>
                 
-                {/* Credit Balance Row - Show as liability if exists */}
-                {/* {creditBalance > 0 && (
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-gray-400 text-sm">Credit (Liability)</span>
-                    <span className="text-red-400 font-medium text-sm">-{formatCurrency(creditBalance)}</span>
-                  </div>
-                )} */}
-
-                {/* Net Worth Row - Only show if credit exists */}
-                {/* {creditBalance > 0 && (
-                  <div className="flex justify-between items-center py-2 border-t border-gray-700/50 pt-3">
-                    <span className="text-gray-400 text-sm font-semibold">Net Worth</span>
-                    <span className="text-white font-bold text-sm">{formatCurrency(netWorth)}</span>
-                  </div>
-                )} */}
-              </div>
+                {/* Total Value Row */}
+                <div className="flex justify-between items-center py-2 border-t border-gray-700/50 pt-3">
+                  <span className="text-gray-400 text-sm">Total Value</span>
+                  <span className="text-white font-semibold text-sm">{formatCurrency(netWorth)}</span>
+                </div>              </div>
 
               {/* Vertical Divider */}
-              <div className="border-l border-gray-700"></div>              
-              
+              <div className="border-l border-gray-700"></div>
+
               {/* Performance Column */}
               <div className="space-y-4 pl-4">
                 <h3 className="text-sm font-semibold text-white mb-4">Performance</h3>
                 
-                {/* Actual Cash Deposited Row */}
+                {/* Total Deposited Row */}
                 <div className="flex justify-between items-center py-2">
-                  <span className="text-gray-400 text-sm">Cash Deposited</span>
+                  <span className="text-gray-400 text-sm">Total Deposited</span>
                   <span className="text-white font-medium text-sm">{formatCurrency(totalDeposits)}</span>
                 </div>
                 
-                {/* Credit Deposited Row - Only show if credit exists */}
-                {creditBalance > 0 && (
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-gray-400 text-sm">Credit Deposited</span>
-                    <span className="text-amber-400 font-medium text-sm">+{formatCurrency(creditBalance)}</span>
-                  </div>
-                )}
-                
-                {/* Total Deposited Row - Only show if credit exists */}
-                {/* {creditBalance > 0 && (
-                  <div className="flex justify-between items-center py-2 border-t border-gray-700/50 pt-2">
-                    <span className="text-gray-400 text-sm">Total Deposited</span>
-                    <span className="text-white font-medium text-sm">{formatCurrency(totalDepositsWithCredit)}</span>
-                  </div>
-                )} */}
-                
                 {/* Overall P&L Row */}
-                <div className="flex justify-between items-center py-2 border-t border-gray-700/50 mt-2">
-                  <span className="text-gray-400 text-sm">P&L</span>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-gray-400 text-sm">Overall P&L</span>
                   <span className={`font-medium text-sm ${
                     isProfit ? 'text-green-400' : isLoss ? 'text-red-400' : 'text-white'
                   }`}>
                     {isProfit ? '+' : ''}
+                    {isLoss ? '-' : ''}
                     {formatCurrency(Math.abs(pnl))}
-                    {!isBreakEven && totalDepositsWithCredit !== 0 && (
+                    {!isBreakEven && totalDeposits !== 0 && (
                       <span className="ml-1">
-                        ({isProfit ? '+' : ''}{pnlPercentage}%)
+                        ({isProfit ? '+' : '-'}{Math.abs((pnl / totalDeposits) * 100).toFixed(2)}%)
                       </span>
                     )}
                   </span>
